@@ -38,6 +38,12 @@ pub struct EligibilityFilter {
 
 impl EligibilityFilter {
     pub fn new(filters: &FiltersConfig) -> Result<Self, FilterError> {
+        for country in &filters.countries {
+            if country != "NL" {
+                return Err(FilterError::UnsupportedCountry(country.clone()));
+            }
+        }
+
         let mut include_patterns = Vec::new();
 
         for family in &filters.include_families {
@@ -153,6 +159,8 @@ fn resolved_countries<'a>(
 pub enum FilterError {
     #[error("unresolved location labels: {0:?}")]
     UnresolvedLocation(Vec<String>),
+    #[error("unsupported filter country: {0}")]
+    UnsupportedCountry(String),
     #[error("unknown included family: {0}")]
     UnknownFamily(String),
     #[error("invalid {kind} pattern `{pattern}`: {message}")]

@@ -90,3 +90,13 @@ fn unresolved_location_makes_the_result_incomplete() {
         FilterError::UnresolvedLocation(vec!["Hybrid".into()])
     );
 }
+
+#[test]
+fn rejects_filters_that_include_a_non_nl_country() {
+    let mut config = filters();
+    config.countries.push("DE".into());
+
+    let error = EligibilityFilter::new(&config).unwrap_err();
+
+    assert_eq!(error, FilterError::UnsupportedCountry("DE".into()));
+}
