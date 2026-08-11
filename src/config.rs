@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fs, path::Path};
 
+use ratatui::style::Color;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -250,25 +251,24 @@ fn validate_country(country: &str, field: String) -> Result<(), ConfigError> {
 
 fn is_supported_colour(value: &str) -> bool {
     matches!(
-        value,
-        "reset"
-            | "black"
-            | "red"
-            | "green"
-            | "yellow"
-            | "blue"
-            | "magenta"
-            | "cyan"
-            | "gray"
-            | "dark-gray"
-            | "light-red"
-            | "light-green"
-            | "light-yellow"
-            | "light-blue"
-            | "light-magenta"
-            | "light-cyan"
-            | "white"
-    ) || (value.len() == 7
-        && value.starts_with('#')
-        && value.bytes().skip(1).all(|byte| byte.is_ascii_hexdigit()))
+        value.parse(),
+        Ok(Color::Reset
+            | Color::Black
+            | Color::Red
+            | Color::Green
+            | Color::Yellow
+            | Color::Blue
+            | Color::Magenta
+            | Color::Cyan
+            | Color::Gray
+            | Color::DarkGray
+            | Color::LightRed
+            | Color::LightGreen
+            | Color::LightYellow
+            | Color::LightBlue
+            | Color::LightMagenta
+            | Color::LightCyan
+            | Color::White
+            | Color::Rgb(_, _, _))
+    )
 }
