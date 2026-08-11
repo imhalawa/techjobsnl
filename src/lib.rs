@@ -3,5 +3,6 @@
 pub mod config;
 pub mod domain;
 pub mod filter;
+pub mod scanner;
 pub mod sources;
 pub mod storage;

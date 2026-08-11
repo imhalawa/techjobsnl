@@ -19,6 +19,7 @@ pub enum SourceErrorKind {
     RateLimit,
     Schema,
     Browser,
+    Storage,
 }
 
 impl fmt::Display for SourceErrorKind {
@@ -29,6 +30,7 @@ impl fmt::Display for SourceErrorKind {
             Self::RateLimit => "rate-limit",
             Self::Schema => "schema",
             Self::Browser => "browser",
+            Self::Storage => "storage",
         };
         formatter.write_str(name)
     }
@@ -42,6 +44,35 @@ pub struct ScanFailure {
 
 #[derive(Debug, Clone)]
 pub enum ScanEvent {
+    RunStarted {
+        run_id: String,
+        company_count: usize,
+    },
+    CompanyStarted {
+        company_id: String,
+    },
+    CompanyCompleted {
+        company_id: String,
+        observed_count: usize,
+        eligible_count: usize,
+    },
+    CompanyFailed {
+        company_id: String,
+        kind: SourceErrorKind,
+        diagnostic: String,
+    },
+    CompanyIncomplete {
+        company_id: String,
+        diagnostic: String,
+        observed_count: usize,
+    },
+    RunFinished {
+        run_id: String,
+        completed: usize,
+        failed: usize,
+        incomplete: usize,
+    },
+    // Retained for compatibility with the source-level event contract.
     Started {
         company_id: String,
     },

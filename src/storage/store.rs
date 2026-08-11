@@ -510,5 +510,6 @@ fn source_error_kind(kind: SourceErrorKind) -> &'static str {
         SourceErrorKind::RateLimit => "rate-limit",
         SourceErrorKind::Schema => "schema",
         SourceErrorKind::Browser => "browser",
+        SourceErrorKind::Storage => "storage",
     }
 }
