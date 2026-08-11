@@ -1,0 +1,274 @@
+use std::{collections::HashMap, fs, path::Path};
+
+use serde::Deserialize;
+use thiserror::Error;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Config {
+    pub schema_version: u32,
+    pub database_path: String,
+    pub companies: Vec<CompanyConfig>,
+    pub filters: FiltersConfig,
+    pub scan: ScanConfig,
+    pub ui: UiConfig,
+    pub keybindings: KeybindingsConfig,
+}
+
+impl Config {
+    pub fn load(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
+        let path = path.as_ref();
+        let contents = fs::read_to_string(path).map_err(|source| ConfigError::Read {
+            path: path.display().to_string(),
+            source,
+        })?;
+        let config: Self = toml::from_str(&contents).map_err(|source| ConfigError::Parse {
+            path: path.display().to_string(),
+            source,
+        })?;
+
+        config.validate()?;
+        Ok(config)
+    }
+
+    pub fn validate(&self) -> Result<(), ConfigError> {
+        if self.schema_version != 1 {
+            return Err(ConfigError::invalid("schema_version", "must be exactly 1"));
+        }
+        if self.scan.concurrency == 0 {
+            return Err(ConfigError::invalid(
+                "scan.concurrency",
+                "must be greater than zero",
+            ));
+        }
+        if self.scan.timeout_seconds == 0 {
+            return Err(ConfigError::invalid(
+                "scan.timeout_seconds",
+                "must be greater than zero",
+            ));
+        }
+
+        for (index, country) in self.filters.countries.iter().enumerate() {
+            validate_country(country, format!("filters.countries[{index}]"))?;
+        }
+
+        let mut company_ids = std::collections::HashSet::new();
+        for (index, company) in self.companies.iter().enumerate() {
+            let id_path = format!("companies[{index}].id");
+            if company.id.trim().is_empty() {
+                return Err(ConfigError::invalid(id_path, "must not be empty"));
+            }
+            if !company_ids.insert(company.id.as_str()) {
+                return Err(ConfigError::invalid(id_path, "must be unique"));
+            }
+            for (location, country) in &company.location_country_overrides {
+                validate_country(
+                    country,
+                    format!("companies[{index}].location_country_overrides.{location}"),
+                )?;
+            }
+            match &company.source {
+                SourceConfig::Ashby { board } if board.trim().is_empty() => {
+                    return Err(ConfigError::invalid(
+                        format!("companies[{index}].source.board"),
+                        "must not be empty",
+                    ));
+                }
+                SourceConfig::Ashby { .. } => {}
+            }
+        }
+
+        if !matches!(self.ui.theme.as_str(), "clean-dark" | "clean-light") {
+            return Err(ConfigError::invalid(
+                "ui.theme",
+                "must be one of: clean-dark, clean-light",
+            ));
+        }
+        self.ui.theme_overrides.validate()?;
+        self.keybindings.validate()
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ConfigError {
+    #[error("could not read configuration {path}: {source}")]
+    Read {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("could not parse configuration {path}: {source}")]
+    Parse {
+        path: String,
+        #[source]
+        source: toml::de::Error,
+    },
+    #[error("invalid configuration at {field}: {message}")]
+    Invalid { field: String, message: String },
+}
+
+impl ConfigError {
+    fn invalid(field: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::Invalid {
+            field: field.into(),
+            message: message.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CompanyConfig {
+    pub id: String,
+    pub name: String,
+    pub enabled: bool,
+    #[serde(default)]
+    pub location_country_overrides: HashMap<String, String>,
+    pub source: SourceConfig,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "strategy", rename_all = "kebab-case")]
+pub enum SourceConfig {
+    Ashby { board: String },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FiltersConfig {
+    pub countries: Vec<String>,
+    pub include_families: Vec<String>,
+    pub include_title_patterns: Vec<String>,
+    pub exclude_title_patterns: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ScanConfig {
+    pub concurrency: usize,
+    pub timeout_seconds: u64,
+    pub retry_count: u32,
+    pub user_agent: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UiConfig {
+    pub theme: String,
+    pub unicode_icons: bool,
+    #[serde(default)]
+    pub theme_overrides: ThemeOverrides,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ThemeOverrides {
+    pub background: Option<String>,
+    pub focused_border: Option<String>,
+    pub unfocused_border: Option<String>,
+    pub selected_row: Option<String>,
+    pub primary_text: Option<String>,
+    pub muted_text: Option<String>,
+    pub open: Option<String>,
+    pub new: Option<String>,
+    pub applied: Option<String>,
+    pub warning: Option<String>,
+    pub error: Option<String>,
+}
+
+impl ThemeOverrides {
+    fn validate(&self) -> Result<(), ConfigError> {
+        for (token, value) in [
+            ("background", &self.background),
+            ("focused_border", &self.focused_border),
+            ("unfocused_border", &self.unfocused_border),
+            ("selected_row", &self.selected_row),
+            ("primary_text", &self.primary_text),
+            ("muted_text", &self.muted_text),
+            ("open", &self.open),
+            ("new", &self.new),
+            ("applied", &self.applied),
+            ("warning", &self.warning),
+            ("error", &self.error),
+        ] {
+            if let Some(value) = value
+                && !is_supported_colour(value)
+            {
+                return Err(ConfigError::invalid(
+                    format!("ui.theme_overrides.{token}"),
+                    "must be a named ANSI colour or #RRGGBB",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct KeybindingsConfig {
+    pub scan: String,
+    pub search: String,
+    pub filter: String,
+    pub toggle_applied: String,
+    pub history: String,
+    pub open: String,
+    pub help: String,
+    pub quit: String,
+}
+
+impl KeybindingsConfig {
+    fn validate(&self) -> Result<(), ConfigError> {
+        let bindings = [
+            ("scan", &self.scan),
+            ("search", &self.search),
+            ("filter", &self.filter),
+            ("toggle_applied", &self.toggle_applied),
+            ("history", &self.history),
+            ("open", &self.open),
+            ("help", &self.help),
+            ("quit", &self.quit),
+        ];
+        let mut values = std::collections::HashSet::new();
+        for (name, binding) in bindings {
+            if !values.insert(binding) {
+                return Err(ConfigError::invalid(
+                    format!("keybindings.{name}"),
+                    "must not duplicate another keybinding",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_country(country: &str, field: String) -> Result<(), ConfigError> {
+    let is_country_code =
+        country.len() == 2 && country.bytes().all(|byte| byte.is_ascii_uppercase());
+    if is_country_code {
+        Ok(())
+    } else {
+        Err(ConfigError::invalid(
+            field,
+            "must be a two-letter uppercase ASCII country code",
+        ))
+    }
+}
+
+fn is_supported_colour(value: &str) -> bool {
+    matches!(
+        value,
+        "reset"
+            | "black"
+            | "red"
+            | "green"
+            | "yellow"
+            | "blue"
+            | "magenta"
+            | "cyan"
+            | "gray"
+            | "dark-gray"
+            | "light-red"
+            | "light-green"
+            | "light-yellow"
+            | "light-blue"
+            | "light-magenta"
+            | "light-cyan"
+            | "white"
+    ) || (value.len() == 7
+        && value.starts_with('#')
+        && value.bytes().skip(1).all(|byte| byte.is_ascii_hexdigit()))
+}
