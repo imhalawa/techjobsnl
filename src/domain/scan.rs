@@ -1,4 +1,5 @@
 use super::ObservedJob;
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum SourceScan {
@@ -18,6 +19,19 @@ pub enum SourceErrorKind {
     RateLimit,
     Schema,
     Browser,
+}
+
+impl fmt::Display for SourceErrorKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Configuration => "configuration",
+            Self::Transport => "transport",
+            Self::RateLimit => "rate-limit",
+            Self::Schema => "schema",
+            Self::Browser => "browser",
+        };
+        formatter.write_str(name)
+    }
 }
 
 #[derive(Debug, Clone)]

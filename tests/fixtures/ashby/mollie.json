@@ -1,0 +1,116 @@
+{
+  "jobs": [
+    {
+      "id": "platform-1",
+      "title": "Senior Platform Engineer",
+      "department": "Engineering",
+      "team": "Developer Enablement",
+      "employmentType": "FullTime",
+      "location": "Amsterdam",
+      "secondaryLocations": [
+        {
+          "location": "Amsterdam",
+          "address": {
+            "postalAddress": {
+              "addressRegion": "Noord-Holland",
+              "streetAddress": "Keizersgracht 126",
+              "addressCountry": "Netherlands",
+              "addressLocality": "Amsterdam"
+            }
+          }
+        }
+      ],
+      "publishedAt": "2026-08-01T09:30:00Z",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "address": {
+        "postalAddress": {
+          "addressRegion": "Noord-Holland",
+          "streetAddress": "Keizersgracht 126",
+          "addressCountry": "Netherlands",
+          "addressLocality": "Amsterdam"
+        }
+      },
+      "jobUrl": "https://jobs.example.test/mollie/platform-1",
+      "applyUrl": "https://jobs.example.test/mollie/platform-1/application",
+      "descriptionHtml": "<p>Build and operate CI/CD infrastructure.</p>",
+      "descriptionPlain": "Build and operate CI/CD infrastructure."
+    },
+    {
+      "id": "software-pt-1",
+      "title": "Software Engineer",
+      "department": "Engineering",
+      "team": "Payments",
+      "employmentType": "FullTime",
+      "location": "Lisbon",
+      "secondaryLocations": [
+        {
+          "location": "Porto",
+          "address": {
+            "postalAddress": {
+              "addressRegion": "Porto",
+              "streetAddress": "Rua das Flores 1",
+              "addressCountry": "Portugal",
+              "addressLocality": "Porto"
+            }
+          }
+        }
+      ],
+      "publishedAt": "2026-08-02T10:45:00+00:00",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "address": {
+        "postalAddress": {
+          "addressRegion": "Lisboa",
+          "streetAddress": "Avenida da Liberdade 1",
+          "addressCountry": "Portugal",
+          "addressLocality": "Lisbon"
+        }
+      },
+      "jobUrl": "https://jobs.example.test/mollie/software-pt-1",
+      "applyUrl": "https://jobs.example.test/mollie/software-pt-1/application",
+      "descriptionHtml": "<p>Develop reliable payment services.</p>",
+      "descriptionPlain": "Develop reliable payment services."
+    },
+    {
+      "id": "support-1",
+      "title": "Customer Support Specialist",
+      "department": "Go To Market",
+      "team": "Business Support",
+      "employmentType": "FullTime",
+      "location": "Amsterdam",
+      "secondaryLocations": [
+        {
+          "location": "Maastricht",
+          "address": {
+            "postalAddress": {
+              "addressRegion": "Limburg",
+              "streetAddress": "Sphinxcour 6",
+              "addressCountry": "Netherlands",
+              "addressLocality": "Maastricht"
+            }
+          }
+        }
+      ],
+      "publishedAt": "2026-08-03T11:15:00Z",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "OnSite",
+      "address": {
+        "postalAddress": {
+          "addressRegion": "Noord-Holland",
+          "streetAddress": "Keizersgracht 126",
+          "addressCountry": "Netherlands",
+          "addressLocality": "Amsterdam"
+        }
+      },
+      "jobUrl": "https://jobs.example.test/mollie/support-1",
+      "applyUrl": "https://jobs.example.test/mollie/support-1/application",
+      "descriptionHtml": "<p>Help merchants resolve product questions.</p>",
+      "descriptionPlain": "Help merchants resolve product questions."
+    }
+  ],
+  "apiVersion": "1"
+}
