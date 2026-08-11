@@ -7,6 +7,15 @@ pub struct JobKey {
     pub source_id: String,
 }
 
+impl JobKey {
+    pub fn new(company_id: impl Into<String>, source_id: impl Into<String>) -> Self {
+        Self {
+            company_id: company_id.into(),
+            source_id: source_id.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservedJob {
     pub source_id: String,
@@ -39,7 +48,11 @@ pub struct Eligibility {
 pub struct JobRecord {
     pub key: JobKey,
     pub classified: ClassifiedJob,
+    pub source_open: bool,
+    pub is_new: bool,
     pub first_seen_at: DateTime<Utc>,
     pub last_seen_at: DateTime<Utc>,
+    pub closed_at: Option<DateTime<Utc>>,
+    pub reopened_at: Option<DateTime<Utc>>,
     pub applied_at: Option<DateTime<Utc>>,
 }

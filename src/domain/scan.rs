@@ -21,6 +21,12 @@ pub enum SourceErrorKind {
 }
 
 #[derive(Debug, Clone)]
+pub struct ScanFailure {
+    pub kind: SourceErrorKind,
+    pub diagnostic: String,
+}
+
+#[derive(Debug, Clone)]
 pub enum ScanEvent {
     Started {
         company_id: String,
