@@ -238,7 +238,7 @@ async fn retryable_timeouts_use_the_configured_retry_budget() {
             company_id: "eventual".into(),
             attempts: Arc::clone(&attempts),
             failures_before_success: 2,
-            error_kind: SourceErrorKind::Transport,
+            error_kind: SourceErrorKind::Timeout,
             http_status: None,
             retry_after: None,
             retryable: true,
@@ -363,6 +363,39 @@ async fn retry_after_overrides_the_fallback_backoff() {
     assert_eq!(summary.completed, 1);
     assert_eq!(attempts.load(Ordering::SeqCst), 2);
     assert!(started_at.elapsed() >= Duration::from_millis(600));
+}
+
+#[tokio::test]
+async fn a_statusless_non_timeout_transport_error_is_not_retried() {
+    let companies = vec![company("connection")];
+    let store = store_for(&companies);
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let service = service_with_scan_config(
+        vec![Arc::new(RetrySource {
+            company_id: "connection".into(),
+            attempts: Arc::clone(&attempts),
+            failures_before_success: 1,
+            error_kind: SourceErrorKind::Transport,
+            http_status: None,
+            retry_after: Some(Duration::ZERO),
+            retryable: true,
+            observations: vec![observed("job-1", "Amsterdam", &["NL"])],
+        })],
+        companies,
+        store,
+        ScanConfig {
+            concurrency: 1,
+            timeout_seconds: 20,
+            retry_count: 1,
+            user_agent: "job-watch-test/0.1".into(),
+        },
+    );
+    let (tx, _rx) = mpsc::unbounded_channel();
+
+    let summary = service.run("run-1", tx).await;
+
+    assert_eq!(summary.failed, 1);
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]

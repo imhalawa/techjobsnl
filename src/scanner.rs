@@ -63,7 +63,7 @@ impl ScanService {
         });
 
         let company_scans = self.sources.iter().cloned().map(|source| {
-            let company = self.companies.get(source_company_id(&source)).cloned();
+            let company = self.companies.get(source.company_id()).cloned();
             scan_one(
                 source,
                 company,
@@ -126,70 +126,52 @@ impl ScanService {
 
     fn persist_outcome(&self, run_id: &str, scan: CompanyScan) -> CompanyOutcome {
         let Some(company) = scan.company else {
-            return CompanyOutcome::Failed {
-                failure: ScanFailure {
-                    kind: SourceErrorKind::Configuration,
-                    diagnostic: format!(
-                        "source company `{}` has no matching company configuration",
-                        scan.company_id
-                    ),
-                },
-                started_at: scan.started_at,
-                completed_at: scan.completed_at,
-            };
+            return scan.outcome;
         };
 
         let mut store = match self.store.lock() {
             Ok(store) => store,
             Err(error) => {
-                return storage_failure(
-                    format!("could not lock job store: {error}"),
-                    scan.started_at,
-                    scan.completed_at,
-                );
+                return storage_failure(format!("could not lock job store: {error}"));
             }
         };
         let storage_result = match &scan.outcome {
-            CompanyOutcome::Complete {
+            CompanyOutcome::Complete { jobs, .. } => store.record_complete_scan(
+                run_id,
+                &company,
                 jobs,
-                started_at,
-                completed_at,
-                ..
-            } => store.record_complete_scan(run_id, &company, jobs, *started_at, *completed_at),
+                scan.window.started_at,
+                scan.window.completed_at,
+            ),
             CompanyOutcome::Incomplete {
                 diagnostic,
                 observed_count,
-                started_at,
-                completed_at,
             } => store.record_incomplete_scan(
                 run_id,
                 &company,
                 diagnostic,
                 *observed_count,
-                *started_at,
-                *completed_at,
+                scan.window.started_at,
+                scan.window.completed_at,
             ),
-            CompanyOutcome::Failed {
+            CompanyOutcome::Failed { failure } => store.record_failed_scan(
+                run_id,
+                &company,
                 failure,
-                started_at,
-                completed_at,
-            } => store.record_failed_scan(run_id, &company, failure, *started_at, *completed_at),
+                scan.window.started_at,
+                scan.window.completed_at,
+            ),
         };
         drop(store);
 
         match storage_result {
             Ok(()) => scan.outcome,
-            Err(error) => storage_failure(
-                format!("could not record scan for {}: {error}", scan.company_id),
-                scan.started_at,
-                scan.completed_at,
-            ),
+            Err(error) => storage_failure(format!(
+                "could not record scan for {}: {error}",
+                scan.company_id
+            )),
         }
     }
-}
-
-fn source_company_id(source: &Arc<dyn JobSource>) -> &str {
-    source.company_id()
 }
 
 async fn scan_one(
@@ -204,35 +186,41 @@ async fn scan_one(
     let _ = event_tx.send(ScanEvent::CompanyStarted {
         company_id: company_id.clone(),
     });
+    let Some(company_config) = company.as_ref() else {
+        return CompanyScan {
+            company_id: company_id.clone(),
+            company,
+            window: ScanWindow {
+                started_at,
+                completed_at: Utc::now(),
+            },
+            outcome: CompanyOutcome::Failed {
+                failure: ScanFailure {
+                    kind: SourceErrorKind::Configuration,
+                    diagnostic: format!(
+                        "source company `{company_id}` has no matching company configuration"
+                    ),
+                },
+            },
+        };
+    };
 
     let source_scan = scan_with_retry(source.as_ref(), retry_count).await;
     let completed_at = Utc::now();
-    let outcome = match (source_scan, company.as_ref()) {
-        (Err(error), _) => CompanyOutcome::Failed {
+    let outcome = match source_scan {
+        Err(error) => CompanyOutcome::Failed {
             failure: source_failure(error),
-            started_at,
-            completed_at,
         },
-        (Ok(_), None) => CompanyOutcome::Failed {
-            failure: ScanFailure {
-                kind: SourceErrorKind::Configuration,
-                diagnostic: format!(
-                    "source company `{company_id}` has no matching company configuration"
-                ),
-            },
-            started_at,
-            completed_at,
-        },
-        (Ok(source_scan), Some(company)) => {
-            classify_scan(source_scan, company, filter, started_at, completed_at)
-        }
+        Ok(source_scan) => classify_scan(source_scan, company_config, filter),
     };
 
     CompanyScan {
         company_id,
         company,
-        started_at,
-        completed_at,
+        window: ScanWindow {
+            started_at,
+            completed_at,
+        },
         outcome,
     }
 }
@@ -261,15 +249,12 @@ fn should_retry(error: &SourceError) -> bool {
         return false;
     }
 
-    match (error.kind, error.http_status) {
-        (SourceErrorKind::RateLimit, Some(429)) => true,
-        (SourceErrorKind::Transport, Some(408)) => true,
-        (SourceErrorKind::Transport, Some(500..=599)) => true,
-        // Reqwest timeout errors do not necessarily carry an HTTP status. The adapter's
-        // retryable flag is the typed retry metadata for that transport case.
-        (SourceErrorKind::Transport, None) => true,
-        _ => false,
-    }
+    matches!(
+        (error.kind, error.http_status),
+        (_, Some(429))
+            | (SourceErrorKind::Timeout, _)
+            | (SourceErrorKind::Transport, Some(500..=599))
+    )
 }
 
 fn retry_delay(company_id: &str, retries_used: u32) -> Duration {
@@ -286,8 +271,6 @@ fn classify_scan(
     source_scan: SourceScan,
     company: &CompanyConfig,
     filter: &EligibilityFilter,
-    started_at: DateTime<Utc>,
-    completed_at: DateTime<Utc>,
 ) -> CompanyOutcome {
     let (observations, source_diagnostic) = match source_scan {
         SourceScan::Complete { observations } => (observations, None),
@@ -317,8 +300,6 @@ fn classify_scan(
         return CompanyOutcome::Incomplete {
             diagnostic: diagnostics.join("; "),
             observed_count,
-            started_at,
-            completed_at,
         };
     }
 
@@ -327,8 +308,6 @@ fn classify_scan(
         jobs,
         observed_count,
         eligible_count,
-        started_at,
-        completed_at,
     }
 }
 
@@ -339,27 +318,26 @@ fn source_failure(error: SourceError) -> ScanFailure {
     }
 }
 
-fn storage_failure(
-    diagnostic: String,
-    started_at: DateTime<Utc>,
-    completed_at: DateTime<Utc>,
-) -> CompanyOutcome {
+fn storage_failure(diagnostic: String) -> CompanyOutcome {
     CompanyOutcome::Failed {
         failure: ScanFailure {
             kind: SourceErrorKind::Storage,
             diagnostic,
         },
-        started_at,
-        completed_at,
     }
 }
 
 struct CompanyScan {
     company_id: String,
     company: Option<CompanyConfig>,
+    window: ScanWindow,
+    outcome: CompanyOutcome,
+}
+
+#[derive(Clone, Copy)]
+struct ScanWindow {
     started_at: DateTime<Utc>,
     completed_at: DateTime<Utc>,
-    outcome: CompanyOutcome,
 }
 
 enum CompanyOutcome {
@@ -367,18 +345,12 @@ enum CompanyOutcome {
         jobs: Vec<ClassifiedJob>,
         observed_count: usize,
         eligible_count: usize,
-        started_at: DateTime<Utc>,
-        completed_at: DateTime<Utc>,
     },
     Incomplete {
         diagnostic: String,
         observed_count: usize,
-        started_at: DateTime<Utc>,
-        completed_at: DateTime<Utc>,
     },
     Failed {
         failure: ScanFailure,
-        started_at: DateTime<Utc>,
-        completed_at: DateTime<Utc>,
     },
 }

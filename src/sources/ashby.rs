@@ -73,7 +73,11 @@ impl JobSource for AshbySource {
         }
         if !status.is_success() {
             return Err(SourceError {
-                kind: SourceErrorKind::Transport,
+                kind: if status == StatusCode::REQUEST_TIMEOUT {
+                    SourceErrorKind::Timeout
+                } else {
+                    SourceErrorKind::Transport
+                },
                 message: format!("Ashby returned HTTP {status}"),
                 http_status: Some(status.as_u16()),
                 retry_after,
@@ -93,7 +97,11 @@ fn transport_error(error: reqwest::Error) -> SourceError {
         || error.is_body()
         || (error.is_request() && !error.is_builder() && !error.is_redirect());
     SourceError {
-        kind: SourceErrorKind::Transport,
+        kind: if error.is_timeout() {
+            SourceErrorKind::Timeout
+        } else {
+            SourceErrorKind::Transport
+        },
         message: error.to_string(),
         http_status: error.status().map(|status| status.as_u16()),
         retry_after: None,

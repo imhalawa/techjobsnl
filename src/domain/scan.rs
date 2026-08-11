@@ -16,6 +16,7 @@ pub enum SourceScan {
 pub enum SourceErrorKind {
     Configuration,
     Transport,
+    Timeout,
     RateLimit,
     Schema,
     Browser,
@@ -27,6 +28,7 @@ impl fmt::Display for SourceErrorKind {
         let name = match self {
             Self::Configuration => "configuration",
             Self::Transport => "transport",
+            Self::Timeout => "timeout",
             Self::RateLimit => "rate-limit",
             Self::Schema => "schema",
             Self::Browser => "browser",

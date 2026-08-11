@@ -507,6 +507,7 @@ fn source_error_kind(kind: SourceErrorKind) -> &'static str {
     match kind {
         SourceErrorKind::Configuration => "configuration",
         SourceErrorKind::Transport => "transport",
+        SourceErrorKind::Timeout => "timeout",
         SourceErrorKind::RateLimit => "rate-limit",
         SourceErrorKind::Schema => "schema",
         SourceErrorKind::Browser => "browser",
