@@ -7,9 +7,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     config::CompanyConfig,
-    domain::{
-        ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanFailure, SourceErrorKind,
-    },
+    domain::{ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanFailure},
 };
 
 use super::schema;
@@ -122,7 +120,7 @@ impl Store {
         completed_at: DateTime<Utc>,
     ) -> Result<()> {
         let tx = self.connection.transaction()?;
-        let error_kind = source_error_kind(error.kind);
+        let error_kind = error.kind.as_str();
         insert_scan_row(
             &tx,
             run_id,
@@ -501,16 +499,4 @@ fn normalized_metadata(observed: &ObservedJob) -> serde_json::Value {
 
 fn normalize_text(value: &str) -> String {
     value.replace("\r\n", "\n").trim().to_owned()
-}
-
-fn source_error_kind(kind: SourceErrorKind) -> &'static str {
-    match kind {
-        SourceErrorKind::Configuration => "configuration",
-        SourceErrorKind::Transport => "transport",
-        SourceErrorKind::Timeout => "timeout",
-        SourceErrorKind::RateLimit => "rate-limit",
-        SourceErrorKind::Schema => "schema",
-        SourceErrorKind::Browser => "browser",
-        SourceErrorKind::Storage => "storage",
-    }
 }

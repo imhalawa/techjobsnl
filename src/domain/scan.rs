@@ -23,9 +23,9 @@ pub enum SourceErrorKind {
     Storage,
 }
 
-impl fmt::Display for SourceErrorKind {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
+impl SourceErrorKind {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
             Self::Configuration => "configuration",
             Self::Transport => "transport",
             Self::Timeout => "timeout",
@@ -33,8 +33,13 @@ impl fmt::Display for SourceErrorKind {
             Self::Schema => "schema",
             Self::Browser => "browser",
             Self::Storage => "storage",
-        };
-        formatter.write_str(name)
+        }
+    }
+}
+
+impl fmt::Display for SourceErrorKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }
 
