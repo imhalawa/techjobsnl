@@ -151,7 +151,7 @@ struct AshbyJob {
     employment_type: Option<String>,
     location: String,
     secondary_locations: Vec<AshbyLocation>,
-    published_at: String,
+    published_at: Option<String>,
     is_listed: bool,
     address: AshbyAddress,
     job_url: String,
@@ -226,14 +226,18 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
             job.id
         )));
     }
-    let published_at = DateTime::parse_from_rfc3339(&job.published_at)
+    let published_at = job
+        .published_at
+        .as_deref()
+        .map(DateTime::parse_from_rfc3339)
+        .transpose()
         .map_err(|error| {
             SourceError::schema(format!(
                 "Ashby job {} for {company_id} has an invalid publication time: {error}",
                 job.id
             ))
         })?
-        .with_timezone(&Utc);
+        .map(|published_at| published_at.with_timezone(&Utc));
 
     let mut locations = Vec::with_capacity(1 + job.secondary_locations.len());
     let mut countries = Vec::with_capacity(1 + job.secondary_locations.len());
@@ -277,7 +281,7 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
         apply_url: job.apply_url,
         description: job.description_plain,
         raw_payload,
-        published_at: Some(published_at),
+        published_at,
     })
 }
 

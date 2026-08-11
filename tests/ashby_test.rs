@@ -57,6 +57,19 @@ fn preserves_timestamp_text_and_unknown_nested_job_fields() {
 }
 
 #[test]
+fn maps_a_missing_publication_time_to_none() {
+    let mut board = fixture_board();
+    board["jobs"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("publishedAt");
+
+    let jobs = parse_ashby_response("mollie", &board.to_string()).unwrap();
+
+    assert!(jobs[0].published_at.is_none());
+}
+
+#[test]
 fn rejects_unsupported_api_versions_as_schema_errors() {
     let mut board = fixture_board();
     board["apiVersion"] = "2".into();
@@ -121,7 +134,6 @@ async fn scans_live_mollie_board_as_a_complete_unique_result() {
         assert!(!job.job_url.is_empty());
         assert!(!job.apply_url.is_empty());
         assert!(!job.description.is_empty());
-        assert!(job.published_at.is_some());
         assert!(job.raw_payload.is_object());
     }
 }
