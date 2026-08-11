@@ -100,6 +100,24 @@ fn complete_scans_advance_lifecycle_and_preserve_applied_state() {
 }
 
 #[test]
+fn duplicate_observations_of_a_first_identity_remain_new() {
+    let config = mollie_config();
+    let mut duplicate = job("1");
+    duplicate.observed.raw_payload = json!({"id": "1", "request_id": "duplicate"});
+    let mut store = Store::open_in_memory().unwrap();
+    store.sync_companies(std::slice::from_ref(&config)).unwrap();
+
+    store
+        .record_complete_scan("run-1", &config, &[job("1"), duplicate], at(9), at(10))
+        .unwrap();
+
+    let all = store.list_jobs(JobQuery::all()).unwrap();
+    assert_eq!(all.len(), 1);
+    assert!(all[0].is_new);
+    assert_eq!(store.list_jobs(JobQuery::new()).unwrap().len(), 1);
+}
+
+#[test]
 fn failed_and_incomplete_scans_record_health_without_mutating_jobs() {
     let path = tempfile::NamedTempFile::new().unwrap();
     let config = mollie_config();

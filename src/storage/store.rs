@@ -241,7 +241,7 @@ fn upsert_observation(
             eligible = excluded.eligible,
             eligibility_reason = excluded.eligibility_reason,
             source_open = 1,
-            is_new = 0,
+            is_new = jobs.is_new,
             last_seen_at = excluded.last_seen_at,
             closed_at = NULL,
             reopened_at = CASE
