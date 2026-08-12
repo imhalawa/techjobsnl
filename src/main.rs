@@ -1,5 +1,7 @@
 use std::{
     error::Error,
+    fs,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -23,19 +25,47 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let config_path = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "config.toml".to_owned());
-    let config = Config::load(config_path)?;
-    let mut store = Store::open(&config.database_path)?;
+    let Startup {
+        mut app,
+        store,
+        scan_service,
+    } = initialize(&std::env::current_dir()?)?;
+    let mut terminal = ratatui::init();
+    let result = run(&mut terminal, &mut app, store, scan_service).await;
+    finish_with_restore(result, ratatui::restore)
+}
+
+struct Startup {
+    app: App,
+    store: Arc<Mutex<Store>>,
+    scan_service: Arc<ScanService>,
+}
+
+fn initialize(working_directory: &Path) -> Result<Startup> {
+    let config = Config::load(working_directory.join("config.toml"))?;
+    let database_path = database_path(working_directory, &config.database_path);
+    if let Some(parent) = database_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut store = Store::open(database_path)?;
     store.sync_companies(&config.companies)?;
     let store = Arc::new(Mutex::new(store));
     let scan_service = Arc::new(scan_service(&config, Arc::clone(&store))?);
     let jobs = store.lock().unwrap().list_jobs(JobQuery::active())?;
-    let mut app = App::new(config, jobs);
-    let mut terminal = ratatui::init();
-    let result = run(&mut terminal, &mut app, store, scan_service).await;
-    finish_with_restore(result, ratatui::restore)
+    Ok(Startup {
+        app: App::new(config, jobs),
+        store,
+        scan_service,
+    })
+}
+
+fn database_path(working_directory: &Path, configured_path: &str) -> PathBuf {
+    let path = Path::new(configured_path);
+    if path.is_absolute() {
+        path.into()
+    } else {
+        working_directory.join(path)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -222,7 +252,8 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::{
-        CommandEffect, abort_scan, execute_command, finish_scan, finish_with_restore, start_scan,
+        CommandEffect, abort_scan, execute_command, finish_scan, finish_with_restore, initialize,
+        start_scan,
     };
 
     struct CompleteSource;
@@ -460,5 +491,60 @@ mod tests {
                 .contains("Query returned no rows")
         );
         assert!(restored.get());
+    }
+
+    #[test]
+    fn startup_reports_the_absolute_working_directory_config_path() {
+        let directory = tempfile::tempdir().unwrap();
+
+        let error = match initialize(directory.path()) {
+            Ok(_) => panic!("startup unexpectedly succeeded without config.toml"),
+            Err(error) => error,
+        };
+
+        assert!(
+            error
+                .to_string()
+                .contains(&directory.path().join("config.toml").display().to_string())
+        );
+    }
+
+    #[test]
+    fn startup_creates_the_database_parent_and_loads_stored_active_jobs_without_scanning() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(
+            directory.path().join("config.toml"),
+            include_str!("../config.toml"),
+        )
+        .unwrap();
+
+        let startup = initialize(directory.path()).unwrap();
+        assert!(directory.path().join(".data").is_dir());
+        let company = startup.app.config().companies[0].clone();
+        let at = Utc.with_ymd_and_hms(2026, 8, 12, 10, 0, 0).unwrap();
+        startup
+            .store
+            .lock()
+            .unwrap()
+            .record_complete_scan(
+                "seed",
+                &company,
+                &[ClassifiedJob {
+                    observed: observed("stored"),
+                    eligibility: Eligibility {
+                        eligible: true,
+                        reason: "eligible".into(),
+                    },
+                }],
+                at,
+                at,
+            )
+            .unwrap();
+        drop(startup);
+
+        let startup = initialize(directory.path()).unwrap();
+        let stored = startup.app.selected_job().unwrap();
+        assert_eq!(stored.key, JobKey::new("mollie", "stored"));
+        assert!(stored.is_new, "startup must not perform an implicit scan");
     }
 }

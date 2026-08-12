@@ -1,0 +1,38 @@
+schema_version = 1
+database_path = ".data/job-watch.sqlite3"
+
+[scan]
+concurrency = 4
+timeout_seconds = 20
+retry_count = 2
+user_agent = "job-watch/0.1 (+local personal job research)"
+
+[filters]
+countries = ["NL"]
+include_families = ["software", "platform", "sre", "data", "ml", "application-security"]
+include_title_patterns = []
+exclude_title_patterns = ["manager", "director", "product manager", "sales engineer", "support"]
+
+[ui]
+theme = "clean-dark"
+unicode_icons = true
+
+[ui.theme_overrides]
+
+[keybindings]
+scan = "r"
+search = "/"
+filter = "f"
+toggle_applied = "a"
+history = "h"
+open = "o"
+help = "?"
+quit = "q"
+
+[[companies]]
+id = "mollie"
+name = "Mollie"
+enabled = true
+[companies.source]
+strategy = "ashby"
+board = "mollie"
