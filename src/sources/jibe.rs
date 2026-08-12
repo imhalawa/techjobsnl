@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 use reqwest::{Client, Url};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::domain::{ObservedJob, SourceScan};
 
@@ -137,8 +137,17 @@ impl<'a> JibeCollection<'a> {
             )));
         }
 
-        for row in jobs {
-            let observation = observed_job(self.company_id, self.base_url, self.client_name, row)?;
+        for raw_row in jobs {
+            let row: JibeRow = serde_json::from_value(raw_row.clone()).map_err(|error| {
+                SourceError::schema(format!("invalid Jibe job for {}: {error}", self.company_id))
+            })?;
+            let observation = observed_job(
+                self.company_id,
+                self.base_url,
+                self.client_name,
+                row,
+                raw_row,
+            )?;
             if !self.ids.insert(observation.source_id.clone()) {
                 return Err(SourceError::schema(format!(
                     "duplicate Jibe job {} for {}",
@@ -192,6 +201,7 @@ fn observed_job(
     base_url: &str,
     client_name: &str,
     row: JibeRow,
+    raw_payload: serde_json::Value,
 ) -> Result<ObservedJob, SourceError> {
     let job = &row.data;
     required(&job.req_id, "id", company_id)?;
@@ -238,12 +248,6 @@ fn observed_job(
             ))
         })?
         .with_timezone(&Utc);
-    let raw_payload = serde_json::to_value(&row).map_err(|error| {
-        SourceError::schema(format!(
-            "could not preserve Jibe job {} for {company_id}: {error}",
-            job.req_id
-        ))
-    })?;
     let department = joined(&job.category);
     let team = non_empty(&job.department);
     let mut job_url = Url::parse(base_url).map_err(|error| {
@@ -309,17 +313,15 @@ fn push_unique(values: &mut Vec<String>, value: String) {
 struct JibePage {
     count: usize,
     total_count: usize,
-    jobs: Option<Vec<JibeRow>>,
+    jobs: Option<Vec<serde_json::Value>>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct JibeRow {
     data: JibeJob,
-    #[serde(flatten)]
-    extra: serde_json::Map<String, serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct JibeJob {
     req_id: String,
     title: String,
@@ -333,6 +335,4 @@ struct JibeJob {
     #[serde(default)]
     employment_type: String,
     full_location: String,
-    #[serde(flatten)]
-    extra: serde_json::Map<String, serde_json::Value>,
 }

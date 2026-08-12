@@ -24,9 +24,6 @@
       "content": "&lt;p&gt;Own reliable data pipelines.&lt;/p&gt;",
       "offices": [
         { "id": 1, "name": "Amsterdam", "location": "Amsterdam" }
-      ],
-      "departments": [
-        { "id": 11, "name": "Data Analytics" }
       ]
     }
   ],

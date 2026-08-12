@@ -22,7 +22,6 @@
       "id": 302,
       "title": "Data Engineer",
       "department": "Data",
-      "category_code": "data",
       "employment_type_code": "parttime_permanent",
       "description": "<p>Make housing data useful.</p>",
       "requirements": "<p>Own reliable pipelines.</p>",

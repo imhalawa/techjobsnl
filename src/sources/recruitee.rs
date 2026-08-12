@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use chrono::NaiveDateTime;
 use reqwest::{Client, Url};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::domain::{ObservedJob, SourceScan};
 
@@ -59,8 +59,14 @@ pub fn parse_recruitee_response(
     let mut ids = HashSet::new();
     offers
         .into_iter()
-        .map(|offer| {
-            let observation = observed_job(company_id, offer)?;
+        .map(|raw_offer| {
+            let offer: RecruiteeOffer =
+                serde_json::from_value(raw_offer.clone()).map_err(|error| {
+                    SourceError::schema(format!(
+                        "invalid Recruitee offer for {company_id}: {error}"
+                    ))
+                })?;
+            let observation = observed_job(company_id, offer, raw_offer)?;
             if !ids.insert(observation.source_id.clone()) {
                 return Err(SourceError::schema(format!(
                     "duplicate Recruitee offer {} for {company_id}",
@@ -83,7 +89,11 @@ fn offers_url(base_url: &str, company_id: &str) -> Result<Url, SourceError> {
     Ok(url)
 }
 
-fn observed_job(company_id: &str, offer: RecruiteeOffer) -> Result<ObservedJob, SourceError> {
+fn observed_job(
+    company_id: &str,
+    offer: RecruiteeOffer,
+    raw_payload: serde_json::Value,
+) -> Result<ObservedJob, SourceError> {
     let id = offer.id.ok_or_else(|| {
         SourceError::schema(format!("Recruitee offer for {company_id} is missing id"))
     })?;
@@ -121,12 +131,6 @@ fn observed_job(company_id: &str, offer: RecruiteeOffer) -> Result<ObservedJob, 
             ))
         })?
         .and_utc();
-    let raw_payload = serde_json::to_value(&offer).map_err(|error| {
-        SourceError::schema(format!(
-            "could not preserve Recruitee offer {id} for {company_id}: {error}"
-        ))
-    })?;
-
     Ok(ObservedJob {
         source_id: id.to_string(),
         title: offer.title,
@@ -164,10 +168,10 @@ fn push_unique(values: &mut Vec<String>, value: String) {
 
 #[derive(Deserialize)]
 struct RecruiteeResponse {
-    offers: Option<Vec<RecruiteeOffer>>,
+    offers: Option<Vec<serde_json::Value>>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct RecruiteeOffer {
     id: Option<u64>,
     title: String,
@@ -183,14 +187,10 @@ struct RecruiteeOffer {
     careers_apply_url: String,
     published_at: String,
     locations: Option<Vec<RecruiteeLocation>>,
-    #[serde(flatten)]
-    extra: serde_json::Map<String, serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct RecruiteeLocation {
     name: String,
     country_code: String,
-    #[serde(flatten)]
-    extra: serde_json::Map<String, serde_json::Value>,
 }

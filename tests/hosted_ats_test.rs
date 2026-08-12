@@ -27,7 +27,9 @@ fn parses_complete_greenhouse_board() {
         jobs[0].published_at.unwrap().to_rfc3339(),
         "2026-08-10T07:15:00+00:00"
     );
-    assert_eq!(jobs[0].raw_payload["fixture_marker"], "preserve-me");
+    let fixture = greenhouse_fixture();
+    assert_eq!(jobs[0].raw_payload, fixture["jobs"][0]);
+    assert_eq!(jobs[1].raw_payload, fixture["jobs"][1]);
 }
 
 #[test]
@@ -88,7 +90,10 @@ fn parses_complete_jibe_pages() {
         jobs[0].published_at.unwrap().to_rfc3339(),
         "2026-08-10T09:30:00+00:00"
     );
-    assert_eq!(jobs[0].raw_payload["data"]["fixture_marker"], "preserve-me");
+    let fixtures = jibe_fixtures();
+    assert_eq!(jobs[0].raw_payload, fixtures[0]["jobs"][0]);
+    assert_eq!(jobs[1].raw_payload, fixtures[0]["jobs"][1]);
+    assert_eq!(jobs[2].raw_payload, fixtures[1]["jobs"][0]);
 }
 
 #[test]
@@ -178,7 +183,9 @@ fn parses_complete_recruitee_offers() {
         jobs[0].published_at.unwrap().to_rfc3339(),
         "2026-08-09T08:30:00+00:00"
     );
-    assert_eq!(jobs[0].raw_payload["fixture_marker"], "preserve-me");
+    let fixture = recruitee_fixture();
+    assert_eq!(jobs[0].raw_payload, fixture["offers"][0]);
+    assert_eq!(jobs[1].raw_payload, fixture["offers"][1]);
 }
 
 #[test]
@@ -187,6 +194,7 @@ fn recruitee_rejects_missing_required_data_and_duplicate_ids() {
         "offers",
         "id",
         "url",
+        "apply_url",
         "description",
         "locations",
         "duplicate",
@@ -200,6 +208,7 @@ fn recruitee_rejects_missing_required_data_and_duplicate_ids() {
                 offers["offers"][0].as_object_mut().unwrap().remove("id");
             }
             "url" => offers["offers"][0]["careers_url"] = "".into(),
+            "apply_url" => offers["offers"][0]["careers_apply_url"] = "".into(),
             "description" => {
                 offers["offers"][0]["description"] = "<p> </p>".into();
                 offers["offers"][0]["requirements"] = "<p> </p>".into();
@@ -310,6 +319,7 @@ fn assert_live_jobs(source: &str, jobs: &[ObservedJob]) {
         assert!(!job.apply_url.trim().is_empty());
         assert!(!job.description.trim().is_empty());
         assert!(job.raw_payload.is_object());
+        assert!(job.published_at.is_some());
     }
     println!("{source}: {} jobs", jobs.len());
 }

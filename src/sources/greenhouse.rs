@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 use reqwest::{Client, Url};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::domain::{ObservedJob, SourceScan};
 
@@ -69,8 +69,11 @@ pub fn parse_greenhouse_response(
 
     let mut ids = HashSet::new();
     jobs.into_iter()
-        .map(|job| {
-            let observation = observed_job(company_id, job)?;
+        .map(|raw_job| {
+            let job: GreenhouseJob = serde_json::from_value(raw_job.clone()).map_err(|error| {
+                SourceError::schema(format!("invalid Greenhouse job for {company_id}: {error}"))
+            })?;
+            let observation = observed_job(company_id, job, raw_job)?;
             if !ids.insert(observation.source_id.clone()) {
                 return Err(SourceError::schema(format!(
                     "duplicate Greenhouse job {} for {company_id}",
@@ -92,7 +95,11 @@ fn board_url(board: &str) -> Url {
     url
 }
 
-fn observed_job(company_id: &str, job: GreenhouseJob) -> Result<ObservedJob, SourceError> {
+fn observed_job(
+    company_id: &str,
+    job: GreenhouseJob,
+    raw_payload: serde_json::Value,
+) -> Result<ObservedJob, SourceError> {
     let id = job.id.ok_or_else(|| {
         SourceError::schema(format!("Greenhouse job for {company_id} is missing id"))
     })?;
@@ -142,12 +149,6 @@ fn observed_job(company_id: &str, job: GreenhouseJob) -> Result<ObservedJob, Sou
         })?
         .with_timezone(&Utc);
     let department = joined_names(job.departments.as_deref().unwrap_or_default());
-    let raw_payload = serde_json::to_value(&job).map_err(|error| {
-        SourceError::schema(format!(
-            "could not preserve Greenhouse job {id} for {company_id}: {error}"
-        ))
-    })?;
-
     Ok(ObservedJob {
         source_id: id.to_string(),
         title: job.title,
@@ -190,7 +191,7 @@ fn push_unique(values: &mut Vec<String>, value: String) {
 
 #[derive(Deserialize)]
 struct GreenhouseResponse {
-    jobs: Option<Vec<GreenhouseJob>>,
+    jobs: Option<Vec<serde_json::Value>>,
     meta: Option<GreenhouseMeta>,
 }
 
@@ -199,7 +200,7 @@ struct GreenhouseMeta {
     total: usize,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct GreenhouseJob {
     id: Option<u64>,
     title: String,
@@ -208,21 +209,15 @@ struct GreenhouseJob {
     content: String,
     offices: Option<Vec<GreenhouseOffice>>,
     departments: Option<Vec<GreenhouseName>>,
-    #[serde(flatten)]
-    extra: serde_json::Map<String, serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct GreenhouseOffice {
     name: String,
     location: Option<String>,
-    #[serde(flatten)]
-    extra: serde_json::Map<String, serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct GreenhouseName {
     name: String,
-    #[serde(flatten)]
-    extra: serde_json::Map<String, serde_json::Value>,
 }
