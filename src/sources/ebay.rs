@@ -49,10 +49,10 @@ pub fn build_client(user_agent: &str, timeout: std::time::Duration) -> Result<Cl
                 return attempt.error("too many eBay redirects");
             }
             let initial_host = attempt.previous().first().and_then(Url::host_str);
-            if attempt.url().host_str() == initial_host {
+            if attempt.url().scheme() == "https" && attempt.url().host_str() == initial_host {
                 attempt.follow()
             } else {
-                attempt.error("eBay cross-host redirect blocked")
+                attempt.error("eBay non-HTTPS or cross-host redirect blocked")
             }
         }))
         .build()

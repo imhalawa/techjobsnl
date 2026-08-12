@@ -157,6 +157,21 @@ async fn ebay_http_client_rejects_cross_host_redirects_before_fetching_the_targe
 }
 
 #[tokio::test]
+async fn ebay_http_client_rejects_same_host_http_redirects_before_fetching_the_target() {
+    let (source_url, target) = same_host_http_redirect();
+    let client = build_ebay_client("job-watch-test", Duration::from_secs(5)).unwrap();
+
+    let error = send_text(client.get(source_url), "eBay").await.unwrap_err();
+
+    assert!(error.message.contains("redirect"));
+    target.set_nonblocking(true).unwrap();
+    assert!(
+        target.accept().is_err(),
+        "HTTP redirect target was requested"
+    );
+}
+
+#[tokio::test]
 #[ignore = "live external source"]
 async fn ebay_live_returns_complete_unique_netherlands_jobs() {
     let client =
@@ -259,6 +274,23 @@ fn cross_host_redirect() -> (String, TcpListener) {
         let _ = stream.read(&mut request).unwrap();
         let response = format!(
             "HTTP/1.1 302 Found\r\nLocation: http://localhost:{target_port}/off-host\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        );
+        stream.write_all(response.as_bytes()).unwrap();
+    });
+    (format!("http://{source_address}"), target)
+}
+
+fn same_host_http_redirect() -> (String, TcpListener) {
+    let source = TcpListener::bind("127.0.0.1:0").unwrap();
+    let source_address = source.local_addr().unwrap();
+    let target = TcpListener::bind("127.0.0.1:0").unwrap();
+    let target_port = target.local_addr().unwrap().port();
+    thread::spawn(move || {
+        let (mut stream, _) = source.accept().unwrap();
+        let mut request = [0; 2048];
+        let _ = stream.read(&mut request).unwrap();
+        let response = format!(
+            "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:{target_port}/downgrade\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
         );
         stream.write_all(response.as_bytes()).unwrap();
     });
