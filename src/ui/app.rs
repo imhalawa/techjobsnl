@@ -30,6 +30,7 @@ pub enum AppCommand {
     StartScan,
     ToggleApplied(JobKey),
     OpenUrl(String),
+    CopyUrl(String),
     ReloadJobs,
     Quit,
 }
@@ -398,6 +399,8 @@ impl App {
             AppCommand::ReloadJobs
         } else if key == keys.open {
             self.open_selected()
+        } else if key == keys.copy {
+            self.copy_selected()
         } else if key == keys.help {
             self.help_visible = !self.help_visible;
             AppCommand::None
@@ -453,6 +456,12 @@ impl App {
     fn open_selected(&self) -> AppCommand {
         self.selected_job().map_or(AppCommand::None, |job| {
             AppCommand::OpenUrl(job.classified.observed.job_url.clone())
+        })
+    }
+
+    fn copy_selected(&self) -> AppCommand {
+        self.selected_job().map_or(AppCommand::None, |job| {
+            AppCommand::CopyUrl(job.classified.observed.job_url.clone())
         })
     }
 

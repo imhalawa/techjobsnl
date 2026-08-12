@@ -583,6 +583,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         if app.narrow_details_visible() {
             vec![
                 format!("{} open", keys.open),
+                format!("{} copy", keys.copy),
                 format!("{} applied", keys.toggle_applied),
             ]
         } else {
@@ -597,6 +598,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             format!("{} search", keys.search),
             format!("{} applied", keys.toggle_applied),
             format!("{} open", keys.open),
+            format!("{} copy", keys.copy),
         ];
         if area.width >= 100 {
             let enabled = app
@@ -626,7 +628,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         Paragraph::new(Line::from(vec![
             Span::styled(format!("{icon} {status}"), Style::new().fg(status_color)),
             Span::styled(
-                format!("  {}", actions.join("  ")),
+                format!("  {}", actions.join(" ")),
                 Style::new().fg(theme.muted_text),
             ),
         ]))
@@ -652,7 +654,7 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
          ↑/↓ or j/k select\n\
          J/K scroll details\n\n\
          {} scan  {} search jobs  {} filter company/New/Applied\n\
-         {} applied  {} history  {} open\n\
+         {} applied  {} history  {} open  {} copy\n\
          Enter narrow: details; otherwise: open\n\
          Search: title or company; Enter accept; Esc clear\n\
          Esc close help  {} toggle help  {} quit",
@@ -662,6 +664,7 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
         keys.toggle_applied,
         keys.history,
         keys.open,
+        keys.copy,
         keys.help,
         keys.quit,
     );

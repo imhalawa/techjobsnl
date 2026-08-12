@@ -1,7 +1,9 @@
 use std::{
     error::Error,
     fs,
+    io::{self, Write},
     path::{Path, PathBuf},
+    process::{Command, Stdio},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -22,6 +24,46 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Platform {
+    Windows,
+    Wsl,
+    Macos,
+    Linux,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CommandSpec {
+    program: &'static str,
+    args: &'static [&'static str],
+}
+
+const NO_ARGS: &[&str] = &[];
+const XCLIP_ARGS: &[&str] = &["-selection", "clipboard"];
+const XSEL_ARGS: &[&str] = &["--clipboard", "--input"];
+const WINDOWS_CLIPBOARD: &[CommandSpec] = &[CommandSpec {
+    program: "clip.exe",
+    args: NO_ARGS,
+}];
+const MACOS_CLIPBOARD: &[CommandSpec] = &[CommandSpec {
+    program: "pbcopy",
+    args: NO_ARGS,
+}];
+const LINUX_CLIPBOARD: &[CommandSpec] = &[
+    CommandSpec {
+        program: "wl-copy",
+        args: NO_ARGS,
+    },
+    CommandSpec {
+        program: "xclip",
+        args: XCLIP_ARGS,
+    },
+    CommandSpec {
+        program: "xsel",
+        args: XSEL_ARGS,
+    },
+];
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -129,8 +171,15 @@ async fn run(
                 if let Event::Key(key) = event {
                     let width = terminal.size()?.width;
                     let command = app.handle_key_with_width(key, width);
-                    let mut open_url = |url: &str| opener::open_browser(url).map_err(Into::into);
-                    match execute_command(command, &store, app, &mut open_url)? {
+                    let mut open_job_url = open_url;
+                    let mut copy_job_url = copy_url;
+                    match execute_command(
+                        command,
+                        &store,
+                        app,
+                        &mut open_job_url,
+                        &mut copy_job_url,
+                    )? {
                         CommandEffect::StartScan => {
                             start_scan(
                                 &mut active_scan,
@@ -247,6 +296,7 @@ fn execute_command(
     store: &Arc<Mutex<Store>>,
     app: &mut App,
     open_url: &mut impl FnMut(&str) -> Result<()>,
+    copy_url: &mut impl FnMut(&str) -> Result<()>,
 ) -> Result<CommandEffect> {
     match command {
         AppCommand::ToggleApplied(key) => {
@@ -258,6 +308,10 @@ fn execute_command(
             open_url(&url)?;
             Ok(CommandEffect::Continue)
         }
+        AppCommand::CopyUrl(url) => {
+            copy_url(&url)?;
+            Ok(CommandEffect::Continue)
+        }
         AppCommand::StartScan => Ok(CommandEffect::StartScan),
         AppCommand::ReloadJobs => {
             reload_jobs(store, app)?;
@@ -265,6 +319,120 @@ fn execute_command(
         }
         AppCommand::Quit => Ok(CommandEffect::Quit),
         AppCommand::None => Ok(CommandEffect::Continue),
+    }
+}
+
+fn current_platform() -> Platform {
+    if cfg!(target_os = "windows") {
+        Platform::Windows
+    } else if cfg!(target_os = "macos") {
+        Platform::Macos
+    } else if is_wsl() {
+        Platform::Wsl
+    } else {
+        Platform::Linux
+    }
+}
+
+fn is_wsl() -> bool {
+    std::env::var_os("WSL_DISTRO_NAME").is_some()
+        || std::env::var_os("WSL_INTEROP").is_some()
+        || fs::read_to_string("/proc/sys/kernel/osrelease")
+            .is_ok_and(|release| release.to_ascii_lowercase().contains("microsoft"))
+}
+
+fn browser_command(platform: Platform) -> Option<CommandSpec> {
+    (platform == Platform::Wsl).then_some(CommandSpec {
+        program: "explorer.exe",
+        args: NO_ARGS,
+    })
+}
+
+fn open_url(url: &str) -> Result<()> {
+    let platform = current_platform();
+    let Some(command) = browser_command(platform) else {
+        return opener::open_browser(url).map_err(Into::into);
+    };
+    let status = Command::new(command.program)
+        .args(command.args)
+        .arg(url)
+        .status()
+        .map_err(|source| {
+            io::Error::new(
+                source.kind(),
+                format!("could not open URL with {}: {source}", command.program),
+            )
+        })?;
+    if !status.success() {
+        return Err(io::Error::other(format!(
+            "could not open URL with {}: exited with {status}",
+            command.program
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn clipboard_commands(platform: Platform) -> &'static [CommandSpec] {
+    match platform {
+        Platform::Windows | Platform::Wsl => WINDOWS_CLIPBOARD,
+        Platform::Macos => MACOS_CLIPBOARD,
+        Platform::Linux => LINUX_CLIPBOARD,
+    }
+}
+
+fn copy_url(url: &str) -> Result<()> {
+    copy_url_with(url, current_platform(), pipe_to_command)
+}
+
+fn copy_url_with(
+    url: &str,
+    platform: Platform,
+    mut pipe: impl FnMut(CommandSpec, &str) -> io::Result<()>,
+) -> Result<()> {
+    let commands = clipboard_commands(platform);
+    for command in commands {
+        match pipe(*command, url) {
+            Ok(()) => return Ok(()),
+            Err(source) if source.kind() == io::ErrorKind::NotFound => {}
+            Err(source) => {
+                return Err(io::Error::new(
+                    source.kind(),
+                    format!("could not copy URL with {}: {source}", command.program),
+                )
+                .into());
+            }
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!(
+            "could not copy URL: no clipboard utility found (tried {})",
+            commands
+                .iter()
+                .map(|command| command.program)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    )
+    .into())
+}
+
+fn pipe_to_command(command: CommandSpec, contents: &str) -> io::Result<()> {
+    let mut child = Command::new(command.program)
+        .args(command.args)
+        .stdin(Stdio::piped())
+        .spawn()?;
+    child
+        .stdin
+        .take()
+        .expect("piped clipboard stdin must be available")
+        .write_all(contents.as_bytes())?;
+    let status = child.wait()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!("exited with {status}")))
     }
 }
 
@@ -332,8 +500,9 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::{
-        CommandEffect, abort_scan, build_sources, execute_command, finish_scan,
-        finish_with_restore, handle_runtime_scan_event, initialize, start_scan,
+        CommandEffect, Platform, abort_scan, browser_command, build_sources, copy_url_with,
+        execute_command, finish_scan, finish_with_restore, handle_runtime_scan_event, initialize,
+        start_scan,
     };
 
     #[test]
@@ -430,6 +599,7 @@ mod tests {
                 toggle_applied: "a".into(),
                 history: "h".into(),
                 open: "o".into(),
+                copy: "c".into(),
                 help: "?".into(),
                 quit: "q".into(),
             },
@@ -495,12 +665,14 @@ mod tests {
         let jobs = store.lock().unwrap().list_jobs(JobQuery::active()).unwrap();
         let mut app = App::new(config(), jobs);
         let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
+        let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
 
         let effect = execute_command(
             AppCommand::ToggleApplied(JobKey::new("acme", "job-1")),
             &store,
             &mut app,
             &mut opened,
+            &mut copied,
         )
         .unwrap();
 
@@ -577,12 +749,14 @@ mod tests {
         let jobs = store.lock().unwrap().list_jobs(JobQuery::active()).unwrap();
         let mut app = App::new(config(), jobs);
         let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
+        let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
         let restored = std::cell::Cell::new(false);
         let result = execute_command(
             AppCommand::ToggleApplied(JobKey::new("acme", "missing")),
             &store,
             &mut app,
             &mut opened,
+            &mut copied,
         )
         .map(|_| ());
 
@@ -782,5 +956,79 @@ mod tests {
             app.sources()[0].diagnostic.as_deref(),
             Some("connection reset")
         );
+    }
+
+    #[test]
+    fn copy_command_sends_the_official_url_to_the_clipboard_action() {
+        let store = store_with_job();
+        let jobs = store.lock().unwrap().list_jobs(JobQuery::active()).unwrap();
+        let mut app = App::new(config(), jobs);
+        let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
+        let mut copied_url = None;
+        let mut copied = |url: &str| -> super::Result<()> {
+            copied_url = Some(url.to_owned());
+            Ok(())
+        };
+
+        let effect = execute_command(
+            AppCommand::CopyUrl("https://example.test/job".into()),
+            &store,
+            &mut app,
+            &mut opened,
+            &mut copied,
+        )
+        .unwrap();
+
+        assert_eq!(effect, CommandEffect::Continue);
+        assert_eq!(copied_url.as_deref(), Some("https://example.test/job"));
+    }
+
+    #[test]
+    fn wsl_browser_uses_windows_explorer_instead_of_a_linux_opener() {
+        let command = browser_command(Platform::Wsl).unwrap();
+
+        assert_eq!(command.program, "explorer.exe");
+        assert!(command.args.is_empty());
+    }
+
+    #[test]
+    fn linux_clipboard_falls_back_in_order() {
+        let mut tried = Vec::new();
+
+        copy_url_with(
+            "https://example.test/job",
+            Platform::Linux,
+            |command, contents| {
+                assert_eq!(contents, "https://example.test/job");
+                tried.push((command.program, command.args));
+                if command.program == "xclip" {
+                    Ok(())
+                } else {
+                    Err(std::io::Error::from(std::io::ErrorKind::NotFound))
+                }
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            tried,
+            vec![
+                ("wl-copy", &[][..]),
+                ("xclip", &["-selection", "clipboard"][..])
+            ]
+        );
+    }
+
+    #[test]
+    fn missing_clipboard_tools_report_every_supported_linux_fallback() {
+        let error = copy_url_with("https://example.test/job", Platform::Linux, |_, _| {
+            Err(std::io::Error::from(std::io::ErrorKind::NotFound))
+        })
+        .unwrap_err()
+        .to_string();
+
+        assert!(error.contains("wl-copy"));
+        assert!(error.contains("xclip"));
+        assert!(error.contains("xsel"));
     }
 }

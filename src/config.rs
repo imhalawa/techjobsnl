@@ -299,6 +299,8 @@ pub struct KeybindingsConfig {
     pub toggle_applied: String,
     pub history: String,
     pub open: String,
+    #[serde(default = "default_copy_key")]
+    pub copy: String,
     pub help: String,
     pub quit: String,
 }
@@ -312,6 +314,7 @@ impl KeybindingsConfig {
             ("toggle_applied", &self.toggle_applied),
             ("history", &self.history),
             ("open", &self.open),
+            ("copy", &self.copy),
             ("help", &self.help),
             ("quit", &self.quit),
         ];
@@ -351,6 +354,10 @@ impl KeybindingsConfig {
         }
         Ok(())
     }
+}
+
+fn default_copy_key() -> String {
+    "c".into()
 }
 
 fn validate_country(country: &str, field: String) -> Result<(), ConfigError> {

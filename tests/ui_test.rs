@@ -92,6 +92,7 @@ fn config() -> Config {
             toggle_applied: "a".into(),
             history: "h".into(),
             open: "o".into(),
+            copy: "c".into(),
             help: "?".into(),
             quit: "q".into(),
         },
@@ -175,6 +176,10 @@ fn default_keys_emit_commands_and_move_the_selection() {
         AppCommand::ToggleApplied(_)
     ));
     assert!(matches!(app.handle_key(key('o')), AppCommand::OpenUrl(_)));
+    assert_eq!(
+        app.handle_key(key('c')),
+        AppCommand::CopyUrl("https://example.test/job".into())
+    );
     assert_eq!(app.handle_key(key('r')), AppCommand::StartScan);
     assert_eq!(app.handle_key(key('h')), AppCommand::ReloadJobs);
     assert_eq!(app.view(), View::History);
@@ -190,6 +195,7 @@ fn configured_actions_replace_only_the_configurable_keys() {
     configured.keybindings.toggle_applied = "x".into();
     configured.keybindings.history = "y".into();
     configured.keybindings.open = "u".into();
+    configured.keybindings.copy = "w".into();
     configured.keybindings.help = "i".into();
     configured.keybindings.quit = "e".into();
     let mut app = App::new(configured, vec![job("Backend Engineer", false, false)]);
@@ -205,6 +211,11 @@ fn configured_actions_replace_only_the_configurable_keys() {
     assert_eq!(app.input_mode(), InputMode::Search);
     assert_eq!(app.handle_key(special(KeyCode::Esc)), AppCommand::None);
     assert!(matches!(app.handle_key(key('u')), AppCommand::OpenUrl(_)));
+    assert_eq!(
+        app.handle_key(key('w')),
+        AppCommand::CopyUrl("https://example.test/job".into())
+    );
+    assert_eq!(app.handle_key(key('c')), AppCommand::None);
     assert_eq!(app.handle_key(key('v')), AppCommand::ReloadJobs);
     assert_eq!(app.company_filter(), Some("acme"));
     assert_eq!(app.handle_key(key('y')), AppCommand::ReloadJobs);
@@ -567,6 +578,17 @@ fn footer_keeps_configured_help_as_the_final_visible_hint_at_supported_widths() 
 }
 
 #[test]
+fn footer_shows_the_configured_copy_fallback_for_job_details() {
+    let mut configured = config();
+    configured.keybindings.copy = "u".into();
+    let mut app = App::new(configured, vec![job("Backend Engineer", false, false)]);
+
+    assert!(rendered(&app, 100, 25).contains("u copy"));
+    app.handle_key_with_width(special(KeyCode::Enter), 79);
+    assert!(rendered(&app, 79, 25).contains("u copy"));
+}
+
+#[test]
 fn footer_reserves_the_configured_help_hint_with_a_long_filter_label() {
     let mut configured = config();
     configured.companies[0].name =
@@ -825,6 +847,7 @@ fn configured_help_opens_an_overlay_with_fixed_and_contextual_controls() {
     configured.keybindings.filter = "v".into();
     configured.keybindings.toggle_applied = "x".into();
     configured.keybindings.open = "u".into();
+    configured.keybindings.copy = "w".into();
     configured.keybindings.history = "y".into();
     configured.keybindings.help = "i".into();
     configured.keybindings.quit = "e".into();
@@ -840,6 +863,7 @@ fn configured_help_opens_an_overlay_with_fixed_and_contextual_controls() {
     assert!(screen.contains("v filter company/New/Applied"));
     assert!(screen.contains("x applied"));
     assert!(screen.contains("u open"));
+    assert!(screen.contains("w copy"));
     assert!(screen.contains("y history"));
     assert!(screen.contains("Enter narrow: details; otherwise: open"));
     assert!(screen.contains("Esc close help"));

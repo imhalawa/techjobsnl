@@ -26,6 +26,7 @@ filter = "f"
 toggle_applied = "a"
 history = "h"
 open = "o"
+copy = "c"
 help = "?"
 quit = "q"
 

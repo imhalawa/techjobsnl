@@ -22,6 +22,7 @@ The application reads `config.toml` from the current directory. It loads stored 
 - `h`: switch between active jobs and history
 - `a`: mark or unmark the selected job as applied
 - `o`: open the selected job in the default browser
+- `c`: copy the selected job URL to the system clipboard
 - `?`: show or hide help
 - `q`: quit
 

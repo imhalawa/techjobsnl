@@ -42,10 +42,23 @@ fn valid_config() -> Config {
             toggle_applied: "a".into(),
             history: "h".into(),
             open: "o".into(),
+            copy: "c".into(),
             help: "?".into(),
             quit: "q".into(),
         },
     }
+}
+
+#[test]
+fn copy_binding_is_configurable_and_must_not_duplicate_another_action() {
+    let mut config = valid_config();
+    config.keybindings.copy = "u".into();
+    config.validate().unwrap();
+
+    config.keybindings.copy = config.keybindings.open.clone();
+    let error = config.validate().unwrap_err();
+    assert!(error.to_string().contains("keybindings.copy"));
+    assert!(error.to_string().contains("must not duplicate"));
 }
 
 #[test]
