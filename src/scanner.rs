@@ -6,7 +6,10 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream};
-use tokio::{sync::mpsc::UnboundedSender, time::sleep};
+use tokio::{
+    sync::mpsc::UnboundedSender,
+    time::{sleep, timeout},
+};
 
 use crate::{
     config::{CompanyConfig, ScanConfig},
@@ -57,17 +60,28 @@ impl ScanService {
         event_tx: UnboundedSender<ScanEvent>,
     ) -> RunSummary {
         let run_id = run_id.into();
+        let scheduled_sources = self
+            .sources
+            .iter()
+            .filter(|source| {
+                self.companies
+                    .get(source.company_id())
+                    .is_some_and(|company| company.enabled)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
         let _ = event_tx.send(ScanEvent::RunStarted {
             run_id: run_id.clone(),
-            company_count: self.sources.len(),
+            company_count: scheduled_sources.len(),
         });
 
-        let company_scans = self.sources.iter().cloned().map(|source| {
+        let company_scans = scheduled_sources.into_iter().map(|source| {
             let company = self.companies.get(source.company_id()).cloned();
             scan_one(
                 source,
                 company,
                 &self.filter,
+                self.scan_config.timeout_seconds,
                 self.scan_config.retry_count,
                 event_tx.clone(),
             )
@@ -178,6 +192,7 @@ async fn scan_one(
     source: Arc<dyn JobSource>,
     company: Option<CompanyConfig>,
     filter: &EligibilityFilter,
+    timeout_seconds: u64,
     retry_count: u32,
     event_tx: UnboundedSender<ScanEvent>,
 ) -> CompanyScan {
@@ -205,7 +220,7 @@ async fn scan_one(
         };
     };
 
-    let source_scan = scan_with_retry(source.as_ref(), retry_count).await;
+    let source_scan = scan_with_retry(source.as_ref(), timeout_seconds, retry_count).await;
     let completed_at = Utc::now();
     let outcome = match source_scan {
         Err(error) => CompanyOutcome::Failed {
@@ -227,11 +242,23 @@ async fn scan_one(
 
 async fn scan_with_retry(
     source: &dyn JobSource,
+    timeout_seconds: u64,
     retry_count: u32,
 ) -> Result<SourceScan, SourceError> {
     let mut retries_used = 0;
     loop {
-        match source.scan().await {
+        let result = timeout(Duration::from_secs(timeout_seconds), source.scan())
+            .await
+            .unwrap_or_else(|_| {
+                Err(SourceError {
+                    kind: SourceErrorKind::Timeout,
+                    message: format!("scan attempt timed out after {timeout_seconds} seconds"),
+                    http_status: None,
+                    retry_after: None,
+                    retryable: true,
+                })
+            });
+        match result {
             Err(error) if retries_used < retry_count && should_retry(&error) => {
                 let delay = error
                     .retry_after

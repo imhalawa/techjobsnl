@@ -9,7 +9,7 @@ use std::{
 
 use job_watch::{
     config::{CompanyConfig, FiltersConfig, ScanConfig, SourceConfig},
-    domain::{ObservedJob, ScanEvent, SourceErrorKind, SourceScan},
+    domain::{JobKey, ObservedJob, ScanEvent, SourceErrorKind, SourceScan},
     filter::EligibilityFilter,
     scanner::ScanService,
     sources::{JobSource, SourceError},
@@ -38,6 +38,11 @@ impl JobSource for CompleteSource {
 
 struct FailingSource {
     company_id: String,
+}
+
+struct HangingSource {
+    company_id: String,
+    attempts: Arc<AtomicUsize>,
 }
 
 struct RetrySource {
@@ -157,6 +162,18 @@ impl JobSource for FailingSource {
     }
 }
 
+#[async_trait::async_trait]
+impl JobSource for HangingSource {
+    fn company_id(&self) -> &str {
+        &self.company_id
+    }
+
+    async fn scan(&self) -> Result<SourceScan, SourceError> {
+        self.attempts.fetch_add(1, Ordering::SeqCst);
+        std::future::pending().await
+    }
+}
+
 #[tokio::test]
 async fn a_failed_company_does_not_discard_another_companys_jobs() {
     let companies = vec![company("healthy"), company("broken")];
@@ -193,6 +210,225 @@ async fn a_failed_company_does_not_discard_another_companys_jobs() {
     assert!(events.iter().any(
         |event| matches!(event, ScanEvent::CompanyFailed { company_id, .. } if company_id == "broken")
     ));
+}
+
+#[tokio::test]
+async fn a_disabled_company_is_not_scheduled_or_counted() {
+    let mut disabled = company("disabled");
+    disabled.enabled = false;
+    let companies = vec![disabled];
+    let store = store_for(&companies);
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let service = service(
+        vec![Arc::new(RetrySource {
+            company_id: "disabled".into(),
+            attempts: Arc::clone(&attempts),
+            failures_before_success: 0,
+            error_kind: SourceErrorKind::Transport,
+            http_status: None,
+            retry_after: None,
+            retryable: false,
+            observations: vec![observed("job-1", "Amsterdam", &["NL"])],
+        })],
+        companies,
+        Arc::clone(&store),
+    );
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    let summary = service.run("run-1", tx).await;
+    let events = drain_events(&mut rx);
+
+    assert_eq!(attempts.load(Ordering::SeqCst), 0);
+    assert_eq!(summary.completed, 0);
+    assert_eq!(summary.failed, 0);
+    assert_eq!(summary.incomplete, 0);
+    assert!(
+        store
+            .lock()
+            .unwrap()
+            .list_jobs(JobQuery::all())
+            .unwrap()
+            .is_empty()
+    );
+    assert!(matches!(
+        events.first(),
+        Some(ScanEvent::RunStarted {
+            company_count: 0,
+            ..
+        })
+    ));
+    assert!(!events.iter().any(|event| matches!(
+        event,
+        ScanEvent::CompanyStarted { .. }
+            | ScanEvent::CompanyCompleted { .. }
+            | ScanEvent::CompanyFailed { .. }
+            | ScanEvent::CompanyIncomplete { .. }
+    )));
+    assert!(matches!(
+        events.last(),
+        Some(ScanEvent::RunFinished {
+            completed: 0,
+            failed: 0,
+            incomplete: 0,
+            ..
+        })
+    ));
+}
+
+#[tokio::test]
+async fn a_disabled_scan_leaves_an_existing_applied_job_unchanged() {
+    let enabled = company("disabled");
+    let store = store_for(std::slice::from_ref(&enabled));
+    let initial_service = service(
+        vec![Arc::new(CompleteSource {
+            company_id: "disabled".into(),
+            observations: vec![observed("job-1", "Amsterdam", &["NL"])],
+        })],
+        vec![enabled.clone()],
+        Arc::clone(&store),
+    );
+    let (tx, _rx) = mpsc::unbounded_channel();
+    initial_service.run("initial", tx).await;
+    store
+        .lock()
+        .unwrap()
+        .toggle_applied(&JobKey::new("disabled", "job-1"), chrono::Utc::now())
+        .unwrap();
+    let before = store
+        .lock()
+        .unwrap()
+        .list_jobs(JobQuery::all())
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    let mut disabled = enabled;
+    disabled.enabled = false;
+    store
+        .lock()
+        .unwrap()
+        .sync_companies(&[disabled.clone()])
+        .unwrap();
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let service = service(
+        vec![Arc::new(RetrySource {
+            company_id: "disabled".into(),
+            attempts: Arc::clone(&attempts),
+            failures_before_success: 0,
+            error_kind: SourceErrorKind::Transport,
+            http_status: None,
+            retry_after: None,
+            retryable: false,
+            observations: Vec::new(),
+        })],
+        vec![disabled],
+        Arc::clone(&store),
+    );
+    let (tx, _rx) = mpsc::unbounded_channel();
+
+    let summary = service.run("disabled", tx).await;
+    let after = store
+        .lock()
+        .unwrap()
+        .list_jobs(JobQuery::all())
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert_eq!(summary.completed, 0);
+    assert_eq!(attempts.load(Ordering::SeqCst), 0);
+    assert_eq!(after.key, before.key);
+    assert!(after.source_open);
+    assert_eq!(after.applied_at, before.applied_at);
+    assert_eq!(after.last_seen_at, before.last_seen_at);
+}
+
+#[tokio::test]
+async fn a_source_without_a_company_configuration_is_not_scheduled() {
+    let companies = vec![company("configured")];
+    let store = store_for(&companies);
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let service = service(
+        vec![Arc::new(RetrySource {
+            company_id: "unconfigured".into(),
+            attempts: Arc::clone(&attempts),
+            failures_before_success: 0,
+            error_kind: SourceErrorKind::Transport,
+            http_status: None,
+            retry_after: None,
+            retryable: false,
+            observations: vec![observed("job-1", "Amsterdam", &["NL"])],
+        })],
+        companies,
+        Arc::clone(&store),
+    );
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    let summary = service.run("run-1", tx).await;
+    let events = drain_events(&mut rx);
+
+    assert_eq!(attempts.load(Ordering::SeqCst), 0);
+    assert_eq!(summary, Default::default());
+    assert!(matches!(
+        events.first(),
+        Some(ScanEvent::RunStarted {
+            company_count: 0,
+            ..
+        })
+    ));
+    assert!(events.iter().all(|event| !matches!(
+        event,
+        ScanEvent::CompanyStarted { .. }
+            | ScanEvent::CompanyCompleted { .. }
+            | ScanEvent::CompanyFailed { .. }
+            | ScanEvent::CompanyIncomplete { .. }
+    )));
+    assert!(
+        store
+            .lock()
+            .unwrap()
+            .list_jobs(JobQuery::all())
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn each_hanging_attempt_times_out_and_uses_the_timeout_retry_budget() {
+    let companies = vec![company("hanging")];
+    let store = store_for(&companies);
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let service = service_with_scan_config(
+        vec![Arc::new(HangingSource {
+            company_id: "hanging".into(),
+            attempts: Arc::clone(&attempts),
+        })],
+        companies,
+        store,
+        ScanConfig {
+            concurrency: 1,
+            timeout_seconds: 1,
+            retry_count: 1,
+            user_agent: "job-watch-test/0.1".into(),
+        },
+    );
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    let summary = tokio::time::timeout(Duration::from_secs(4), service.run("run-1", tx))
+        .await
+        .expect("each hanging scan attempt must be bounded");
+    let events = drain_events(&mut rx);
+
+    assert_eq!(summary.failed, 1);
+    assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        ScanEvent::CompanyFailed {
+            company_id,
+            kind: SourceErrorKind::Timeout,
+            ..
+        } if company_id == "hanging"
+    )));
 }
 
 #[tokio::test]
