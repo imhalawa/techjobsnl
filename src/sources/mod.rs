@@ -2,6 +2,7 @@ pub mod ashby;
 pub mod bol;
 pub mod greenhouse;
 pub mod http;
+pub mod ing;
 pub mod jibe;
 pub mod json_ld;
 pub mod recruitee;
