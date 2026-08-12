@@ -132,6 +132,9 @@ pub enum SourceConfig {
         base_url: String,
         client: String,
     },
+    Ebay {
+        listing_url: String,
+    },
     Recruitee {
         base_url: String,
     },
@@ -178,7 +181,9 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
             }
             Ok(())
         }
-        SourceConfig::Ing { listing_url } => validate_https_url(listing_url, path("listing_url")),
+        SourceConfig::Ing { listing_url } | SourceConfig::Ebay { listing_url } => {
+            validate_https_url(listing_url, path("listing_url"))
+        }
         SourceConfig::PagedHtml {
             listing_url,
             offset_parameter,

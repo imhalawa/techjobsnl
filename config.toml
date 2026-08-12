@@ -46,3 +46,11 @@ enabled = true
 strategy = "jibe"
 base_url = "https://jobs.booking.com"
 client = "Booking.com"
+
+[[companies]]
+id = "ebay"
+name = "eBay"
+enabled = true
+[companies.source]
+strategy = "ebay"
+listing_url = "https://jobs.ebayinc.com/us/en/jobs-in-netherlands"

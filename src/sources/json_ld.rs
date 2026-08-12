@@ -10,6 +10,7 @@ pub struct JobPosting {
     pub url: Option<String>,
     pub title: Option<String>,
     pub description: String,
+    #[serde(default, deserialize_with = "optional_one_or_many_string")]
     pub employment_type: Option<String>,
     pub date_posted: Option<String>,
     #[serde(default, deserialize_with = "one_or_many")]
@@ -73,6 +74,19 @@ pub struct HiringOrganization {
 }
 
 pub fn parse_job_posting(html: &str, source: &str) -> Result<JobPosting, SourceError> {
+    let posting = job_posting_value(html, source)?;
+    let posting: JobPosting = serde_json::from_value(posting).map_err(|error| {
+        SourceError::schema(format!("invalid JobPosting from {source}: {error}"))
+    })?;
+    if html_text(&posting.description).is_empty() {
+        return Err(SourceError::schema(format!(
+            "JobPosting from {source} has an empty description"
+        )));
+    }
+    Ok(posting)
+}
+
+pub fn job_posting_value(html: &str, source: &str) -> Result<serde_json::Value, SourceError> {
     let document = Html::parse_document(html);
     let selector = Selector::parse(r#"script[type="application/ld+json"]"#)
         .expect("static JSON-LD selector must be valid");
@@ -83,15 +97,7 @@ pub fn parse_job_posting(html: &str, source: &str) -> Result<JobPosting, SourceE
             SourceError::schema(format!("invalid JSON-LD from {source}: {error}"))
         })?;
         if let Some(posting) = find_job_posting(&value) {
-            let posting: JobPosting = serde_json::from_value(posting.clone()).map_err(|error| {
-                SourceError::schema(format!("invalid JobPosting from {source}: {error}"))
-            })?;
-            if html_text(&posting.description).is_empty() {
-                return Err(SourceError::schema(format!(
-                    "JobPosting from {source} has an empty description"
-                )));
-            }
-            return Ok(posting);
+            return Ok(posting.clone());
         }
     }
 
@@ -146,4 +152,28 @@ where
         OneOrMany::One(value) => vec![value],
         OneOrMany::Many(values) => values,
     })
+}
+
+fn optional_one_or_many_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(String),
+        Many(Vec<String>),
+    }
+
+    let values = match Option::<OneOrMany>::deserialize(deserializer)? {
+        Some(OneOrMany::One(value)) => vec![value],
+        Some(OneOrMany::Many(values)) => values,
+        None => return Ok(None),
+    };
+    let values = values
+        .into_iter()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>();
+    Ok((!values.is_empty()).then(|| values.join(" / ")))
 }

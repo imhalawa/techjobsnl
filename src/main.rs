@@ -16,7 +16,7 @@ use job_watch::{
     domain::ScanEvent,
     filter::EligibilityFilter,
     scanner::ScanService,
-    sources::{JobSource, ashby, jibe},
+    sources::{JobSource, ashby, ebay, jibe},
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
 };
@@ -262,6 +262,11 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     brand,
                     client.clone(),
                 ))),
+                SourceConfig::Ebay { listing_url } => Ok(Arc::new(ebay::EbaySource::new(
+                    &company.id,
+                    listing_url,
+                    client.clone(),
+                ))),
                 _ => Err(std::io::Error::other(format!(
                     "source strategy for {} is not wired yet",
                     company.id
@@ -493,20 +498,20 @@ mod tests {
     };
 
     #[test]
-    fn production_config_builds_mollie_and_booking_sources() {
+    fn production_config_builds_mollie_booking_and_ebay_sources() {
         let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
-        let booking = config
+        let ebay = config
             .companies
             .iter()
-            .filter(|company| company.id == "booking-com")
+            .filter(|company| company.id == "ebay")
             .collect::<Vec<_>>();
 
-        assert_eq!(booking.len(), 1);
-        assert!(booking[0].enabled);
+        assert_eq!(ebay.len(), 1);
+        assert!(ebay[0].enabled);
         assert!(matches!(
-            &booking[0].source,
-            SourceConfig::Jibe { base_url, client }
-                if base_url == "https://jobs.booking.com" && client == "Booking.com"
+            &ebay[0].source,
+            SourceConfig::Ebay { listing_url }
+                if listing_url == "https://jobs.ebayinc.com/us/en/jobs-in-netherlands"
         ));
 
         let source_ids = build_sources(&config)
@@ -514,7 +519,7 @@ mod tests {
             .into_iter()
             .map(|source| source.company_id().to_owned())
             .collect::<Vec<_>>();
-        assert_eq!(source_ids, ["mollie", "booking-com"]);
+        assert_eq!(source_ids, ["mollie", "booking-com", "ebay"]);
     }
 
     struct CompleteSource;

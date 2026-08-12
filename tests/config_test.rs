@@ -272,6 +272,10 @@ fn parses_and_validates_every_source_strategy() {
             true,
         ),
         (
+            "strategy = \"ebay\"\nlisting_url = \"https://jobs.ebayinc.com/us/en/jobs-in-netherlands\"",
+            true,
+        ),
+        (
             "strategy = \"recruitee\"\nbase_url = \"https://jobs.funda.nl\"",
             true,
         ),
@@ -328,6 +332,9 @@ fn rejects_empty_source_fields() {
         SourceConfig::Ing {
             listing_url: "".into(),
         },
+        SourceConfig::Ebay {
+            listing_url: "".into(),
+        },
         SourceConfig::Getnoticed {
             base_url: "https://www.werkenbijabnamro.nl".into(),
             country_filter: Some(" ".into()),
@@ -372,6 +379,9 @@ fn rejects_non_https_source_urls() {
         },
         SourceConfig::Ing {
             listing_url: "http://careers.ing.com/en/search-jobs".into(),
+        },
+        SourceConfig::Ebay {
+            listing_url: "http://jobs.ebayinc.com/us/en/jobs-in-netherlands".into(),
         },
         SourceConfig::Getnoticed {
             base_url: "http://www.werkenbijabnamro.nl".into(),
