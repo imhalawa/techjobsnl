@@ -391,30 +391,17 @@ fn copy_url_with(
     mut pipe: impl FnMut(CommandSpec, &str) -> io::Result<()>,
 ) -> Result<()> {
     let commands = clipboard_commands(platform);
+    let mut errors = Vec::with_capacity(commands.len());
     for command in commands {
         match pipe(*command, url) {
             Ok(()) => return Ok(()),
-            Err(source) if source.kind() == io::ErrorKind::NotFound => {}
-            Err(source) => {
-                return Err(io::Error::new(
-                    source.kind(),
-                    format!("could not copy URL with {}: {source}", command.program),
-                )
-                .into());
-            }
+            Err(source) => errors.push(format!("{}: {source}", command.program)),
         }
     }
-    Err(io::Error::new(
-        io::ErrorKind::NotFound,
-        format!(
-            "could not copy URL: no clipboard utility found (tried {})",
-            commands
-                .iter()
-                .map(|command| command.program)
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
-    )
+    Err(io::Error::other(format!(
+        "could not copy URL: all clipboard utilities failed ({})",
+        errors.join("; ")
+    ))
     .into())
 }
 
@@ -1020,6 +1007,23 @@ mod tests {
     }
 
     #[test]
+    fn linux_clipboard_falls_back_after_an_installed_utility_fails() {
+        let mut tried = Vec::new();
+
+        copy_url_with("https://example.test/job", Platform::Linux, |command, _| {
+            tried.push(command.program);
+            if command.program == "xclip" {
+                Ok(())
+            } else {
+                Err(std::io::Error::other("no Wayland display"))
+            }
+        })
+        .unwrap();
+
+        assert_eq!(tried, vec!["wl-copy", "xclip"]);
+    }
+
+    #[test]
     fn missing_clipboard_tools_report_every_supported_linux_fallback() {
         let error = copy_url_with("https://example.test/job", Platform::Linux, |_, _| {
             Err(std::io::Error::from(std::io::ErrorKind::NotFound))
@@ -1030,5 +1034,21 @@ mod tests {
         assert!(error.contains("wl-copy"));
         assert!(error.contains("xclip"));
         assert!(error.contains("xsel"));
+    }
+
+    #[test]
+    fn failed_clipboard_tools_aggregate_every_diagnostic() {
+        let error = copy_url_with("https://example.test/job", Platform::Linux, |command, _| {
+            Err(std::io::Error::other(format!(
+                "{} unavailable",
+                command.program
+            )))
+        })
+        .unwrap_err()
+        .to_string();
+
+        assert!(error.contains("wl-copy unavailable"));
+        assert!(error.contains("xclip unavailable"));
+        assert!(error.contains("xsel unavailable"));
     }
 }
