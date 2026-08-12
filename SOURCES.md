@@ -25,3 +25,10 @@
 - Hiring entity: eBay's Workday data names hiring organisation `0039 eBay Intl Management BV`. Mapping that abbreviated name to the registered entity above is an inference; the source does not publish the KvK number on each vacancy.
 - Official source: <https://jobs.ebayinc.com/us/en/jobs-in-netherlands>. Its embedded `phApp.ddo.eagerLoadRefineSearch` publishes `totalHits` and listing jobs; `?from=10&s=1` supplies later pages. Each official detail page publishes matching `JobPosting` JSON-LD with the complete description and Netherlands location.
 - Live discovery: 7 Netherlands jobs on 2026-08-12. This count is volatile; scans trust the source's internally consistent total, not the baseline.
+
+## Eneco
+
+- Sponsor candidates: the current IND public register lists `Eneco Zakelijk` (KvK `24296168`), `Eneco Diamond Hydrogen B.V.` (KvK `90411285`), and `N.V. Eneco` (KvK `24246970`): <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.
+- Official source: Eneco's public careers source returned 21 live postings on 2026-08-12. Each posting's `hiringOrganization` was only `Eneco`; it did not identify a legal employer or a KvK number that could be matched to a sponsor candidate.
+- Privacy evidence: Eneco's privacy controller, `Eneco B.V.`, is not employment proof and must not be used to infer the hiring entity.
+- Policy: Eneco remains configured as disabled and unsupported because its legal employer is not established. Re-enable it only when an official vacancy or employment document names the legal entity and its KvK number matches a current IND-recognised sponsor.

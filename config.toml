@@ -78,3 +78,11 @@ enabled = false
 [companies.source]
 strategy = "unsupported"
 reason = "official sources reject unattended access (HTTP 403)"
+
+[[companies]]
+id = "eneco"
+name = "Eneco"
+enabled = false
+[companies.source]
+strategy = "unsupported"
+reason = "legal employer not established"

@@ -506,7 +506,7 @@ mod tests {
     };
 
     #[test]
-    fn production_config_enables_adyen_and_keeps_rabobank_unschedulable() {
+    fn production_config_keeps_disabled_companies_unschedulable() {
         let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
         let adyen = config
             .companies
@@ -517,6 +517,11 @@ mod tests {
             .companies
             .iter()
             .filter(|company| company.id == "rabobank")
+            .collect::<Vec<_>>();
+        let eneco = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "eneco")
             .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
@@ -532,6 +537,13 @@ mod tests {
             &rabobank[0].source,
             SourceConfig::Unsupported { reason }
                 if reason == "official sources reject unattended access (HTTP 403)"
+        ));
+
+        assert_eq!(eneco.len(), 1);
+        assert!(!eneco[0].enabled);
+        assert!(matches!(
+            &eneco[0].source,
+            SourceConfig::Unsupported { reason } if reason == "legal employer not established"
         ));
 
         let enabled_ids = config
