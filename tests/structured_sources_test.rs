@@ -53,6 +53,7 @@ fn parses_complete_bol_pages() {
 #[test]
 fn bol_rejects_invalid_records_and_rich_text() {
     for mutation in [
+        "source_id",
         "id",
         "title",
         "office",
@@ -64,6 +65,11 @@ fn bol_rejects_invalid_records_and_rich_text() {
         "span",
     ] {
         let mut pages = bol_fixtures();
+        if mutation == "source_id" {
+            pages[0]["hits"]["hits"][0]["_id"] = " \t".into();
+            assert_schema_error(parse_fixture_pages(pages));
+            continue;
+        }
         let source = &mut pages[0]["hits"]["hits"][0]["_source"];
         match mutation {
             "id" => {
@@ -213,6 +219,7 @@ fn assert_live_jobs(jobs: &[ObservedJob]) {
     let mut ids = HashSet::new();
     for job in jobs {
         assert!(ids.insert(&job.source_id));
+        assert!(!job.source_id.trim().is_empty());
         assert!(!job.title.trim().is_empty());
         assert!(!job.locations.is_empty());
         assert_eq!(job.countries, ["NL"]);

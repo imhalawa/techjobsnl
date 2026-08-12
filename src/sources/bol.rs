@@ -160,6 +160,12 @@ impl<'a> BolCollection<'a> {
             let hit: BolHit = serde_json::from_value(raw_hit).map_err(|error| {
                 SourceError::schema(format!("invalid bol hit for {}: {error}", self.company_id))
             })?;
+            if hit.id.trim().is_empty() {
+                return Err(SourceError::schema(format!(
+                    "bol job for {} has an empty source ID",
+                    self.company_id
+                )));
+            }
             if !self.ids.insert(hit.id.clone()) {
                 return Err(SourceError::schema(format!(
                     "duplicate bol job {} for {}",
