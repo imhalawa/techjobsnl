@@ -1,4 +1,6 @@
 pub mod ashby;
+pub mod http;
+pub mod json_ld;
 
 use std::time::Duration;
 

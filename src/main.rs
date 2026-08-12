@@ -186,13 +186,21 @@ fn scan_service(config: &Config, store: Arc<Mutex<Store>>) -> Result<ScanService
     let sources = config
         .companies
         .iter()
-        .map(|company| match &company.source {
-            SourceConfig::Ashby { board } => {
-                Arc::new(ashby::AshbySource::new(&company.id, board, client.clone()))
-                    as Arc<dyn JobSource>
+        .map(|company| -> Result<Arc<dyn JobSource>> {
+            match &company.source {
+                SourceConfig::Ashby { board } => Ok(Arc::new(ashby::AshbySource::new(
+                    &company.id,
+                    board,
+                    client.clone(),
+                ))),
+                _ => Err(std::io::Error::other(format!(
+                    "source strategy for {} is not wired yet",
+                    company.id
+                ))
+                .into()),
             }
         })
-        .collect();
+        .collect::<Result<Vec<_>>>()?;
     Ok(ScanService::new(
         sources,
         EligibilityFilter::new(&config.filters)?,

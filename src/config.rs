@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fs, path::Path};
 
 use ratatui::style::Color;
+use reqwest::Url;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -67,15 +68,7 @@ impl Config {
                     format!("companies[{index}].location_country_overrides.{location}"),
                 )?;
             }
-            match &company.source {
-                SourceConfig::Ashby { board } if board.trim().is_empty() => {
-                    return Err(ConfigError::invalid(
-                        format!("companies[{index}].source.board"),
-                        "must not be empty",
-                    ));
-                }
-                SourceConfig::Ashby { .. } => {}
-            }
+            validate_source(company, index)?;
         }
 
         if !matches!(self.ui.theme.as_str(), "clean-dark" | "clean-light") {
@@ -129,7 +122,106 @@ pub struct CompanyConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "strategy", rename_all = "kebab-case")]
 pub enum SourceConfig {
-    Ashby { board: String },
+    Ashby {
+        board: String,
+    },
+    Greenhouse {
+        board: String,
+    },
+    Jibe {
+        base_url: String,
+        client: String,
+    },
+    Recruitee {
+        base_url: String,
+    },
+    Bol {
+        base_url: String,
+    },
+    Ing {
+        listing_url: String,
+    },
+    Getnoticed {
+        base_url: String,
+        country_filter: Option<String>,
+    },
+    PagedHtml {
+        listing_url: String,
+        offset_parameter: String,
+        page_size: usize,
+    },
+    Unsupported {
+        reason: String,
+    },
+}
+
+fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigError> {
+    let path = |field: &str| format!("companies[{index}].source.{field}");
+    match &company.source {
+        SourceConfig::Ashby { board } | SourceConfig::Greenhouse { board } => {
+            validate_non_empty(board, path("board"))
+        }
+        SourceConfig::Jibe { base_url, client } => {
+            validate_https_url(base_url, path("base_url"))?;
+            validate_non_empty(client, path("client"))
+        }
+        SourceConfig::Recruitee { base_url }
+        | SourceConfig::Bol { base_url }
+        | SourceConfig::Getnoticed { base_url, .. } => {
+            validate_https_url(base_url, path("base_url"))?;
+            if let SourceConfig::Getnoticed {
+                country_filter: Some(country_filter),
+                ..
+            } = &company.source
+            {
+                validate_non_empty(country_filter, path("country_filter"))?;
+            }
+            Ok(())
+        }
+        SourceConfig::Ing { listing_url } => validate_https_url(listing_url, path("listing_url")),
+        SourceConfig::PagedHtml {
+            listing_url,
+            offset_parameter,
+            page_size,
+        } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            validate_non_empty(offset_parameter, path("offset_parameter"))?;
+            if *page_size == 0 {
+                return Err(ConfigError::invalid(
+                    path("page_size"),
+                    "must be greater than zero",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Unsupported { reason } => {
+            validate_non_empty(reason, path("reason"))?;
+            if company.enabled {
+                return Err(ConfigError::invalid(
+                    path("strategy"),
+                    "unsupported sources must be disabled",
+                ));
+            }
+            Ok(())
+        }
+    }
+}
+
+fn validate_non_empty(value: &str, path: String) -> Result<(), ConfigError> {
+    if value.trim().is_empty() {
+        return Err(ConfigError::invalid(path, "must not be empty"));
+    }
+    Ok(())
+}
+
+fn validate_https_url(value: &str, path: String) -> Result<(), ConfigError> {
+    validate_non_empty(value, path.clone())?;
+    let valid =
+        Url::parse(value).is_ok_and(|url| url.scheme() == "https" && url.host_str().is_some());
+    if !valid {
+        return Err(ConfigError::invalid(path, "must be an HTTPS URL"));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Deserialize)]

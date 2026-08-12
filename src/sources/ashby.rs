@@ -1,12 +1,12 @@
 use std::{collections::HashSet, time::Duration};
 
 use chrono::{DateTime, Utc};
-use reqwest::{Client, StatusCode, Url, header::HeaderValue, redirect::Policy};
+use reqwest::{Client, Url, redirect::Policy};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{ObservedJob, SourceErrorKind, SourceScan};
 
-use super::{JobSource, SourceError};
+use super::{JobSource, SourceError, http::send_text};
 
 const ASHBY_BOARD_ENDPOINT: &str = "https://api.ashbyhq.com/posting-api/job-board";
 const REDIRECT_LIMIT: usize = 5;
@@ -50,62 +50,9 @@ impl JobSource for AshbySource {
     }
 
     async fn scan(&self) -> Result<SourceScan, SourceError> {
-        let response = self
-            .client
-            .get(board_url(&self.board))
-            .send()
-            .await
-            .map_err(transport_error)?;
-        let status = response.status();
-        let retry_after = response
-            .headers()
-            .get(reqwest::header::RETRY_AFTER)
-            .and_then(parse_retry_after);
-
-        if status == StatusCode::TOO_MANY_REQUESTS {
-            return Err(SourceError {
-                kind: SourceErrorKind::RateLimit,
-                message: "Ashby rate limit exceeded".to_owned(),
-                http_status: Some(status.as_u16()),
-                retry_after,
-                retryable: true,
-            });
-        }
-        if !status.is_success() {
-            return Err(SourceError {
-                kind: if status == StatusCode::REQUEST_TIMEOUT {
-                    SourceErrorKind::Timeout
-                } else {
-                    SourceErrorKind::Transport
-                },
-                message: format!("Ashby returned HTTP {status}"),
-                http_status: Some(status.as_u16()),
-                retry_after,
-                retryable: retryable_status(status),
-            });
-        }
-
-        let raw_json = response.text().await.map_err(transport_error)?;
+        let raw_json = send_text(self.client.get(board_url(&self.board)), "Ashby").await?;
         let observations = parse_ashby_response(&self.company_id, &raw_json)?;
         Ok(SourceScan::Complete { observations })
-    }
-}
-
-fn transport_error(error: reqwest::Error) -> SourceError {
-    let retryable = error.is_connect()
-        || error.is_timeout()
-        || error.is_body()
-        || (error.is_request() && !error.is_builder() && !error.is_redirect());
-    SourceError {
-        kind: if error.is_timeout() {
-            SourceErrorKind::Timeout
-        } else {
-            SourceErrorKind::Transport
-        },
-        message: error.to_string(),
-        http_status: error.status().map(|status| status.as_u16()),
-        retry_after: None,
-        retryable,
     }
 }
 
@@ -115,31 +62,6 @@ fn board_url(board: &str) -> Url {
         .expect("Ashby endpoint must be a base URL")
         .push(board);
     url
-}
-
-fn parse_retry_after(value: &HeaderValue) -> Option<Duration> {
-    parse_retry_after_at(value, Utc::now())
-}
-
-fn parse_retry_after_at(value: &HeaderValue, now: DateTime<Utc>) -> Option<Duration> {
-    let value = value.to_str().ok()?;
-    if let Ok(seconds) = value.parse::<u64>() {
-        return Some(Duration::from_secs(seconds));
-    }
-
-    let retry_at = DateTime::parse_from_rfc2822(value)
-        .ok()?
-        .with_timezone(&Utc);
-    Some(
-        retry_at
-            .signed_duration_since(now)
-            .to_std()
-            .unwrap_or_default(),
-    )
-}
-
-fn retryable_status(status: StatusCode) -> bool {
-    status == StatusCode::REQUEST_TIMEOUT || status.is_server_error()
 }
 
 #[derive(Debug, Deserialize)]
@@ -308,12 +230,7 @@ fn push_unique(values: &mut Vec<String>, seen: &mut HashSet<String>, value: Stri
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
-    use chrono::{TimeZone, Utc};
-    use reqwest::{StatusCode, header::HeaderValue};
-
-    use super::{board_url, parse_retry_after_at, retryable_status};
+    use super::board_url;
 
     #[test]
     fn encodes_board_as_one_url_path_segment() {
@@ -323,30 +240,5 @@ mod tests {
             url.as_str(),
             "https://api.ashbyhq.com/posting-api/job-board/mollie%2Fpreview%3Fregion=nl%23jobs"
         );
-    }
-
-    #[test]
-    fn parses_retry_after_seconds_and_http_dates() {
-        let now = Utc.with_ymd_and_hms(2015, 10, 21, 7, 27, 0).unwrap();
-
-        assert_eq!(
-            parse_retry_after_at(&HeaderValue::from_static("45"), now),
-            Some(Duration::from_secs(45))
-        );
-        assert_eq!(
-            parse_retry_after_at(
-                &HeaderValue::from_static("Wed, 21 Oct 2015 07:28:00 GMT"),
-                now,
-            ),
-            Some(Duration::from_secs(60))
-        );
-    }
-
-    #[test]
-    fn retries_request_timeout_and_server_statuses_only() {
-        assert!(retryable_status(StatusCode::REQUEST_TIMEOUT));
-        assert!(retryable_status(StatusCode::INTERNAL_SERVER_ERROR));
-        assert!(!retryable_status(StatusCode::UNAUTHORIZED));
-        assert!(!retryable_status(StatusCode::NOT_FOUND));
     }
 }
