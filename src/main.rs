@@ -77,9 +77,18 @@ fn initialize(working_directory: &Path) -> Result<Startup> {
             config_path.display()
         ))
     })?);
-    let jobs = store.lock().unwrap().list_jobs(JobQuery::active())?;
+    let (jobs, scans, sources) = {
+        let store = store.lock().unwrap();
+        (
+            store.list_jobs(JobQuery::active())?,
+            store.recent_scans()?,
+            store.source_health()?,
+        )
+    };
+    let mut app = App::new(config, jobs);
+    app.replace_read_models(scans, sources);
     Ok(Startup {
-        app: App::new(config, jobs),
+        app,
         store,
         scan_service,
     })
@@ -138,7 +147,7 @@ async fn run(
                 }
             }
             Some(event) = scan_rx.recv() => {
-                app.handle_scan_event(event);
+                handle_runtime_scan_event(event, &store, app)?;
             }
             scan_result = async {
                 active_scan.as_mut().expect("guarded by select branch").await
@@ -147,6 +156,24 @@ async fn run(
                 reload_jobs(&store, app)?;
             }
         }
+    }
+    Ok(())
+}
+
+fn handle_runtime_scan_event(
+    event: ScanEvent,
+    store: &Arc<Mutex<Store>>,
+    app: &mut App,
+) -> rusqlite::Result<()> {
+    let company_finished = matches!(
+        &event,
+        ScanEvent::CompanyCompleted { .. }
+            | ScanEvent::CompanyFailed { .. }
+            | ScanEvent::CompanyIncomplete { .. }
+    );
+    app.handle_scan_event(event);
+    if company_finished {
+        reload_jobs(store, app)?;
     }
     Ok(())
 }
@@ -186,8 +213,11 @@ fn reload_jobs(store: &Arc<Mutex<Store>>, app: &mut App) -> rusqlite::Result<()>
     let store = store.lock().unwrap();
     let jobs = store.list_jobs(query)?;
     let active_job_count = store.list_jobs(JobQuery::active())?.len();
+    let scans = store.recent_scans()?;
+    let sources = store.source_health()?;
     drop(store);
     app.replace_jobs(jobs, active_job_count);
+    app.replace_read_models(scans, sources);
     Ok(())
 }
 
@@ -267,7 +297,10 @@ mod tests {
             CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig, SourceConfig,
             UiConfig,
         },
-        domain::{ClassifiedJob, Eligibility, JobKey, ObservedJob, SourceScan},
+        domain::{
+            ClassifiedJob, Eligibility, JobKey, ObservedJob, ScanEvent, ScanFailure,
+            SourceErrorKind, SourceScan,
+        },
         filter::EligibilityFilter,
         scanner::ScanService,
         sources::{JobSource, SourceError},
@@ -278,8 +311,8 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::{
-        CommandEffect, abort_scan, execute_command, finish_scan, finish_with_restore, initialize,
-        start_scan,
+        CommandEffect, abort_scan, execute_command, finish_scan, finish_with_restore,
+        handle_runtime_scan_event, initialize, start_scan,
     };
 
     struct CompleteSource;
@@ -660,5 +693,48 @@ mod tests {
         let stored = startup.app.selected_job().unwrap();
         assert_eq!(stored.key, JobKey::new("mollie", "stored"));
         assert!(stored.is_new, "startup must not perform an implicit scan");
+    }
+
+    #[test]
+    fn company_completion_event_refreshes_durable_scan_and_source_read_models() {
+        let store = store_with_job();
+        let jobs = store.lock().unwrap().list_jobs(JobQuery::active()).unwrap();
+        let mut app = App::new(config(), jobs);
+        let configured = company();
+        store
+            .lock()
+            .unwrap()
+            .record_failed_scan(
+                "run-failed",
+                &configured,
+                &ScanFailure {
+                    kind: SourceErrorKind::Transport,
+                    diagnostic: "connection reset".into(),
+                },
+                Utc.with_ymd_and_hms(2026, 8, 12, 10, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2026, 8, 12, 11, 0, 0).unwrap(),
+            )
+            .unwrap();
+
+        handle_runtime_scan_event(
+            ScanEvent::CompanyFailed {
+                company_id: "acme".into(),
+                kind: SourceErrorKind::Transport,
+                diagnostic: "connection reset".into(),
+            },
+            &store,
+            &mut app,
+        )
+        .unwrap();
+
+        assert_eq!(app.scans().len(), 2);
+        assert_eq!(app.scans()[0].company_name, "Acme");
+        assert_eq!(app.scans()[0].error_kind, Some(SourceErrorKind::Transport));
+        assert_eq!(app.sources().len(), 1);
+        assert_eq!(app.sources()[0].company_name, "Acme");
+        assert_eq!(
+            app.sources()[0].diagnostic.as_deref(),
+            Some("connection reset")
+        );
     }
 }

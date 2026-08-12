@@ -10,22 +10,37 @@ use job_watch::{
     domain::{
         ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanEvent, SourceErrorKind,
     },
+    storage::{ScanOutcome, ScanReadModel, SourceHealth, SourceReadModel},
     ui::{App, AppCommand, IconSet, InputMode, Theme, View, render},
 };
-use ratatui::{Terminal, backend::TestBackend, style::Color};
+use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, style::Color};
 use serde_json::json;
 
 fn rendered(app: &App, width: u16, height: u16) -> String {
-    let backend = TestBackend::new(width, height);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal.draw(|frame| render(frame, app)).unwrap();
-    terminal
-        .backend()
-        .buffer()
+    rendered_buffer(app, width, height)
         .content()
         .iter()
         .map(|cell| cell.symbol())
         .collect()
+}
+
+fn rendered_buffer(app: &App, width: u16, height: u16) -> Buffer {
+    let backend = TestBackend::new(width, height);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|frame| render(frame, app)).unwrap();
+    terminal.backend().buffer().clone()
+}
+
+fn row(buffer: &Buffer, y: u16) -> String {
+    (0..buffer.area.width)
+        .map(|x| buffer.cell((x, y)).unwrap().symbol())
+        .collect()
+}
+
+fn symbol_x(buffer: &Buffer, y: u16, start_x: u16, symbol: &str) -> u16 {
+    (start_x..buffer.area.width)
+        .find(|x| buffer.cell((*x, y)).unwrap().symbol() == symbol)
+        .unwrap_or_else(|| panic!("missing {symbol:?} on row {y}"))
 }
 
 fn config() -> Config {
@@ -188,14 +203,13 @@ fn configured_actions_replace_only_the_configurable_keys() {
 }
 
 #[test]
-fn search_accepts_input_filters_by_title_or_company_and_escape_cancels() {
+fn search_accepts_input_filters_by_title_company_or_posting_and_escape_cancels() {
     let configured = config_with_two_companies();
+    let mut backend = job("Backend Engineer", false, false);
+    backend.classified.observed.description = "Maintain payment ledgers.".into();
     let mut app = App::new(
         configured,
-        vec![
-            job("Backend Engineer", false, false),
-            job_for("beta", "Platform Engineer", false, false),
-        ],
+        vec![backend, job_for("beta", "Platform Engineer", false, false)],
     );
 
     app.handle_key(key('/'));
@@ -217,6 +231,14 @@ fn search_accepts_input_filters_by_title_or_company_and_escape_cancels() {
     }
     assert_eq!(app.visible_jobs().count(), 1);
     assert_eq!(app.selected_job().unwrap().key.company_id, "beta");
+
+    app.handle_key(special(KeyCode::Esc));
+    app.handle_key(key('/'));
+    for character in "ledgers".chars() {
+        app.handle_key(key(character));
+    }
+    assert_eq!(app.visible_jobs().count(), 1);
+    assert_eq!(app.selected_job().unwrap().key.company_id, "acme");
 }
 
 #[test]
@@ -338,6 +360,16 @@ fn fixed_navigation_controls_move_jobs_scroll_details_and_switch_views() {
         app.handle_key(special(KeyCode::Right)),
         AppCommand::ReloadJobs
     );
+    assert_eq!(app.view(), View::Scans);
+    assert_eq!(
+        app.handle_key(special(KeyCode::Right)),
+        AppCommand::ReloadJobs
+    );
+    assert_eq!(app.view(), View::Sources);
+    assert_eq!(
+        app.handle_key(special(KeyCode::Right)),
+        AppCommand::ReloadJobs
+    );
     assert_eq!(app.view(), View::Active);
 }
 
@@ -396,9 +428,19 @@ fn scan_events_update_progress_and_health_without_moving_selection() {
     app.handle_scan_event(ScanEvent::CompanyStarted {
         company_id: "acme".into(),
     });
-    let scanning = rendered(&app, 140, 30);
+    let scanning_buffer = rendered_buffer(&app, 140, 30);
+    let scanning: String = scanning_buffer
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
     assert!(scanning.contains("SCANNING 0/1"));
-    assert!(scanning.contains("acme scanning"));
+    assert!(!scanning.contains("acme scanning"));
+    let scanning_x = symbol_x(&scanning_buffer, 29, 0, "↻");
+    assert_eq!(
+        scanning_buffer.cell((scanning_x, 29)).unwrap().fg,
+        Theme::clean_dark().warning
+    );
     assert_eq!(app.selected_index(), 1);
 
     app.handle_scan_event(ScanEvent::CompanyFailed {
@@ -407,7 +449,7 @@ fn scan_events_update_progress_and_health_without_moving_selection() {
         diagnostic: "timed out".into(),
     });
     let failed = rendered(&app, 140, 30);
-    assert!(failed.contains("acme timeout"));
+    assert!(!failed.contains("acme timeout"));
     assert_eq!(app.selected_index(), 1);
 
     app.handle_scan_event(ScanEvent::RunFinished {
@@ -416,7 +458,13 @@ fn scan_events_update_progress_and_health_without_moving_selection() {
         failed: 1,
         incomplete: 0,
     });
-    assert!(rendered(&app, 140, 30).contains("FAILED 1"));
+    let failed_buffer = rendered_buffer(&app, 140, 30);
+    assert!(row(&failed_buffer, 29).contains("FAILED 1"));
+    let failed_x = symbol_x(&failed_buffer, 29, 0, "⚠");
+    assert_eq!(
+        failed_buffer.cell((failed_x, 29)).unwrap().fg,
+        Theme::clean_dark().error
+    );
     assert_eq!(app.selected_index(), 1);
 }
 
@@ -447,7 +495,7 @@ fn renderer_uses_the_specified_responsive_job_layouts_and_status_icons() {
             && narrow.contains("Active jobs")
             && !narrow.contains("Job details")
     );
-    assert!(wide.contains("● OPEN") && wide.contains("✦ NEW") && wide.contains("✓ APPLIED"));
+    assert!(wide.contains("● OPEN") && wide.contains("✦") && wide.contains("✓"));
 }
 
 #[test]
@@ -492,15 +540,19 @@ fn theme_overrides_and_ascii_icons_preserve_the_configured_semantics() {
 }
 
 #[test]
-fn footer_uses_configured_key_hints_and_job_counts() {
+fn footer_keeps_configured_help_as_the_final_visible_hint_at_supported_widths() {
     let mut configured = config();
     configured.keybindings.scan = "s".into();
-    configured.keybindings.search = "?".into();
+    configured.keybindings.search = "z".into();
+    configured.keybindings.help = "i".into();
     let app = App::new(configured, vec![job("Backend Engineer", false, false)]);
 
-    let screen = rendered(&app, 70, 25);
-    assert!(screen.contains("s scan  ? search"));
-    assert!(screen.contains("1 companies  1 active jobs"));
+    for width in [70, 100, 140] {
+        let buffer = rendered_buffer(&app, width, 25);
+        let footer = row(&buffer, 24);
+        assert!(footer.contains("s scan"));
+        assert!(footer.trim_end().ends_with("i help"), "{footer:?}");
+    }
 }
 
 #[test]
@@ -572,4 +624,211 @@ fn navigation_renders_history_scan_and_source_failure_status_icons() {
     assert!(screen.contains("◷ History"));
     assert!(screen.contains("↻ Scans"));
     assert!(screen.contains("⚠ Sources"));
+}
+
+#[test]
+fn production_job_buffers_preserve_geometry_styles_and_truth_at_all_breakpoints_and_themes() {
+    for theme_name in ["clean-dark", "clean-light"] {
+        let mut configured = config();
+        configured.ui.theme = theme_name.into();
+        let theme = Theme::from_config(theme_name, &Default::default());
+        let mut app = App::new(configured, vec![job("Backend Engineer", true, true)]);
+
+        for width in [120, 80, 79] {
+            let buffer = rendered_buffer(&app, width, 24);
+            let screen: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
+            assert!(screen.contains("Acme · Backend Engineer"));
+            assert!(!screen.contains("acme"));
+            assert!(screen.contains("11 Aug"));
+            assert!(row(&buffer, 23).trim_end().ends_with("? help"));
+
+            let list_x = if width >= 120 { 22 } else { 0 };
+            let open_x = symbol_x(&buffer, 1, list_x, "●");
+            assert_eq!(buffer.cell((open_x, 1)).unwrap().fg, theme.open);
+            assert_eq!(buffer.cell((open_x, 1)).unwrap().bg, theme.selected_row);
+            let new_x = symbol_x(&buffer, 1, open_x + 1, "✦");
+            let applied_x = symbol_x(&buffer, 1, new_x + 1, "✓");
+            assert_eq!(buffer.cell((new_x, 1)).unwrap().fg, theme.new);
+            assert_eq!(buffer.cell((applied_x, 1)).unwrap().fg, theme.applied);
+
+            match width {
+                120 => {
+                    assert!(screen.contains("● Active"));
+                    assert!(screen.contains("✦ New"));
+                    assert!(screen.contains("✓ Applied"));
+                    assert_eq!(buffer.cell((18, 0)).unwrap().fg, theme.unfocused_border);
+                    assert_eq!(buffer.cell((40, 0)).unwrap().fg, theme.focused_border);
+                    assert_eq!(buffer.cell((100, 0)).unwrap().fg, theme.unfocused_border);
+                    assert_eq!(buffer.cell((21, 5)).unwrap().symbol(), "│");
+                    assert_ne!(buffer.cell((22, 5)).unwrap().symbol(), "│");
+                    assert_eq!(buffer.cell((69, 5)).unwrap().symbol(), "│");
+                    assert_ne!(buffer.cell((70, 5)).unwrap().symbol(), "│");
+                    assert!(screen.contains("Job details"));
+                    assert!(screen.contains("Engineering"));
+                    assert!(screen.contains("Status"));
+                    assert!(screen.contains("First seen"));
+                    assert!(screen.contains("Last seen"));
+                    assert!(screen.contains("Applied"));
+                    assert!(screen.contains("Build reliable systems."));
+                }
+                80 => {
+                    assert!(!screen.contains("Navigation"));
+                    assert_eq!(buffer.cell((25, 0)).unwrap().fg, theme.focused_border);
+                    assert_eq!(buffer.cell((60, 0)).unwrap().fg, theme.unfocused_border);
+                    assert_eq!(buffer.cell((35, 5)).unwrap().symbol(), "│");
+                    assert_ne!(buffer.cell((36, 5)).unwrap().symbol(), "│");
+                    assert!(screen.contains("Job details"));
+                }
+                79 => {
+                    assert!(!screen.contains("Job details"));
+                    assert_eq!(buffer.cell((25, 0)).unwrap().fg, theme.focused_border);
+                    app.handle_key_with_width(special(KeyCode::Enter), 79);
+                    let details = rendered_buffer(&app, 79, 24);
+                    let details_screen: String =
+                        details.content().iter().map(|cell| cell.symbol()).collect();
+                    assert!(details_screen.contains("Job details"));
+                    assert!(details_screen.contains("Acme · Amsterdam · Engineering"));
+                    assert_eq!(details.cell((25, 0)).unwrap().fg, theme.focused_border);
+                    app.handle_key_with_width(special(KeyCode::Esc), 79);
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+#[test]
+fn scans_and_sources_render_durable_semantic_states_at_all_breakpoints_and_themes() {
+    let completed_at = Utc.with_ymd_and_hms(2026, 8, 11, 11, 0, 0).unwrap();
+    for theme_name in ["clean-dark", "clean-light"] {
+        let mut configured = config();
+        configured.ui.theme = theme_name.into();
+        let theme = Theme::from_config(theme_name, &Default::default());
+        let mut app = App::new(configured, vec![]);
+        app.replace_read_models(
+            vec![ScanReadModel {
+                run_id: "run-2".into(),
+                company_id: "acme".into(),
+                company_name: "Acme".into(),
+                completed_at,
+                outcome: ScanOutcome::Failed,
+                observed_count: 0,
+                error_kind: Some(SourceErrorKind::Timeout),
+                diagnostic: Some("timed out".into()),
+            }],
+            vec![SourceReadModel {
+                company_id: "acme".into(),
+                company_name: "Acme".into(),
+                enabled: true,
+                latest_attempted_at: Some(completed_at),
+                latest_successful_at: None,
+                health: SourceHealth::Incomplete,
+                latest_error_kind: Some(SourceErrorKind::IncompleteResults),
+                diagnostic: Some("unresolved location".into()),
+            }],
+        );
+
+        for _ in 0..4 {
+            assert_eq!(
+                app.handle_key(special(KeyCode::Right)),
+                AppCommand::ReloadJobs
+            );
+        }
+        assert_eq!(app.view(), View::Scans);
+        for width in [120, 80, 79] {
+            let buffer = rendered_buffer(&app, width, 24);
+            let screen: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
+            assert!(screen.contains("FAILED"));
+            assert!(screen.contains("Acme"));
+            assert!(screen.contains("11 Aug 11:00"));
+            assert!(screen.contains("0 observed"));
+            assert!(screen.contains("timeout · timed out"));
+            let start_x = if width >= 120 { 22 } else { 0 };
+            let status_x = symbol_x(&buffer, 1, start_x, "⚠");
+            assert_eq!(buffer.cell((status_x, 1)).unwrap().fg, theme.error);
+            assert_eq!(
+                buffer.cell((25.max(start_x), 0)).unwrap().fg,
+                theme.focused_border
+            );
+        }
+
+        assert_eq!(
+            app.handle_key(special(KeyCode::Right)),
+            AppCommand::ReloadJobs
+        );
+        assert_eq!(app.view(), View::Sources);
+        for width in [120, 80, 79] {
+            let buffer = rendered_buffer(&app, width, 24);
+            let screen: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
+            assert!(screen.contains("INCOMPLETE"));
+            assert!(screen.contains("Acme · enabled"));
+            assert!(screen.contains("last attempt 11 Aug 11:00"));
+            assert!(screen.contains("last success never"));
+            assert!(screen.contains("incomplete-results · unresolved location"));
+            let start_x = if width >= 120 { 22 } else { 0 };
+            let status_x = symbol_x(&buffer, 1, start_x, "⚠");
+            assert_eq!(buffer.cell((status_x, 1)).unwrap().fg, theme.warning);
+        }
+    }
+}
+
+#[test]
+fn configured_help_opens_an_overlay_with_fixed_and_contextual_controls() {
+    let mut configured = config();
+    configured.keybindings.scan = "s".into();
+    configured.keybindings.search = "z".into();
+    configured.keybindings.filter = "v".into();
+    configured.keybindings.toggle_applied = "x".into();
+    configured.keybindings.open = "u".into();
+    configured.keybindings.help = "i".into();
+    configured.keybindings.quit = "e".into();
+    let mut app = App::new(configured, vec![job("Backend Engineer", false, false)]);
+
+    app.handle_key(key('i'));
+    let screen = rendered(&app, 79, 28);
+    assert!(screen.contains("←/→ views"));
+    assert!(screen.contains("↑/↓ or j/k select"));
+    assert!(screen.contains("J/K scroll details"));
+    assert!(screen.contains("s scan"));
+    assert!(screen.contains("z search jobs"));
+    assert!(screen.contains("v filter company/New/Applied"));
+    assert!(screen.contains("x applied"));
+    assert!(screen.contains("u open"));
+    assert!(screen.contains("Enter narrow: details; otherwise: open"));
+    assert!(screen.contains("Esc close help"));
+    assert!(screen.contains("e quit"));
+
+    app.handle_key(special(KeyCode::Esc));
+    assert!(!app.help_visible());
+    assert!(rendered(&app, 79, 28).contains("Active jobs"));
+}
+
+#[test]
+fn operational_rows_remain_keyboard_reachable_when_the_view_exceeds_the_terminal() {
+    let mut app = App::new(config(), vec![]);
+    let sources = (0..12)
+        .map(|index| SourceReadModel {
+            company_id: format!("source-{index}"),
+            company_name: format!("Source {index}"),
+            enabled: true,
+            latest_attempted_at: None,
+            latest_successful_at: None,
+            health: SourceHealth::Unknown,
+            latest_error_kind: None,
+            diagnostic: None,
+        })
+        .collect();
+    app.replace_read_models(vec![], sources);
+    for _ in 0..5 {
+        app.handle_key(special(KeyCode::Right));
+    }
+    for _ in 0..11 {
+        app.handle_key(key('j'));
+    }
+
+    assert_eq!(app.view(), View::Sources);
+    assert_eq!(app.selected_index(), 11);
+    let screen = rendered(&app, 79, 12);
+    assert!(screen.contains("Source 11"));
+    assert!(!screen.contains("Source 0 ·"));
 }

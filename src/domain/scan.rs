@@ -19,6 +19,7 @@ pub enum SourceErrorKind {
     Timeout,
     RateLimit,
     Schema,
+    IncompleteResults,
     Browser,
     Storage,
 }
@@ -31,8 +32,23 @@ impl SourceErrorKind {
             Self::Timeout => "timeout",
             Self::RateLimit => "rate-limit",
             Self::Schema => "schema",
+            Self::IncompleteResults => "incomplete-results",
             Self::Browser => "browser",
             Self::Storage => "storage",
+        }
+    }
+
+    pub(crate) fn from_str(value: &str) -> Option<Self> {
+        match value {
+            "configuration" => Some(Self::Configuration),
+            "transport" => Some(Self::Transport),
+            "timeout" => Some(Self::Timeout),
+            "rate-limit" => Some(Self::RateLimit),
+            "schema" => Some(Self::Schema),
+            "incomplete-results" => Some(Self::IncompleteResults),
+            "browser" => Some(Self::Browser),
+            "storage" => Some(Self::Storage),
+            _ => None,
         }
     }
 }

@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
 use crate::{
     config::Config,
-    domain::{JobKey, JobRecord, ScanEvent, SourceErrorKind, SourceScan},
+    domain::{JobKey, JobRecord, ScanEvent, SourceScan},
+    storage::{ScanReadModel, SourceReadModel},
 };
 
 use super::{IconSet, Theme};
@@ -35,14 +34,6 @@ pub enum AppCommand {
     Quit,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SourceHealth {
-    Scanning,
-    Healthy,
-    Incomplete,
-    Failed(SourceErrorKind),
-}
-
 #[derive(Debug, Clone, Copy, Default)]
 struct ScanProgress {
     active: bool,
@@ -55,6 +46,8 @@ struct ScanProgress {
 pub struct App {
     config: Config,
     jobs: Vec<JobRecord>,
+    scans: Vec<ScanReadModel>,
+    sources: Vec<SourceReadModel>,
     theme: Theme,
     icons: IconSet,
     view: View,
@@ -68,7 +61,6 @@ pub struct App {
     narrow_details_visible: bool,
     help_visible: bool,
     scan_progress: ScanProgress,
-    source_health: HashMap<String, SourceHealth>,
 }
 
 impl App {
@@ -83,6 +75,8 @@ impl App {
         Self {
             config,
             jobs,
+            scans: Vec::new(),
+            sources: Vec::new(),
             theme,
             icons,
             view: View::Active,
@@ -96,11 +90,15 @@ impl App {
             narrow_details_visible: false,
             help_visible: false,
             scan_progress: ScanProgress::default(),
-            source_health: HashMap::new(),
         }
     }
 
     pub fn replace_jobs(&mut self, jobs: Vec<JobRecord>, active_job_count: usize) {
+        if matches!(self.view, View::Scans | View::Sources) {
+            self.jobs = jobs;
+            self.active_job_count = active_job_count;
+            return;
+        }
         let selected_key = self
             .preserve_selection_on_replace
             .then(|| self.selected_job().map(|job| job.key.clone()))
@@ -113,6 +111,16 @@ impl App {
             .and_then(|key| self.visible_jobs().position(|job| &job.key == key))
             .unwrap_or_else(|| fallback_index.min(self.visible_jobs().count().saturating_sub(1)));
         self.preserve_selection_on_replace = true;
+    }
+
+    pub fn replace_read_models(
+        &mut self,
+        scans: Vec<ScanReadModel>,
+        sources: Vec<SourceReadModel>,
+    ) {
+        self.scans = scans;
+        self.sources = sources;
+        self.selected_index = self.selected_index.min(self.item_count().saturating_sub(1));
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> AppCommand {
@@ -134,7 +142,13 @@ impl App {
             KeyCode::Char('K') => self.detail_scroll = self.detail_scroll.saturating_sub(1),
             KeyCode::Left => return self.switch_view(-1),
             KeyCode::Right => return self.switch_view(1),
-            KeyCode::Enter if width < 80 => {
+            KeyCode::Enter
+                if width < 80
+                    && matches!(
+                        self.view,
+                        View::Active | View::New | View::Applied | View::History
+                    ) =>
+            {
                 self.narrow_details_visible = !self.narrow_details_visible;
             }
             KeyCode::Enter => return self.open_selected(),
@@ -156,46 +170,27 @@ impl App {
                     company_count,
                     ..ScanProgress::default()
                 };
-                self.source_health.clear();
             }
-            ScanEvent::CompanyStarted { company_id } | ScanEvent::Started { company_id } => {
-                self.source_health
-                    .insert(company_id, SourceHealth::Scanning);
-            }
-            ScanEvent::CompanyCompleted { company_id, .. } => {
+            ScanEvent::CompanyStarted { .. } | ScanEvent::Started { .. } => {}
+            ScanEvent::CompanyCompleted { .. } => {
                 self.scan_progress.finished += 1;
-                self.source_health.insert(company_id, SourceHealth::Healthy);
             }
-            ScanEvent::CompanyFailed {
-                company_id, kind, ..
-            }
-            | ScanEvent::Failed {
-                company_id, kind, ..
-            } => {
+            ScanEvent::CompanyFailed { .. } | ScanEvent::Failed { .. } => {
                 self.scan_progress.finished += 1;
                 self.scan_progress.failed += 1;
-                self.source_health
-                    .insert(company_id, SourceHealth::Failed(kind));
             }
-            ScanEvent::CompanyIncomplete { company_id, .. } => {
+            ScanEvent::CompanyIncomplete { .. } => {
                 self.scan_progress.finished += 1;
                 self.scan_progress.incomplete += 1;
-                self.source_health
-                    .insert(company_id, SourceHealth::Incomplete);
             }
-            ScanEvent::Completed {
-                company_id,
-                source_scan,
-            } => {
+            ScanEvent::Completed { source_scan, .. } => {
                 self.scan_progress.finished += 1;
-                let health = match source_scan {
-                    SourceScan::Complete { .. } => SourceHealth::Healthy,
+                match source_scan {
+                    SourceScan::Complete { .. } => {}
                     SourceScan::Incomplete { .. } => {
                         self.scan_progress.incomplete += 1;
-                        SourceHealth::Incomplete
                     }
-                };
-                self.source_health.insert(company_id, health);
+                }
             }
             ScanEvent::RunFinished {
                 failed, incomplete, ..
@@ -213,6 +208,14 @@ impl App {
 
     pub fn jobs(&self) -> &[JobRecord] {
         &self.jobs
+    }
+
+    pub fn scans(&self) -> &[ScanReadModel] {
+        &self.scans
+    }
+
+    pub fn sources(&self) -> &[SourceReadModel] {
+        &self.sources
     }
 
     pub fn visible_jobs(&self) -> impl Iterator<Item = &JobRecord> {
@@ -277,6 +280,14 @@ impl App {
             .unwrap_or("All")
     }
 
+    pub fn company_name<'a>(&'a self, company_id: &'a str) -> &'a str {
+        self.config
+            .companies
+            .iter()
+            .find(|company| company.id == company_id)
+            .map_or(company_id, |company| company.name.as_str())
+    }
+
     pub fn filter_label(&self) -> &str {
         if self.company_filter.is_some() {
             self.company_filter_label()
@@ -306,7 +317,7 @@ impl App {
     }
 
     pub fn footer_status(&self) -> String {
-        let progress = if self.scan_progress.active {
+        if self.scan_progress.active {
             format!(
                 "SCANNING {}/{}",
                 self.scan_progress.finished, self.scan_progress.company_count
@@ -317,21 +328,7 @@ impl App {
             format!("INCOMPLETE {}", self.scan_progress.incomplete)
         } else {
             "OK".to_owned()
-        };
-        let mut sources = self.source_health.iter().collect::<Vec<_>>();
-        sources.sort_by_key(|(company_id, _)| *company_id);
-        sources
-            .into_iter()
-            .fold(progress, |mut text, (company_id, health)| {
-                let health = match health {
-                    SourceHealth::Scanning => "scanning".to_owned(),
-                    SourceHealth::Healthy => "healthy".to_owned(),
-                    SourceHealth::Incomplete => "incomplete".to_owned(),
-                    SourceHealth::Failed(kind) => kind.to_string(),
-                };
-                text.push_str(&format!("  {company_id} {health}"));
-                text
-            })
+        }
     }
 
     fn handle_search_key(&mut self, code: KeyCode) -> AppCommand {
@@ -393,7 +390,7 @@ impl App {
     }
 
     fn move_selection(&mut self, direction: isize) {
-        let last = self.visible_jobs().count().saturating_sub(1);
+        let last = self.item_count().saturating_sub(1);
         self.selected_index = if direction < 0 {
             self.selected_index.saturating_sub(1)
         } else {
@@ -402,8 +399,23 @@ impl App {
         self.detail_scroll = 0;
     }
 
+    fn item_count(&self) -> usize {
+        match self.view {
+            View::Scans => self.scans.len(),
+            View::Sources => self.sources.len(),
+            _ => self.visible_jobs().count(),
+        }
+    }
+
     fn switch_view(&mut self, direction: isize) -> AppCommand {
-        const VIEWS: [View; 4] = [View::Active, View::New, View::Applied, View::History];
+        const VIEWS: [View; 6] = [
+            View::Active,
+            View::New,
+            View::Applied,
+            View::History,
+            View::Scans,
+            View::Sources,
+        ];
         let index = VIEWS
             .iter()
             .position(|view| *view == self.view)
@@ -473,6 +485,12 @@ impl App {
             .title
             .to_lowercase()
             .contains(&query)
+            || job
+                .classified
+                .observed
+                .description
+                .to_lowercase()
+                .contains(&query)
             || job.key.company_id.to_lowercase().contains(&query)
             || self.config.companies.iter().any(|company| {
                 company.id == job.key.company_id && company.name.to_lowercase().contains(&query)

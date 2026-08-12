@@ -7,13 +7,54 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     config::CompanyConfig,
-    domain::{ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanFailure},
+    domain::{
+        ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanFailure, SourceErrorKind,
+    },
 };
 
 use super::schema;
 
 pub struct Store {
     connection: Connection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScanOutcome {
+    Complete,
+    Incomplete,
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScanReadModel {
+    pub run_id: String,
+    pub company_id: String,
+    pub company_name: String,
+    pub completed_at: DateTime<Utc>,
+    pub outcome: ScanOutcome,
+    pub observed_count: usize,
+    pub error_kind: Option<SourceErrorKind>,
+    pub diagnostic: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceHealth {
+    Unknown,
+    Healthy,
+    Incomplete,
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceReadModel {
+    pub company_id: String,
+    pub company_name: String,
+    pub enabled: bool,
+    pub latest_attempted_at: Option<DateTime<Utc>>,
+    pub latest_successful_at: Option<DateTime<Utc>>,
+    pub health: SourceHealth,
+    pub latest_error_kind: Option<SourceErrorKind>,
+    pub diagnostic: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -152,7 +193,7 @@ impl Store {
             company,
             "incomplete",
             observed_count,
-            None,
+            Some(SourceErrorKind::IncompleteResults.as_str()),
             Some(diagnostic),
             started_at,
             completed_at,
@@ -188,6 +229,35 @@ impl Store {
         let mut statement = self.connection.prepare(&sql)?;
         statement
             .query_map([], job_record_from_row)?
+            .collect::<Result<Vec<_>>>()
+    }
+
+    pub fn recent_scans(&self) -> Result<Vec<ScanReadModel>> {
+        // ponytail: keep the latest 100; add pagination when the scan view needs older runs.
+        let mut statement = self.connection.prepare(
+            "SELECT
+                s.run_id, s.company_id, c.name, s.completed_at, s.outcome,
+                s.observed_count, s.error_kind, s.diagnostic
+             FROM scans s
+             JOIN companies c ON c.id = s.company_id
+             ORDER BY s.completed_at DESC, s.id DESC
+             LIMIT 100",
+        )?;
+        statement
+            .query_map([], scan_read_model_from_row)?
+            .collect::<Result<Vec<_>>>()
+    }
+
+    pub fn source_health(&self) -> Result<Vec<SourceReadModel>> {
+        let mut statement = self.connection.prepare(
+            "SELECT
+                id, name, enabled, latest_attempted_at, latest_successful_at,
+                health, latest_error_kind, latest_diagnostic
+             FROM companies
+             ORDER BY name COLLATE NOCASE, id",
+        )?;
+        statement
+            .query_map([], source_read_model_from_row)?
             .collect::<Result<Vec<_>>>()
     }
 
@@ -423,6 +493,45 @@ fn job_record_from_row(row: &Row<'_>) -> Result<JobRecord> {
     })
 }
 
+fn scan_read_model_from_row(row: &Row<'_>) -> Result<ScanReadModel> {
+    let outcome = match row.get::<_, String>(4)?.as_str() {
+        "complete" => ScanOutcome::Complete,
+        "incomplete" => ScanOutcome::Incomplete,
+        "failed" => ScanOutcome::Failed,
+        value => return Err(invalid_text(4, "scan outcome", value)),
+    };
+    Ok(ScanReadModel {
+        run_id: row.get(0)?,
+        company_id: row.get(1)?,
+        company_name: row.get(2)?,
+        completed_at: required_timestamp(row, 3)?,
+        outcome,
+        observed_count: usize_from_row(row, 5)?,
+        error_kind: optional_error_kind(row, 6)?,
+        diagnostic: row.get(7)?,
+    })
+}
+
+fn source_read_model_from_row(row: &Row<'_>) -> Result<SourceReadModel> {
+    let health = match row.get::<_, String>(5)?.as_str() {
+        "unknown" => SourceHealth::Unknown,
+        "healthy" => SourceHealth::Healthy,
+        "incomplete" => SourceHealth::Incomplete,
+        "failed" => SourceHealth::Failed,
+        value => return Err(invalid_text(5, "source health", value)),
+    };
+    Ok(SourceReadModel {
+        company_id: row.get(0)?,
+        company_name: row.get(1)?,
+        enabled: row.get(2)?,
+        latest_attempted_at: optional_timestamp(row, 3)?,
+        latest_successful_at: optional_timestamp(row, 4)?,
+        health,
+        latest_error_kind: optional_error_kind(row, 6)?,
+        diagnostic: row.get(7)?,
+    })
+}
+
 fn timestamp(value: DateTime<Utc>) -> String {
     value.to_rfc3339()
 }
@@ -444,6 +553,34 @@ fn parse_timestamp(index: usize, value: String) -> Result<DateTime<Utc>> {
         .map_err(|error| {
             rusqlite::Error::FromSqlConversionFailure(index, Type::Text, Box::new(error))
         })
+}
+
+fn usize_from_row(row: &Row<'_>, index: usize) -> Result<usize> {
+    let value = row.get::<_, i64>(index)?;
+    usize::try_from(value).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(index, Type::Integer, Box::new(error))
+    })
+}
+
+fn optional_error_kind(row: &Row<'_>, index: usize) -> Result<Option<SourceErrorKind>> {
+    row.get::<_, Option<String>>(index)?
+        .map(|value| {
+            SourceErrorKind::from_str(&value)
+                .ok_or_else(|| invalid_text(index, "source error kind", &value))
+        })
+        .transpose()
+}
+
+fn invalid_text(index: usize, field: &str, value: &str) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(
+        index,
+        Type::Text,
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("unknown {field} `{value}`"),
+        )
+        .into(),
+    )
 }
 
 fn json_from_row<T: serde::de::DeserializeOwned>(row: &Row<'_>, index: usize) -> Result<T> {

@@ -4,7 +4,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use job_watch::{
     config::{CompanyConfig, SourceConfig},
     domain::{ClassifiedJob, Eligibility, JobKey, ObservedJob, ScanFailure, SourceErrorKind},
-    storage::{JobQuery, Store},
+    storage::{JobQuery, ScanOutcome, SourceHealth, Store},
 };
 use rusqlite::Connection;
 use serde_json::json;
@@ -177,7 +177,7 @@ fn failed_and_incomplete_scans_record_health_without_mutating_jobs() {
         health,
         (
             "incomplete".into(),
-            None,
+            Some("incomplete-results".into()),
             Some("unresolved location".into())
         )
     );
@@ -297,4 +297,60 @@ fn complete_scan_rolls_back_every_job_change_when_scan_recording_fails() {
     assert_eq!(jobs.len(), 2);
     assert!(jobs.iter().all(|job| job.source_open && job.is_new));
     assert!(jobs.iter().all(|job| job.last_seen_at == at(10)));
+}
+
+#[test]
+fn durable_scan_and_source_read_models_include_display_names_and_diagnostics() {
+    let mollie = CompanyConfig {
+        name: "Mollie".into(),
+        ..company("mollie", true)
+    };
+    let disabled = CompanyConfig {
+        name: "Beta Labs".into(),
+        ..company("beta", false)
+    };
+    let mut store = Store::open_in_memory().unwrap();
+    store
+        .sync_companies(&[mollie.clone(), disabled.clone()])
+        .unwrap();
+    store
+        .record_complete_scan("run-1", &mollie, &[job("1")], at(9), at(10))
+        .unwrap();
+    store
+        .record_incomplete_scan("run-2", &mollie, "unresolved location", 7, at(10), at(11))
+        .unwrap();
+
+    let scans = store.recent_scans().unwrap();
+    assert_eq!(scans.len(), 2);
+    assert_eq!(scans[0].run_id, "run-2");
+    assert_eq!(scans[0].company_name, "Mollie");
+    assert_eq!(scans[0].completed_at, at(11));
+    assert_eq!(scans[0].outcome, ScanOutcome::Incomplete);
+    assert_eq!(scans[0].observed_count, 7);
+    assert_eq!(
+        scans[0].error_kind,
+        Some(SourceErrorKind::IncompleteResults)
+    );
+    assert_eq!(scans[0].diagnostic.as_deref(), Some("unresolved location"));
+
+    let sources = store.source_health().unwrap();
+    assert_eq!(sources.len(), 2);
+    assert_eq!(sources[0].company_id, "beta");
+    assert_eq!(sources[0].company_name, "Beta Labs");
+    assert!(!sources[0].enabled);
+    assert_eq!(sources[0].health, SourceHealth::Unknown);
+    assert_eq!(sources[1].company_id, "mollie");
+    assert_eq!(sources[1].company_name, "Mollie");
+    assert!(sources[1].enabled);
+    assert_eq!(sources[1].latest_attempted_at, Some(at(11)));
+    assert_eq!(sources[1].latest_successful_at, Some(at(10)));
+    assert_eq!(sources[1].health, SourceHealth::Incomplete);
+    assert_eq!(
+        sources[1].latest_error_kind,
+        Some(SourceErrorKind::IncompleteResults)
+    );
+    assert_eq!(
+        sources[1].diagnostic.as_deref(),
+        Some("unresolved location")
+    );
 }
