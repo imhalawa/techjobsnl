@@ -23,6 +23,18 @@ struct CompleteSource {
     observations: Vec<ObservedJob>,
 }
 
+#[test]
+fn scan_service_run_future_is_send() {
+    fn assert_send(_: impl Send) {}
+
+    let configured = company("send-check");
+    let store = store_for(std::slice::from_ref(&configured));
+    let scan_service = service(vec![], vec![configured], store);
+    let (tx, _rx) = mpsc::unbounded_channel();
+
+    assert_send(scan_service.run("send-check", tx));
+}
+
 #[async_trait::async_trait]
 impl JobSource for CompleteSource {
     fn company_id(&self) -> &str {

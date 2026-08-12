@@ -90,10 +90,17 @@ fn render_job_list(frame: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme();
     let jobs = app.visible_jobs().collect::<Vec<_>>();
     let items = jobs.iter().map(|job| {
-        let mut spans = vec![Span::styled(
-            format!("{} OPEN ", app.icons().open),
-            Style::new().fg(theme.open),
-        )];
+        let mut spans = if job.source_open {
+            vec![Span::styled(
+                format!("{} OPEN ", app.icons().open),
+                Style::new().fg(theme.open),
+            )]
+        } else {
+            vec![Span::styled(
+                format!("{} CLOSED ", app.icons().history),
+                Style::new().fg(theme.muted_text),
+            )]
+        };
         if job.is_new {
             spans.push(Span::styled(
                 format!("{} NEW ", app.icons().new),
@@ -178,14 +185,21 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         .filter(|company| company.enabled)
         .count();
     let keys = &app.config().keybindings;
+    let input = if app.input_mode() == super::InputMode::Search {
+        format!("SEARCH {}  ", app.search_query())
+    } else {
+        String::new()
+    };
     let text = format!(
-        "{}  {} scan  {} search  {} applied  {} quit  {enabled} companies  {} active jobs",
+        "{input}{}  {} scan  {} search  {enabled} companies  {} active jobs  {} company {}  {} applied  {} quit",
         app.footer_status(),
         keys.scan,
         keys.search,
+        app.active_job_count(),
+        keys.filter,
+        app.company_filter_label(),
         keys.toggle_applied,
         keys.quit,
-        app.jobs().iter().filter(|job| job.source_open).count()
     );
     frame.render_widget(
         Paragraph::new(text).style(Style::new().fg(theme.muted_text).bg(theme.background)),

@@ -28,6 +28,7 @@ enum QueryKind {
     All,
 }
 
+#[allow(clippy::new_without_default)] // `new` means newly discovered jobs, not a constructor.
 impl JobQuery {
     pub fn active() -> Self {
         Self(QueryKind::Active)

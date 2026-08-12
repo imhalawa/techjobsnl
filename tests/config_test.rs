@@ -1,4 +1,52 @@
-use job_watch::config::{Config, SourceConfig};
+use std::collections::HashMap;
+
+use job_watch::config::{
+    CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig, SourceConfig,
+    ThemeOverrides, UiConfig,
+};
+
+fn valid_config() -> Config {
+    Config {
+        schema_version: 1,
+        database_path: ":memory:".into(),
+        companies: vec![CompanyConfig {
+            id: "mollie".into(),
+            name: "Mollie".into(),
+            enabled: true,
+            location_country_overrides: HashMap::new(),
+            source: SourceConfig::Ashby {
+                board: "mollie".into(),
+            },
+        }],
+        filters: FiltersConfig {
+            countries: vec!["NL".into()],
+            include_families: vec![],
+            include_title_patterns: vec![],
+            exclude_title_patterns: vec![],
+        },
+        scan: ScanConfig {
+            concurrency: 1,
+            timeout_seconds: 20,
+            retry_count: 0,
+            user_agent: "job-watch-test".into(),
+        },
+        ui: UiConfig {
+            theme: "clean-dark".into(),
+            unicode_icons: true,
+            theme_overrides: ThemeOverrides::default(),
+        },
+        keybindings: KeybindingsConfig {
+            scan: "r".into(),
+            search: "/".into(),
+            filter: "f".into(),
+            toggle_applied: "a".into(),
+            history: "h".into(),
+            open: "o".into(),
+            help: "?".into(),
+            quit: "q".into(),
+        },
+    }
+}
 
 #[test]
 fn loads_and_validates_an_ashby_company() {
@@ -163,4 +211,28 @@ board = "mollie"
             .to_string()
             .contains("ui.theme_overrides.focused_border")
     );
+}
+
+#[test]
+fn rejects_action_bindings_that_are_not_exactly_one_character() {
+    for binding in ["", "scan"] {
+        let mut config = valid_config();
+        config.keybindings.scan = binding.into();
+
+        let error = config.validate().unwrap_err();
+        assert!(error.to_string().contains("keybindings.scan"));
+        assert!(error.to_string().contains("exactly one character"));
+    }
+}
+
+#[test]
+fn rejects_action_bindings_that_collide_with_fixed_navigation_keys() {
+    for binding in ["j", "k", "J", "K"] {
+        let mut config = valid_config();
+        config.keybindings.scan = binding.into();
+
+        let error = config.validate().unwrap_err();
+        assert!(error.to_string().contains("keybindings.scan"));
+        assert!(error.to_string().contains("fixed navigation"));
+    }
 }

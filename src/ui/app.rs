@@ -60,6 +60,8 @@ pub struct App {
     view: View,
     input_mode: InputMode,
     selected_index: usize,
+    active_job_count: usize,
+    company_filter: Option<String>,
     search_query: String,
     detail_scroll: u16,
     narrow_details_visible: bool,
@@ -76,6 +78,7 @@ impl App {
         } else {
             IconSet::ascii()
         };
+        let active_job_count = jobs.iter().filter(|job| job.source_open).count();
         Self {
             config,
             jobs,
@@ -84,6 +87,8 @@ impl App {
             view: View::Active,
             input_mode: InputMode::Normal,
             selected_index: 0,
+            active_job_count,
+            company_filter: None,
             search_query: String::new(),
             detail_scroll: 0,
             narrow_details_visible: false,
@@ -93,11 +98,15 @@ impl App {
         }
     }
 
-    pub fn replace_jobs(&mut self, jobs: Vec<JobRecord>) {
+    pub fn replace_jobs(&mut self, jobs: Vec<JobRecord>, active_job_count: usize) {
+        let selected_key = self.selected_job().map(|job| job.key.clone());
+        let fallback_index = self.selected_index;
         self.jobs = jobs;
-        self.selected_index = self
-            .selected_index
-            .min(self.visible_jobs().count().saturating_sub(1));
+        self.active_job_count = active_job_count;
+        self.selected_index = selected_key
+            .as_ref()
+            .and_then(|key| self.visible_jobs().position(|job| &job.key == key))
+            .unwrap_or_else(|| fallback_index.min(self.visible_jobs().count().saturating_sub(1)));
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> AppCommand {
@@ -209,7 +218,11 @@ impl App {
                 View::History => !job.source_open || job.reopened_at.is_some(),
                 View::Scans | View::Sources => false,
             };
-            in_view && self.matches_search(job)
+            let in_company = self
+                .company_filter
+                .as_deref()
+                .is_none_or(|company_id| job.key.company_id == company_id);
+            in_view && in_company && self.matches_search(job)
         })
     }
 
@@ -235,6 +248,27 @@ impl App {
 
     pub fn selected_job(&self) -> Option<&JobRecord> {
         self.visible_jobs().nth(self.selected_index)
+    }
+
+    pub fn active_job_count(&self) -> usize {
+        self.active_job_count
+    }
+
+    pub fn company_filter(&self) -> Option<&str> {
+        self.company_filter.as_deref()
+    }
+
+    pub fn company_filter_label(&self) -> &str {
+        self.company_filter
+            .as_deref()
+            .and_then(|id| {
+                self.config
+                    .companies
+                    .iter()
+                    .find(|company| company.id == id)
+                    .map(|company| company.name.as_str())
+            })
+            .unwrap_or("All")
     }
 
     pub fn search_query(&self) -> &str {
@@ -311,13 +345,9 @@ impl App {
             self.input_mode = InputMode::Search;
             AppCommand::None
         } else if key == keys.filter {
-            self.view = match self.view {
-                View::Active => View::New,
-                View::New => View::Applied,
-                _ => View::Active,
-            };
+            self.cycle_company_filter();
             self.reset_view_state();
-            AppCommand::ReloadJobs
+            AppCommand::None
         } else if key == keys.toggle_applied {
             self.selected_job().map_or(AppCommand::None, |job| {
                 AppCommand::ToggleApplied(job.key.clone())
@@ -353,14 +383,7 @@ impl App {
     }
 
     fn switch_view(&mut self, direction: isize) -> AppCommand {
-        const VIEWS: [View; 6] = [
-            View::Active,
-            View::New,
-            View::Applied,
-            View::History,
-            View::Scans,
-            View::Sources,
-        ];
+        const VIEWS: [View; 4] = [View::Active, View::New, View::Applied, View::History];
         let index = VIEWS
             .iter()
             .position(|view| *view == self.view)
@@ -391,6 +414,24 @@ impl App {
         self.selected_index = self
             .selected_index
             .min(self.visible_jobs().count().saturating_sub(1));
+    }
+
+    fn cycle_company_filter(&mut self) {
+        let enabled = self
+            .config
+            .companies
+            .iter()
+            .filter(|company| company.enabled)
+            .map(|company| company.id.as_str())
+            .collect::<Vec<_>>();
+        self.company_filter = match self.company_filter.as_deref() {
+            None => enabled.first().map(|id| (*id).to_owned()),
+            Some(current) => enabled
+                .iter()
+                .position(|id| *id == current)
+                .and_then(|index| enabled.get(index + 1))
+                .map(|id| (*id).to_owned()),
+        };
     }
 
     fn matches_search(&self, job: &JobRecord) -> bool {

@@ -71,6 +71,20 @@ fn config() -> Config {
     }
 }
 
+fn config_with_two_companies() -> Config {
+    let mut configured = config();
+    configured.companies.push(CompanyConfig {
+        id: "beta".into(),
+        name: "Beta Labs".into(),
+        enabled: true,
+        location_country_overrides: HashMap::new(),
+        source: SourceConfig::Ashby {
+            board: "beta".into(),
+        },
+    });
+    configured
+}
+
 fn key(character: char) -> KeyEvent {
     KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE)
 }
@@ -164,8 +178,8 @@ fn configured_actions_replace_only_the_configurable_keys() {
     assert_eq!(app.input_mode(), InputMode::Search);
     assert_eq!(app.handle_key(special(KeyCode::Esc)), AppCommand::None);
     assert!(matches!(app.handle_key(key('u')), AppCommand::OpenUrl(_)));
-    assert_eq!(app.handle_key(key('v')), AppCommand::ReloadJobs);
-    assert_eq!(app.view(), View::New);
+    assert_eq!(app.handle_key(key('v')), AppCommand::None);
+    assert_eq!(app.company_filter(), Some("acme"));
     assert_eq!(app.handle_key(key('y')), AppCommand::ReloadJobs);
     assert_eq!(app.view(), View::History);
     assert_eq!(app.handle_key(key('i')), AppCommand::None);
@@ -175,16 +189,7 @@ fn configured_actions_replace_only_the_configurable_keys() {
 
 #[test]
 fn search_accepts_input_filters_by_title_or_company_and_escape_cancels() {
-    let mut configured = config();
-    configured.companies.push(CompanyConfig {
-        id: "beta".into(),
-        name: "Beta Labs".into(),
-        enabled: true,
-        location_country_overrides: HashMap::new(),
-        source: SourceConfig::Ashby {
-            board: "beta".into(),
-        },
-    });
+    let configured = config_with_two_companies();
     let mut app = App::new(
         configured,
         vec![
@@ -212,6 +217,54 @@ fn search_accepts_input_filters_by_title_or_company_and_escape_cancels() {
     }
     assert_eq!(app.visible_jobs().count(), 1);
     assert_eq!(app.selected_job().unwrap().key.company_id, "beta");
+}
+
+#[test]
+fn configured_filter_cycles_companies_and_clears_without_changing_view() {
+    let mut app = App::new(
+        config_with_two_companies(),
+        vec![
+            job("Backend Engineer", false, false),
+            job_for("beta", "Platform Engineer", false, false),
+        ],
+    );
+
+    assert_eq!(app.handle_key(key('f')), AppCommand::None);
+    assert_eq!(app.company_filter(), Some("acme"));
+    assert_eq!(app.visible_jobs().count(), 1);
+    assert!(rendered(&app, 100, 25).contains("company Acme"));
+
+    app.handle_key(key('f'));
+    assert_eq!(app.company_filter(), Some("beta"));
+    assert_eq!(app.visible_jobs().count(), 1);
+
+    app.handle_key(key('f'));
+    assert_eq!(app.company_filter(), None);
+    assert_eq!(app.visible_jobs().count(), 2);
+    assert_eq!(app.view(), View::Active);
+    assert!(rendered(&app, 100, 25).contains("company All"));
+}
+
+#[test]
+fn replace_jobs_preserves_selected_identity_across_reorder_and_falls_back_if_removed() {
+    let backend = job("Backend Engineer", false, false);
+    let platform = job("Platform Engineer", false, false);
+    let data = job("Data Engineer", false, false);
+    let mut app = App::new(
+        config(),
+        vec![backend.clone(), platform.clone(), data.clone()],
+    );
+    app.handle_key(key('j'));
+
+    app.replace_jobs(vec![data.clone(), platform.clone(), backend], 3);
+    assert_eq!(app.selected_job().unwrap().key, platform.key);
+
+    app.replace_jobs(vec![data], 1);
+    assert_eq!(app.selected_index(), 0);
+    assert_eq!(
+        app.selected_job().unwrap().classified.observed.title,
+        "Data Engineer"
+    );
 }
 
 #[test]
@@ -254,8 +307,27 @@ fn fixed_navigation_controls_move_jobs_scroll_details_and_switch_views() {
 
     assert_eq!(app.handle_key(key('h')), AppCommand::ReloadJobs);
     assert_eq!(app.view(), View::History);
-    assert_eq!(app.handle_key(key('h')), AppCommand::ReloadJobs);
+    assert_eq!(
+        app.handle_key(special(KeyCode::Right)),
+        AppCommand::ReloadJobs
+    );
     assert_eq!(app.view(), View::Active);
+}
+
+#[test]
+fn fixed_navigation_keys_win_even_if_an_unvalidated_config_reuses_them() {
+    let mut configured = config();
+    configured.keybindings.scan = "j".into();
+    let mut app = App::new(
+        configured,
+        vec![
+            job("Backend Engineer", false, false),
+            job("Platform Engineer", false, false),
+        ],
+    );
+
+    assert_eq!(app.handle_key(key('j')), AppCommand::None);
+    assert_eq!(app.selected_index(), 1);
 }
 
 #[test]
@@ -415,6 +487,54 @@ fn active_view_hides_closed_records_supplied_with_open_records() {
     let screen = rendered(&app, 140, 40);
     assert!(screen.contains("Open role"));
     assert!(!screen.contains("Closed role"));
+}
+
+#[test]
+fn history_renders_closed_rows_as_closed_instead_of_open() {
+    let mut closed = job("Closed role", false, false);
+    closed.source_open = false;
+    closed.closed_at = Some(closed.last_seen_at);
+    let mut app = App::new(config(), vec![closed]);
+    app.handle_key(key('h'));
+
+    let screen = rendered(&app, 100, 25);
+    assert!(screen.contains("CLOSED"));
+    assert!(!screen.contains("OPEN  Closed role"));
+}
+
+#[test]
+fn footer_keeps_total_active_count_when_the_loaded_view_is_a_subset() {
+    let mut app = App::new(
+        config(),
+        vec![
+            job("Backend Engineer", false, false),
+            job("Platform Engineer", true, false),
+            job("Applied Engineer", false, true),
+        ],
+    );
+
+    app.handle_key(special(KeyCode::Right));
+    app.replace_jobs(vec![job("Platform Engineer", true, false)], 3);
+    assert!(rendered(&app, 100, 25).contains("3 active jobs"));
+
+    app.handle_key(special(KeyCode::Right));
+    app.replace_jobs(vec![job("Applied Engineer", false, true)], 3);
+    assert!(rendered(&app, 100, 25).contains("3 active jobs"));
+
+    app.handle_key(key('h'));
+    app.replace_jobs(vec![], 3);
+    assert!(rendered(&app, 100, 25).contains("3 active jobs"));
+}
+
+#[test]
+fn renderer_shows_active_search_mode_and_query() {
+    let mut app = App::new(config(), vec![job("Backend Engineer", false, false)]);
+    app.handle_key(key('/'));
+    for character in "back".chars() {
+        app.handle_key(key(character));
+    }
+
+    assert!(rendered(&app, 100, 25).contains("SEARCH back"));
 }
 
 #[test]

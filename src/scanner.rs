@@ -75,17 +75,23 @@ impl ScanService {
             company_count: scheduled_sources.len(),
         });
 
-        let company_scans = scheduled_sources.into_iter().map(|source| {
+        let filter = Arc::new(self.filter.clone());
+        let timeout_seconds = self.scan_config.timeout_seconds;
+        let retry_count = self.scan_config.retry_count;
+        let mut company_scans = Vec::with_capacity(scheduled_sources.len());
+        for source in scheduled_sources {
             let company = self.companies.get(source.company_id()).cloned();
-            scan_one(
+            let filter = Arc::clone(&filter);
+            let event_tx = event_tx.clone();
+            company_scans.push(scan_one(
                 source,
                 company,
-                &self.filter,
-                self.scan_config.timeout_seconds,
-                self.scan_config.retry_count,
-                event_tx.clone(),
-            )
-        });
+                filter,
+                timeout_seconds,
+                retry_count,
+                event_tx,
+            ));
+        }
         let mut company_scans =
             stream::iter(company_scans).buffer_unordered(self.scan_config.concurrency);
         let mut summary = RunSummary::default();
@@ -191,7 +197,7 @@ impl ScanService {
 async fn scan_one(
     source: Arc<dyn JobSource>,
     company: Option<CompanyConfig>,
-    filter: &EligibilityFilter,
+    filter: Arc<EligibilityFilter>,
     timeout_seconds: u64,
     retry_count: u32,
     event_tx: UnboundedSender<ScanEvent>,
@@ -226,7 +232,7 @@ async fn scan_one(
         Err(error) => CompanyOutcome::Failed {
             failure: source_failure(error),
         },
-        Ok(source_scan) => classify_scan(source_scan, company_config, filter),
+        Ok(source_scan) => classify_scan(source_scan, company_config, &filter),
     };
 
     CompanyScan {

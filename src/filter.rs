@@ -29,7 +29,7 @@ const FAMILY_PATTERNS: [(&str, &str); 6] = [
     ),
 ];
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EligibilityFilter {
     countries: HashSet<String>,
     include_patterns: Vec<Regex>,

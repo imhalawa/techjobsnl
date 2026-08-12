@@ -225,6 +225,18 @@ impl KeybindingsConfig {
         ];
         let mut values = std::collections::HashSet::new();
         for (name, binding) in bindings {
+            if binding.chars().count() != 1 {
+                return Err(ConfigError::invalid(
+                    format!("keybindings.{name}"),
+                    "must be exactly one character",
+                ));
+            }
+            if matches!(binding.as_str(), "j" | "k" | "J" | "K") {
+                return Err(ConfigError::invalid(
+                    format!("keybindings.{name}"),
+                    "must not collide with a fixed navigation key",
+                ));
+            }
             if !values.insert(binding) {
                 return Err(ConfigError::invalid(
                     format!("keybindings.{name}"),

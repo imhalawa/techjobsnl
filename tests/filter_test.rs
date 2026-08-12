@@ -8,6 +8,12 @@ use job_watch::{
 };
 use serde_json::json;
 
+type FilterCase = (
+    ObservedJob,
+    HashMap<String, String>,
+    Result<(bool, &'static str), ()>,
+);
+
 fn filters() -> FiltersConfig {
     FiltersConfig {
         countries: vec!["NL".into()],
@@ -40,11 +46,7 @@ fn observed(title: &str, locations: &[&str], countries: &[&str]) -> ObservedJob 
 #[test]
 fn classifies_country_role_and_overrides() {
     let filter = EligibilityFilter::new(&filters()).unwrap();
-    let cases: [(
-        ObservedJob,
-        HashMap<String, String>,
-        Result<(bool, &str), ()>,
-    ); 4] = [
+    let cases: [FilterCase; 4] = [
         (
             observed("Senior Platform Engineer", &["Amsterdam"], &["NL"]),
             HashMap::new(),
