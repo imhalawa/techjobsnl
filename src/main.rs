@@ -14,7 +14,7 @@ use job_watch::{
     domain::ScanEvent,
     filter::EligibilityFilter,
     scanner::ScanService,
-    sources::{JobSource, ashby},
+    sources::{JobSource, ashby, jibe},
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
 };
@@ -179,11 +179,22 @@ fn handle_runtime_scan_event(
 }
 
 fn scan_service(config: &Config, store: Arc<Mutex<Store>>) -> Result<ScanService> {
+    let sources = build_sources(config)?;
+    Ok(ScanService::new(
+        sources,
+        EligibilityFilter::new(&config.filters)?,
+        config.companies.clone(),
+        store,
+        config.scan.clone(),
+    ))
+}
+
+fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
     let client = ashby::build_client(
         &config.scan.user_agent,
         Duration::from_secs(config.scan.timeout_seconds),
     )?;
-    let sources = config
+    config
         .companies
         .iter()
         .map(|company| -> Result<Arc<dyn JobSource>> {
@@ -193,6 +204,15 @@ fn scan_service(config: &Config, store: Arc<Mutex<Store>>) -> Result<ScanService
                     board,
                     client.clone(),
                 ))),
+                SourceConfig::Jibe {
+                    base_url,
+                    client: brand,
+                } => Ok(Arc::new(jibe::JibeSource::new(
+                    &company.id,
+                    base_url,
+                    brand,
+                    client.clone(),
+                ))),
                 _ => Err(std::io::Error::other(format!(
                     "source strategy for {} is not wired yet",
                     company.id
@@ -200,14 +220,7 @@ fn scan_service(config: &Config, store: Arc<Mutex<Store>>) -> Result<ScanService
                 .into()),
             }
         })
-        .collect::<Result<Vec<_>>>()?;
-    Ok(ScanService::new(
-        sources,
-        EligibilityFilter::new(&config.filters)?,
-        config.companies.clone(),
-        store,
-        config.scan.clone(),
-    ))
+        .collect()
 }
 
 fn reload_jobs(store: &Arc<Mutex<Store>>, app: &mut App) -> rusqlite::Result<()> {
@@ -319,9 +332,34 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::{
-        CommandEffect, abort_scan, execute_command, finish_scan, finish_with_restore,
-        handle_runtime_scan_event, initialize, start_scan,
+        CommandEffect, abort_scan, build_sources, execute_command, finish_scan,
+        finish_with_restore, handle_runtime_scan_event, initialize, start_scan,
     };
+
+    #[test]
+    fn production_config_builds_mollie_and_booking_sources() {
+        let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
+        let booking = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "booking-com")
+            .collect::<Vec<_>>();
+
+        assert_eq!(booking.len(), 1);
+        assert!(booking[0].enabled);
+        assert!(matches!(
+            &booking[0].source,
+            SourceConfig::Jibe { base_url, client }
+                if base_url == "https://jobs.booking.com" && client == "Booking.com"
+        ));
+
+        let source_ids = build_sources(&config)
+            .unwrap()
+            .into_iter()
+            .map(|source| source.company_id().to_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(source_ids, ["mollie", "booking-com"]);
+    }
 
     struct CompleteSource;
 

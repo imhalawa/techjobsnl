@@ -1,6 +1,6 @@
 # Job Watch
 
-Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. This foundation release enables Mollie's Ashby board only.
+Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. It enables Mollie's Ashby board and Booking.com's Jibe API.
 
 ## Run
 
@@ -47,14 +47,15 @@ Run the offline suite, including the fake-source end-to-end lifecycle:
 cargo test --all-targets
 ```
 
-Run the ignored live Ashby smoke test separately (network access required):
+Run the ignored live source smoke tests separately (network access required):
 
 ```bash
 cargo test --test ashby_test -- --ignored
+cargo test --test hosted_ats_test jibe_live_returns_complete_unique_jobs -- --ignored --nocapture
 ```
 
-The live smoke test checks Mollie's current public Ashby payload. The offline suite is the deterministic verification path.
+The live smoke tests check Mollie's and Booking.com's current public payloads. The offline suite is the deterministic verification path.
 
 ## Company onboarding
 
-Adyen, Booking.com, and the remaining allowlist are not enabled in this foundation release. Each requires a separate onboarding plan covering its source contract, location evidence, completeness rules, fixtures, and live verification before it can be added safely.
+The remaining allowlist is not enabled. Each company requires source-contract fixtures and live verification before it can be added safely.

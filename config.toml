@@ -36,3 +36,12 @@ enabled = true
 [companies.source]
 strategy = "ashby"
 board = "mollie"
+
+[[companies]]
+id = "booking-com"
+name = "Booking.com"
+enabled = true
+[companies.source]
+strategy = "jibe"
+base_url = "https://jobs.booking.com"
+client = "Booking.com"
