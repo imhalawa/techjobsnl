@@ -48,7 +48,15 @@ fn render_single_pane(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_navigation(frame: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme();
-    let items = ["Active", "New", "Applied", "History", "Scans", "Sources"];
+    let icons = app.icons();
+    let items = [
+        "Active".to_owned(),
+        "New".to_owned(),
+        "Applied".to_owned(),
+        format!("{} History", icons.history),
+        format!("{} Scans", icons.scanning),
+        format!("{} Sources", icons.source_failure),
+    ];
     let list = List::new(items)
         .block(panel(
             "Navigation",
@@ -61,7 +69,8 @@ fn render_navigation(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_job_list(frame: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme();
-    let items = app.jobs().iter().map(|job| {
+    let jobs = app.visible_jobs().collect::<Vec<_>>();
+    let items = jobs.iter().map(|job| {
         let mut spans = vec![Span::styled(
             format!("{} OPEN ", app.icons().open),
             Style::new().fg(theme.open),
@@ -89,7 +98,7 @@ fn render_job_list(frame: &mut Frame, app: &App, area: Rect) {
         .highlight_style(Style::new().bg(theme.selected_row))
         .highlight_symbol("› ");
     let mut state = ListState::default();
-    if !app.jobs().is_empty() {
+    if !jobs.is_empty() {
         state.select(Some(app.selected_index()));
     }
     frame.render_stateful_widget(list, area, &mut state);

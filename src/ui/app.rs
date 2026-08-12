@@ -56,7 +56,9 @@ impl App {
 
     pub fn replace_jobs(&mut self, jobs: Vec<JobRecord>) {
         self.jobs = jobs;
-        self.selected_index = self.selected_index.min(self.jobs.len().saturating_sub(1));
+        self.selected_index = self
+            .selected_index
+            .min(self.visible_jobs().count().saturating_sub(1));
     }
 
     pub fn handle_key(&mut self, _key: KeyEvent) -> AppCommand {
@@ -69,6 +71,16 @@ impl App {
 
     pub fn jobs(&self) -> &[JobRecord] {
         &self.jobs
+    }
+
+    pub fn visible_jobs(&self) -> impl Iterator<Item = &JobRecord> {
+        self.jobs.iter().filter(move |job| match self.view {
+            View::Active => job.source_open,
+            View::New => job.source_open && job.is_new,
+            View::Applied => job.applied_at.is_some(),
+            View::History => !job.source_open || job.reopened_at.is_some(),
+            View::Scans | View::Sources => false,
+        })
     }
 
     pub fn theme(&self) -> Theme {
@@ -92,6 +104,6 @@ impl App {
     }
 
     pub fn selected_job(&self) -> Option<&JobRecord> {
-        self.jobs.get(self.selected_index)
+        self.visible_jobs().nth(self.selected_index)
     }
 }

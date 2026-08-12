@@ -184,3 +184,26 @@ fn footer_uses_configured_key_hints_and_job_counts() {
     assert!(screen.contains("s scan  ? search"));
     assert!(screen.contains("1 companies  1 active jobs"));
 }
+
+#[test]
+fn active_view_hides_closed_records_supplied_with_open_records() {
+    let open = job("Open role", false, false);
+    let mut closed = job("Closed role", false, false);
+    closed.source_open = false;
+    closed.closed_at = Some(closed.last_seen_at);
+    let app = App::new(config(), vec![open, closed]);
+
+    let screen = rendered(&app, 140, 40);
+    assert!(screen.contains("Open role"));
+    assert!(!screen.contains("Closed role"));
+}
+
+#[test]
+fn navigation_renders_history_scan_and_source_failure_status_icons() {
+    let app = App::new(config(), vec![]);
+
+    let screen = rendered(&app, 140, 40);
+    assert!(screen.contains("◷ History"));
+    assert!(screen.contains("↻ Scans"));
+    assert!(screen.contains("⚠ Sources"));
+}
