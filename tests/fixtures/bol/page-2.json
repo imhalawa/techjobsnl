@@ -1,0 +1,27 @@
+{
+  "hits": {
+    "total": { "value": 3, "relation": "eq" },
+    "hits": [
+      {
+        "_id": "bol-103",
+        "_source": {
+          "id": 103,
+          "title": "Product Manager",
+          "status": "PUBLISHED",
+          "internal": false,
+          "publicationDate": 1786176000000,
+          "jobFamily": { "id": "product", "label": "Product" },
+          "department": 44,
+          "expertise": { "id": "commerce", "label": "Commerce" },
+          "office": { "id": "utrecht", "label": "Utrecht" },
+          "employmentType": "Full-time",
+          "howDoYouMakeOurCustomerSmile": { "content": [{ "_type": "block", "children": [{ "_type": "span", "text": "Shape useful products." }] }] },
+          "theBiggestChallenge": { "content": [] },
+          "whatYouWillDoAs": { "content": [] },
+          "whyYouCanMakeADifference": { "content": [] },
+          "whereYoullBeWorking": { "content": [] }
+        }
+      }
+    ]
+  }
+}

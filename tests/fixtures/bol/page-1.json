@@ -1,0 +1,62 @@
+{
+  "hits": {
+    "total": { "value": 3, "relation": "eq" },
+    "hits": [
+      {
+        "_id": "bol-101",
+        "_source": {
+          "id": 101,
+          "reqId": 9001,
+          "title": "Senior Platform Engineer & Reliability",
+          "status": "PUBLISHED",
+          "internal": false,
+          "publicationDate": 1786348800000,
+          "updatedDate": 1786352400000,
+          "jobFamily": { "id": "engineering", "label": "Engineering" },
+          "department": 42,
+          "expertise": { "id": "platform", "label": "Platform" },
+          "office": { "id": "utrecht", "label": "Utrecht" },
+          "employmentType": "Full-time",
+          "howDoYouMakeOurCustomerSmile": {
+            "content": [{ "_type": "block", "style": "normal", "children": [{ "_type": "span", "text": "Serve customers." }] }]
+          },
+          "theBiggestChallenge": {
+            "content": [{ "_type": "block", "style": "normal", "children": [{ "_type": "span", "text": "Solve hard problems." }] }]
+          },
+          "whatYouWillDoAs": {
+            "content": [
+              { "_type": "block", "style": "normal", "children": [{ "_type": "span", "text": "Build reliable" }, { "_type": "span", "text": " systems." }] },
+              { "_type": "block", "style": "normal", "listItem": "bullet", "children": [{ "_type": "span", "text": "Automate safely." }] }
+            ]
+          },
+          "whyYouCanMakeADifference": {
+            "content": [{ "_type": "block", "style": "normal", "children": [{ "_type": "span", "text": "Bring curiosity." }] }]
+          },
+          "whereYoullBeWorking": {
+            "content": [{ "_type": "block", "style": "normal", "children": [{ "_type": "span", "text": "Work in Utrecht." }] }]
+          }
+        }
+      },
+      {
+        "_id": "bol-102",
+        "_source": {
+          "id": 102,
+          "title": "Data Analyst",
+          "status": "PUBLISHED",
+          "internal": false,
+          "publicationDate": 1786262400000,
+          "jobFamily": { "id": "data", "label": "Data" },
+          "department": 43,
+          "expertise": { "id": "analytics", "label": "Analytics" },
+          "office": { "id": "utrecht", "label": "Utrecht" },
+          "employmentType": "Full-time",
+          "howDoYouMakeOurCustomerSmile": { "content": [{ "_type": "block", "children": [{ "_type": "span", "text": "Turn data into decisions." }] }] },
+          "theBiggestChallenge": { "content": [] },
+          "whatYouWillDoAs": { "content": [] },
+          "whyYouCanMakeADifference": { "content": [] },
+          "whereYoullBeWorking": { "content": [] }
+        }
+      }
+    ]
+  }
+}
