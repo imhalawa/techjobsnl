@@ -1,0 +1,34 @@
+{
+  "jobs": [
+    {
+      "id": 101,
+      "title": "Platform Engineer",
+      "updated_at": "2026-08-10T09:15:00+02:00",
+      "absolute_url": "https://job-boards.greenhouse.io/adyen/jobs/101",
+      "content": "&lt;p&gt;Build &amp;amp; operate payment systems.&lt;/p&gt;",
+      "offices": [
+        { "id": 1, "name": "Amsterdam", "location": "Amsterdam" },
+        { "id": 2, "name": "London", "location": "London" }
+      ],
+      "departments": [
+        { "id": 10, "name": "Development" }
+      ],
+      "requisition_id": "JR_101",
+      "fixture_marker": "preserve-me"
+    },
+    {
+      "id": 102,
+      "title": "Data Engineer",
+      "updated_at": "2026-08-11T08:00:00Z",
+      "absolute_url": "https://job-boards.greenhouse.io/adyen/jobs/102",
+      "content": "&lt;p&gt;Own reliable data pipelines.&lt;/p&gt;",
+      "offices": [
+        { "id": 1, "name": "Amsterdam", "location": "Amsterdam" }
+      ],
+      "departments": [
+        { "id": 11, "name": "Data Analytics" }
+      ]
+    }
+  ],
+  "meta": { "total": 2 }
+}

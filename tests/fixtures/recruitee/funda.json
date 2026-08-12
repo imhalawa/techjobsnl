@@ -1,0 +1,38 @@
+{
+  "offers": [
+    {
+      "id": 301,
+      "title": "Backend Engineer",
+      "department": "Engineering",
+      "category_code": "software-development",
+      "employment_type_code": "fulltime_permanent",
+      "description": "<p>Build the housing platform.</p>",
+      "requirements": "<p>Work closely with product.</p>",
+      "careers_url": "https://jobs.funda.nl/o/backend-engineer",
+      "careers_apply_url": "https://jobs.funda.nl/o/backend-engineer/c/new",
+      "published_at": "2026-08-09 08:30:00 UTC",
+      "status": "published",
+      "locations": [
+        { "id": 1, "name": "Amsterdam", "country": "Nederland", "country_code": "NL" },
+        { "id": 2, "name": "Utrecht", "country": "Nederland", "country_code": "NL" }
+      ],
+      "fixture_marker": "preserve-me"
+    },
+    {
+      "id": 302,
+      "title": "Data Engineer",
+      "department": "Data",
+      "category_code": "data",
+      "employment_type_code": "parttime_permanent",
+      "description": "<p>Make housing data useful.</p>",
+      "requirements": "<p>Own reliable pipelines.</p>",
+      "careers_url": "https://jobs.funda.nl/o/data-engineer",
+      "careers_apply_url": "https://jobs.funda.nl/o/data-engineer/c/new",
+      "published_at": "2026-08-10 10:00:00 UTC",
+      "status": "published",
+      "locations": [
+        { "id": 1, "name": "Amsterdam", "country": "Nederland", "country_code": "NL" }
+      ]
+    }
+  ]
+}
