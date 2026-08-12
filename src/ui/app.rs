@@ -3,7 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use crate::{
     config::Config,
     domain::{JobKey, JobRecord, ScanEvent, SourceScan},
-    storage::{ScanReadModel, SourceReadModel},
+    storage::{ScanReadModel, SourceHealth, SourceReadModel},
 };
 
 use super::{IconSet, Theme};
@@ -118,9 +118,20 @@ impl App {
         scans: Vec<ScanReadModel>,
         sources: Vec<SourceReadModel>,
     ) {
+        let selected_scan = (self.view == View::Scans)
+            .then(|| self.scans.get(self.selected_index))
+            .flatten()
+            .map(|scan| (scan.run_id.clone(), scan.company_id.clone()));
         self.scans = scans;
         self.sources = sources;
-        self.selected_index = self.selected_index.min(self.item_count().saturating_sub(1));
+        self.selected_index = selected_scan
+            .as_ref()
+            .and_then(|key| {
+                self.scans
+                    .iter()
+                    .position(|scan| (&scan.run_id, &scan.company_id) == (&key.0, &key.1))
+            })
+            .unwrap_or_else(|| self.selected_index.min(self.item_count().saturating_sub(1)));
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> AppCommand {
@@ -142,13 +153,7 @@ impl App {
             KeyCode::Char('K') => self.detail_scroll = self.detail_scroll.saturating_sub(1),
             KeyCode::Left => return self.switch_view(-1),
             KeyCode::Right => return self.switch_view(1),
-            KeyCode::Enter
-                if width < 80
-                    && matches!(
-                        self.view,
-                        View::Active | View::New | View::Applied | View::History
-                    ) =>
-            {
+            KeyCode::Enter if width < 80 => {
                 self.narrow_details_visible = !self.narrow_details_visible;
             }
             KeyCode::Enter => return self.open_selected(),
@@ -322,12 +327,26 @@ impl App {
                 "SCANNING {}/{}",
                 self.scan_progress.finished, self.scan_progress.company_count
             )
-        } else if self.scan_progress.failed > 0 {
-            format!("FAILED {}", self.scan_progress.failed)
-        } else if self.scan_progress.incomplete > 0 {
-            format!("INCOMPLETE {}", self.scan_progress.incomplete)
         } else {
-            "OK".to_owned()
+            let failed = self
+                .sources
+                .iter()
+                .filter(|source| source.enabled && source.health == SourceHealth::Failed)
+                .count()
+                .max(self.scan_progress.failed);
+            let incomplete = self
+                .sources
+                .iter()
+                .filter(|source| source.enabled && source.health == SourceHealth::Incomplete)
+                .count()
+                .max(self.scan_progress.incomplete);
+            if failed > 0 {
+                format!("FAILED {failed}")
+            } else if incomplete > 0 {
+                format!("INCOMPLETE {incomplete}")
+            } else {
+                "OK".to_owned()
+            }
         }
     }
 
@@ -485,12 +504,6 @@ impl App {
             .title
             .to_lowercase()
             .contains(&query)
-            || job
-                .classified
-                .observed
-                .description
-                .to_lowercase()
-                .contains(&query)
             || job.key.company_id.to_lowercase().contains(&query)
             || self.config.companies.iter().any(|company| {
                 company.id == job.key.company_id && company.name.to_lowercase().contains(&query)

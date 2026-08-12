@@ -78,6 +78,10 @@ fn render_single_job_pane(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_operational_view(frame: &mut Frame, app: &App, area: Rect) {
+    if area.width < 80 && app.narrow_details_visible() {
+        render_operational_details(frame, app, area);
+        return;
+    }
     if area.width >= 120 {
         let areas = Layout::horizontal([Constraint::Length(22), Constraint::Fill(1)]).split(area);
         render_navigation(frame, app, areas[0]);
@@ -90,6 +94,130 @@ fn render_operational_view(frame: &mut Frame, app: &App, area: Rect) {
     } else {
         render_operational_surface(frame, app, area, Borders::ALL);
     }
+}
+
+fn render_operational_details(frame: &mut Frame, app: &App, area: Rect) {
+    let theme = app.theme();
+    let (title, text, color) = match app.view() {
+        View::Scans => app.scans().get(app.selected_index()).map_or_else(
+            || {
+                (
+                    "Scan details",
+                    Text::from("No scan selected."),
+                    theme.muted_text,
+                )
+            },
+            |scan| {
+                let (status, color) = match scan.outcome {
+                    ScanOutcome::Complete => ("COMPLETE", theme.open),
+                    ScanOutcome::Incomplete => ("INCOMPLETE", theme.warning),
+                    ScanOutcome::Failed => ("FAILED", theme.error),
+                };
+                (
+                    "Scan details",
+                    Text::from(vec![
+                        metadata_line("Status      ", status.into(), theme.muted_text, color),
+                        metadata_line(
+                            "Company     ",
+                            scan.company_name.clone(),
+                            theme.muted_text,
+                            theme.primary_text,
+                        ),
+                        metadata_line(
+                            "Completed   ",
+                            compact_time(scan.completed_at),
+                            theme.muted_text,
+                            theme.primary_text,
+                        ),
+                        metadata_line(
+                            "Observed    ",
+                            format!("{} observed", scan.observed_count),
+                            theme.muted_text,
+                            theme.primary_text,
+                        ),
+                        Line::from(""),
+                        Line::styled(
+                            diagnostic(&scan.error_kind, &scan.diagnostic),
+                            Style::new().fg(color),
+                        ),
+                    ]),
+                    color,
+                )
+            },
+        ),
+        View::Sources => app.sources().get(app.selected_index()).map_or_else(
+            || {
+                (
+                    "Source details",
+                    Text::from("No source selected."),
+                    theme.muted_text,
+                )
+            },
+            |source| {
+                let (status, color) = match source.health {
+                    SourceHealth::Unknown => ("UNKNOWN", theme.muted_text),
+                    SourceHealth::Healthy => ("HEALTHY", theme.open),
+                    SourceHealth::Incomplete => ("INCOMPLETE", theme.warning),
+                    SourceHealth::Failed => ("FAILED", theme.error),
+                };
+                (
+                    "Source details",
+                    Text::from(vec![
+                        metadata_line("Health       ", status.into(), theme.muted_text, color),
+                        metadata_line(
+                            "Company      ",
+                            source.company_name.clone(),
+                            theme.muted_text,
+                            theme.primary_text,
+                        ),
+                        metadata_line(
+                            "State        ",
+                            if source.enabled {
+                                "enabled"
+                            } else {
+                                "disabled"
+                            }
+                            .into(),
+                            theme.muted_text,
+                            theme.primary_text,
+                        ),
+                        metadata_line(
+                            "last attempt ",
+                            optional_time(source.latest_attempted_at),
+                            theme.muted_text,
+                            theme.primary_text,
+                        ),
+                        metadata_line(
+                            "last success ",
+                            optional_time(source.latest_successful_at),
+                            theme.muted_text,
+                            theme.primary_text,
+                        ),
+                        Line::from(""),
+                        Line::styled(
+                            diagnostic(&source.latest_error_kind, &source.diagnostic),
+                            Style::new().fg(color),
+                        ),
+                    ]),
+                    color,
+                )
+            },
+        ),
+        _ => unreachable!("operational details have fixed views"),
+    };
+    frame.render_widget(
+        Paragraph::new(text)
+            .block(panel(
+                title,
+                theme.focused_border,
+                theme.background,
+                Borders::ALL,
+            ))
+            .style(Style::new().fg(color).bg(theme.background))
+            .scroll((app.detail_scroll(), 0))
+            .wrap(Wrap { trim: true }),
+        area,
+    );
 }
 
 fn render_operational_surface(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
@@ -333,12 +461,7 @@ fn render_scans(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
             ScanOutcome::Incomplete => (app.icons().source_failure, "INCOMPLETE", theme.warning),
             ScanOutcome::Failed => (app.icons().source_failure, "FAILED", theme.error),
         };
-        let diagnostic = match (&scan.error_kind, &scan.diagnostic) {
-            (Some(kind), Some(diagnostic)) => format!("{kind} · {diagnostic}"),
-            (Some(kind), None) => kind.to_string(),
-            (None, Some(diagnostic)) => diagnostic.clone(),
-            (None, None) => "no diagnostic".to_owned(),
-        };
+        let diagnostic = diagnostic(&scan.error_kind, &scan.diagnostic);
         ListItem::new(vec![
             Line::from(vec![
                 Span::styled(format!("{icon} {label}"), Style::new().fg(color)),
@@ -389,12 +512,7 @@ fn render_sources(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
         } else {
             "disabled"
         };
-        let diagnostic = match (&source.latest_error_kind, &source.diagnostic) {
-            (Some(kind), Some(diagnostic)) => format!("{kind} · {diagnostic}"),
-            (Some(kind), None) => kind.to_string(),
-            (None, Some(diagnostic)) => diagnostic.clone(),
-            (None, None) => "no diagnostic".to_owned(),
-        };
+        let diagnostic = diagnostic(&source.latest_error_kind, &source.diagnostic);
         ListItem::new(vec![
             Line::from(vec![
                 Span::styled(format!("{icon} {label}"), Style::new().fg(color)),
@@ -454,27 +572,23 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             format!("SEARCH {query}"),
             "Enter apply".to_owned(),
             "Esc clear".to_owned(),
-            format!("{} help", keys.help),
         ]
     } else if matches!(app.view(), View::Scans | View::Sources) {
         let mut actions = vec![format!("{} scan", keys.scan), "←/→ views".to_owned()];
         if area.width >= 80 {
             actions.push(format!("{} quit", keys.quit));
         }
-        actions.push(format!("{} help", keys.help));
         actions
     } else if area.width < 80 {
         if app.narrow_details_visible() {
             vec![
                 format!("{} open", keys.open),
                 format!("{} applied", keys.toggle_applied),
-                format!("{} help", keys.help),
             ]
         } else {
             vec![
                 format!("{} scan", keys.scan),
                 format!("{} search", keys.search),
-                format!("{} help", keys.help),
             ]
         }
     } else {
@@ -500,9 +614,13 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         if area.width >= 120 {
             actions.push(format!("{} quit", keys.quit));
         }
-        actions.push(format!("{} help", keys.help));
         actions
     };
+    let footer = Layout::horizontal([
+        Constraint::Min(0),
+        Constraint::Length(u16::try_from(keys.help.chars().count() + 5).unwrap_or(u16::MAX)),
+    ])
+    .split(area);
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(format!("{icon} {status}"), Style::new().fg(status_color)),
@@ -512,7 +630,12 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             ),
         ]))
         .style(Style::new().bg(theme.background)),
-        area,
+        footer[0],
+    );
+    frame.render_widget(
+        Paragraph::new(format!("{} help", keys.help))
+            .style(Style::new().fg(theme.muted_text).bg(theme.background)),
+        footer[1],
     );
 }
 
@@ -529,11 +652,18 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
          ↑/↓ or j/k select\n\
          J/K scroll details\n\n\
          {} scan  {} search jobs  {} filter company/New/Applied\n\
-         {} applied  {} open\n\
+         {} applied  {} history  {} open\n\
          Enter narrow: details; otherwise: open\n\
-         Search: title, company, posting; Enter accept; Esc clear\n\
+         Search: title or company; Enter accept; Esc clear\n\
          Esc close help  {} toggle help  {} quit",
-        keys.scan, keys.search, keys.filter, keys.toggle_applied, keys.open, keys.help, keys.quit,
+        keys.scan,
+        keys.search,
+        keys.filter,
+        keys.toggle_applied,
+        keys.history,
+        keys.open,
+        keys.help,
+        keys.quit,
     );
     frame.render_widget(Clear, overlay);
     frame.render_widget(
@@ -564,6 +694,18 @@ fn compact_time(value: DateTime<Utc>) -> String {
 
 fn optional_time(value: Option<DateTime<Utc>>) -> String {
     value.map_or_else(|| "never".to_owned(), compact_time)
+}
+
+fn diagnostic(
+    error_kind: &Option<crate::domain::SourceErrorKind>,
+    diagnostic: &Option<String>,
+) -> String {
+    match (error_kind, diagnostic) {
+        (Some(kind), Some(diagnostic)) => format!("{kind} · {diagnostic}"),
+        (Some(kind), None) => kind.to_string(),
+        (None, Some(diagnostic)) => diagnostic.clone(),
+        (None, None) => "no diagnostic".to_owned(),
+    }
 }
 
 fn panel(title: &str, border: Color, background: Color, borders: Borders) -> Block<'_> {

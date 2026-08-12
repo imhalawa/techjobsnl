@@ -108,6 +108,7 @@ impl Store {
 
     pub fn sync_companies(&mut self, companies: &[CompanyConfig]) -> Result<()> {
         let tx = self.connection.transaction()?;
+        tx.execute("UPDATE companies SET enabled = 0", [])?;
         for company in companies {
             tx.execute(
                 "INSERT INTO companies (id, name, enabled)

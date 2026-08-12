@@ -43,6 +43,18 @@ fn symbol_x(buffer: &Buffer, y: u16, start_x: u16, symbol: &str) -> u16 {
         .unwrap_or_else(|| panic!("missing {symbol:?} on row {y}"))
 }
 
+fn normalized_interior(buffer: &Buffer) -> String {
+    (1..buffer.area.height.saturating_sub(1))
+        .flat_map(|y| {
+            (1..buffer.area.width.saturating_sub(1))
+                .map(move |x| buffer.cell((x, y)).unwrap().symbol())
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn config() -> Config {
     Config {
         schema_version: 1,
@@ -203,7 +215,7 @@ fn configured_actions_replace_only_the_configurable_keys() {
 }
 
 #[test]
-fn search_accepts_input_filters_by_title_company_or_posting_and_escape_cancels() {
+fn search_filters_by_title_or_company_but_not_posting_text_and_escape_cancels() {
     let configured = config_with_two_companies();
     let mut backend = job("Backend Engineer", false, false);
     backend.classified.observed.description = "Maintain payment ledgers.".into();
@@ -237,8 +249,7 @@ fn search_accepts_input_filters_by_title_company_or_posting_and_escape_cancels()
     for character in "ledgers".chars() {
         app.handle_key(key(character));
     }
-    assert_eq!(app.visible_jobs().count(), 1);
-    assert_eq!(app.selected_job().unwrap().key.company_id, "acme");
+    assert_eq!(app.visible_jobs().count(), 0);
 }
 
 #[test]
@@ -556,6 +567,21 @@ fn footer_keeps_configured_help_as_the_final_visible_hint_at_supported_widths() 
 }
 
 #[test]
+fn footer_reserves_the_configured_help_hint_with_a_long_filter_label() {
+    let mut configured = config();
+    configured.companies[0].name =
+        "A company name deliberately longer than the complete footer width".into();
+    configured.keybindings.help = "i".into();
+    let mut app = App::new(configured, vec![job("Backend Engineer", false, false)]);
+    app.handle_key(key('f'));
+
+    for width in [70, 100, 140] {
+        let buffer = rendered_buffer(&app, width, 25);
+        assert!(row(&buffer, 24).trim_end().ends_with("i help"));
+    }
+}
+
+#[test]
 fn active_view_hides_closed_records_supplied_with_open_records() {
     let open = job("Open role", false, false);
     let mut closed = job("Closed role", false, false);
@@ -780,6 +806,7 @@ fn configured_help_opens_an_overlay_with_fixed_and_contextual_controls() {
     configured.keybindings.filter = "v".into();
     configured.keybindings.toggle_applied = "x".into();
     configured.keybindings.open = "u".into();
+    configured.keybindings.history = "y".into();
     configured.keybindings.help = "i".into();
     configured.keybindings.quit = "e".into();
     let mut app = App::new(configured, vec![job("Backend Engineer", false, false)]);
@@ -794,6 +821,7 @@ fn configured_help_opens_an_overlay_with_fixed_and_contextual_controls() {
     assert!(screen.contains("v filter company/New/Applied"));
     assert!(screen.contains("x applied"));
     assert!(screen.contains("u open"));
+    assert!(screen.contains("y history"));
     assert!(screen.contains("Enter narrow: details; otherwise: open"));
     assert!(screen.contains("Esc close help"));
     assert!(screen.contains("e quit"));
@@ -831,4 +859,131 @@ fn operational_rows_remain_keyboard_reachable_when_the_view_exceeds_the_terminal
     let screen = rendered(&app, 79, 12);
     assert!(screen.contains("Source 11"));
     assert!(!screen.contains("Source 0 ·"));
+}
+
+#[test]
+fn narrow_operational_details_recover_long_required_fields() {
+    let at = Utc.with_ymd_and_hms(2026, 8, 11, 11, 0, 0).unwrap();
+    let company = "A Company Display Name That Does Not Fit On One Narrow Row";
+    let diagnostic =
+        "the source returned a diagnostic long enough to require wrapping across terminal rows";
+    let mut app = App::new(config(), vec![]);
+    app.replace_read_models(
+        vec![ScanReadModel {
+            run_id: "run-long".into(),
+            company_id: "acme".into(),
+            company_name: company.into(),
+            completed_at: at,
+            outcome: ScanOutcome::Incomplete,
+            observed_count: 1234,
+            error_kind: Some(SourceErrorKind::IncompleteResults),
+            diagnostic: Some(diagnostic.into()),
+        }],
+        vec![SourceReadModel {
+            company_id: "acme".into(),
+            company_name: company.into(),
+            enabled: true,
+            latest_attempted_at: Some(at),
+            latest_successful_at: None,
+            health: SourceHealth::Incomplete,
+            latest_error_kind: Some(SourceErrorKind::IncompleteResults),
+            diagnostic: Some(diagnostic.into()),
+        }],
+    );
+
+    for _ in 0..4 {
+        app.handle_key(special(KeyCode::Right));
+    }
+    app.handle_key_with_width(special(KeyCode::Enter), 79);
+    let scans = normalized_interior(&rendered_buffer(&app, 79, 20));
+    assert!(scans.contains(company));
+    assert!(scans.contains("1234 observed"));
+    assert!(scans.contains(diagnostic));
+
+    app.handle_key(special(KeyCode::Esc));
+    app.handle_key(special(KeyCode::Right));
+    app.handle_key_with_width(special(KeyCode::Enter), 79);
+    let sources = normalized_interior(&rendered_buffer(&app, 79, 20));
+    assert!(sources.contains(company));
+    assert!(sources.contains("last attempt 11 Aug 11:00"));
+    assert!(sources.contains("last success never"));
+    assert!(sources.contains(diagnostic));
+}
+
+#[test]
+fn idle_footer_uses_durable_enabled_source_health() {
+    let mut app = App::new(config(), vec![]);
+    app.replace_read_models(
+        vec![],
+        vec![
+            SourceReadModel {
+                company_id: "acme".into(),
+                company_name: "Acme".into(),
+                enabled: true,
+                latest_attempted_at: None,
+                latest_successful_at: None,
+                health: SourceHealth::Incomplete,
+                latest_error_kind: Some(SourceErrorKind::IncompleteResults),
+                diagnostic: Some("partial".into()),
+            },
+            SourceReadModel {
+                company_id: "removed".into(),
+                company_name: "Removed".into(),
+                enabled: false,
+                latest_attempted_at: None,
+                latest_successful_at: None,
+                health: SourceHealth::Failed,
+                latest_error_kind: Some(SourceErrorKind::Transport),
+                diagnostic: Some("offline".into()),
+            },
+        ],
+    );
+
+    assert!(row(&rendered_buffer(&app, 100, 20), 19).contains("INCOMPLETE 1"));
+}
+
+#[test]
+fn scan_selection_follows_identity_when_newer_rows_are_prepended() {
+    let at = Utc.with_ymd_and_hms(2026, 8, 11, 11, 0, 0).unwrap();
+    let scan = |run_id: &str| ScanReadModel {
+        run_id: run_id.into(),
+        company_id: "acme".into(),
+        company_name: "Acme".into(),
+        completed_at: at,
+        outcome: ScanOutcome::Complete,
+        observed_count: 1,
+        error_kind: None,
+        diagnostic: None,
+    };
+    let mut app = App::new(config(), vec![]);
+    app.replace_read_models(vec![scan("new"), scan("selected")], vec![]);
+    for _ in 0..4 {
+        app.handle_key(special(KeyCode::Right));
+    }
+    app.handle_key(key('j'));
+
+    app.replace_read_models(vec![scan("newest"), scan("new"), scan("selected")], vec![]);
+
+    assert_eq!(app.scans()[app.selected_index()].run_id, "selected");
+}
+
+#[test]
+fn lifecycle_details_show_closed_reopened_and_applied_dates() {
+    let mut closed = job("Closed Engineer", false, true);
+    closed.source_open = false;
+    closed.closed_at = Some(Utc.with_ymd_and_hms(2026, 8, 11, 10, 0, 0).unwrap());
+    let mut reopened = job("Reopened Engineer", false, true);
+    reopened.reopened_at = Some(Utc.with_ymd_and_hms(2026, 8, 11, 11, 0, 0).unwrap());
+    let mut app = App::new(config(), vec![closed, reopened]);
+    app.handle_key(key('h'));
+
+    let closed_screen = rendered(&app, 120, 24);
+    assert!(closed_screen.contains("Closed"));
+    assert!(closed_screen.contains("11 Aug 2026 10:00 UTC"));
+    assert!(closed_screen.contains("✓ YES · 11 Aug 2026 09:00 UTC"));
+
+    app.handle_key(key('j'));
+    let reopened_screen = rendered(&app, 120, 24);
+    assert!(reopened_screen.contains("Reopened"));
+    assert!(reopened_screen.contains("11 Aug 2026 11:00 UTC"));
 }

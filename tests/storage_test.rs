@@ -354,3 +354,38 @@ fn durable_scan_and_source_read_models_include_display_names_and_diagnostics() {
         Some("unresolved location")
     );
 }
+
+#[test]
+fn syncing_a_removed_company_disables_it_without_deleting_history_or_applied_state() {
+    let path = tempfile::NamedTempFile::new().unwrap();
+    let mollie = mollie_config();
+    let removed = company("removed", true);
+    let mut store = Store::open(path.path()).unwrap();
+    store
+        .sync_companies(&[mollie.clone(), removed.clone()])
+        .unwrap();
+    store
+        .record_complete_scan("run-1", &removed, &[job("kept")], at(9), at(10))
+        .unwrap();
+    store
+        .toggle_applied(&JobKey::new("removed", "kept"), at(11))
+        .unwrap();
+
+    store.sync_companies(std::slice::from_ref(&mollie)).unwrap();
+    drop(store);
+    let store = Store::open(path.path()).unwrap();
+
+    let removed_source = store
+        .source_health()
+        .unwrap()
+        .into_iter()
+        .find(|source| source.company_id == "removed")
+        .unwrap();
+    assert!(!removed_source.enabled);
+    assert!(store.list_jobs(JobQuery::active()).unwrap().is_empty());
+    assert!(store.list_jobs(JobQuery::applied()).unwrap().is_empty());
+    let stored = store.list_jobs(JobQuery::all()).unwrap();
+    assert_eq!(stored.len(), 1);
+    assert!(stored[0].applied_at.is_some());
+    assert_eq!(store.recent_scans().unwrap().len(), 1);
+}
