@@ -17,7 +17,7 @@ The application reads `config.toml` from the current directory. It loads stored 
 - `r`: scan enabled sources
 - Arrow keys or `j`/`k`: move through jobs and views
 - `J`/`K`: scroll job details
-- `/`: search by job title or company; `Esc` clears the search
+- `/`: search by job title or company; `Enter` accepts the search, while `Esc` cancels and clears it during editing (press `/`, then `Esc`, to clear an accepted search)
 - `f`: cycle company, new, and applied filters, then clear the filter
 - `h`: switch between active jobs and history
 - `a`: mark or unmark the selected job as applied

@@ -42,15 +42,41 @@ struct Startup {
 }
 
 fn initialize(working_directory: &Path) -> Result<Startup> {
-    let config = Config::load(working_directory.join("config.toml"))?;
-    let database_path = database_path(working_directory, &config.database_path);
+    let config_path = std::path::absolute(working_directory.join("config.toml"))?;
+    let config = Config::load(&config_path).map_err(|source| {
+        std::io::Error::other(format!(
+            "could not initialize from configuration {}: {source}",
+            config_path.display()
+        ))
+    })?;
+    let database_path = database_path(
+        config_path
+            .parent()
+            .expect("config.toml always has its working-directory parent"),
+        &config.database_path,
+    );
     if let Some(parent) = database_path.parent() {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent).map_err(|source| {
+            std::io::Error::other(format!(
+                "could not create parent for database {}: {source}",
+                database_path.display()
+            ))
+        })?;
     }
-    let mut store = Store::open(database_path)?;
+    let mut store = Store::open(&database_path).map_err(|source| {
+        std::io::Error::other(format!(
+            "could not open database {}: {source}",
+            database_path.display()
+        ))
+    })?;
     store.sync_companies(&config.companies)?;
     let store = Arc::new(Mutex::new(store));
-    let scan_service = Arc::new(scan_service(&config, Arc::clone(&store))?);
+    let scan_service = Arc::new(scan_service(&config, Arc::clone(&store)).map_err(|source| {
+        std::io::Error::other(format!(
+            "could not initialize from configuration {}: {source}",
+            config_path.display()
+        ))
+    })?);
     let jobs = store.lock().unwrap().list_jobs(JobQuery::active())?;
     Ok(Startup {
         app: App::new(config, jobs),
@@ -506,6 +532,94 @@ mod tests {
             error
                 .to_string()
                 .contains(&directory.path().join("config.toml").display().to_string())
+        );
+    }
+
+    #[test]
+    fn startup_invalid_configuration_reports_the_absolute_config_path() {
+        let directory = tempfile::tempdir().unwrap();
+        let config =
+            include_str!("../config.toml").replace("schema_version = 1", "schema_version = 2");
+        std::fs::write(directory.path().join("config.toml"), config).unwrap();
+
+        let error = match initialize(directory.path()) {
+            Ok(_) => panic!("startup unexpectedly accepted an invalid configuration"),
+            Err(error) => error,
+        };
+        let diagnostic = error.to_string();
+
+        assert!(diagnostic.contains("schema_version"));
+        assert!(diagnostic.contains(&directory.path().join("config.toml").display().to_string()));
+    }
+
+    #[test]
+    fn startup_config_derived_failure_reports_the_absolute_config_path() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = include_str!("../config.toml").replace(
+            "include_families = [\"software\", \"platform\", \"sre\", \"data\", \"ml\", \"application-security\"]",
+            "include_families = [\"unknown-family\"]",
+        );
+        std::fs::write(directory.path().join("config.toml"), config).unwrap();
+
+        let error = match initialize(directory.path()) {
+            Ok(_) => panic!("startup unexpectedly accepted an unknown filter family"),
+            Err(error) => error,
+        };
+        let diagnostic = error.to_string();
+
+        assert!(diagnostic.contains("unknown included family"));
+        assert!(diagnostic.contains(&directory.path().join("config.toml").display().to_string()));
+    }
+
+    #[test]
+    fn startup_database_parent_failure_reports_the_absolute_database_path() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(
+            directory.path().join("config.toml"),
+            include_str!("../config.toml"),
+        )
+        .unwrap();
+        std::fs::write(directory.path().join(".data"), "not a directory").unwrap();
+
+        let error = match initialize(directory.path()) {
+            Ok(_) => panic!("startup unexpectedly created a database below a file"),
+            Err(error) => error,
+        };
+
+        assert!(
+            error.to_string().contains(
+                &directory
+                    .path()
+                    .join(".data/job-watch.sqlite3")
+                    .display()
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn startup_database_open_failure_reports_the_absolute_database_path() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(
+            directory.path().join("config.toml"),
+            include_str!("../config.toml"),
+        )
+        .unwrap();
+        std::fs::create_dir_all(directory.path().join(".data/job-watch.sqlite3")).unwrap();
+
+        let error = match initialize(directory.path()) {
+            Ok(_) => panic!("startup unexpectedly opened a directory as a database"),
+            Err(error) => error,
+        };
+
+        assert!(
+            error.to_string().contains(
+                &directory
+                    .path()
+                    .join(".data/job-watch.sqlite3")
+                    .display()
+                    .to_string()
+            )
         );
     }
 

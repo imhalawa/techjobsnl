@@ -196,6 +196,11 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
     );
 
     scan(&service, "run-3").await;
+    store
+        .lock()
+        .unwrap()
+        .toggle_applied(&JobKey::new("mollie", "stable"), chrono::Utc::now())
+        .unwrap();
     let before_errors = store.lock().unwrap().list_jobs(JobQuery::all()).unwrap();
     assert!(
         before_errors
@@ -206,15 +211,12 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
 
     scan(&service, "run-4").await;
     let after_errors = store.lock().unwrap().list_jobs(JobQuery::all()).unwrap();
-    for before in &before_errors {
-        let after = after_errors
-            .iter()
-            .find(|job| job.key == before.key)
-            .unwrap();
-        assert_eq!(after.source_open, before.source_open);
-        assert_eq!(after.is_new, before.is_new);
-        assert_eq!(after.last_seen_at, before.last_seen_at);
-    }
+    assert_eq!(after_errors.len(), before_errors.len());
+    assert_eq!(
+        serde_json::to_value(&after_errors).unwrap(),
+        serde_json::to_value(&before_errors).unwrap(),
+        "failed and incomplete company results must not mutate any persisted job field"
+    );
     assert!(
         after_errors
             .iter()
@@ -234,11 +236,6 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
     assert!(!reopened.is_new);
     assert!(reopened.reopened_at.is_some());
 
-    store
-        .lock()
-        .unwrap()
-        .toggle_applied(&JobKey::new("mollie", "stable"), chrono::Utc::now())
-        .unwrap();
     scan(&service, "run-6").await;
     let all = store.lock().unwrap().list_jobs(JobQuery::all()).unwrap();
     assert_eq!(all.len(), 4);
@@ -262,10 +259,19 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
         .unwrap();
     config.companies[1] = disabled_atlas;
     let jobs = store.lock().unwrap().list_jobs(JobQuery::active()).unwrap();
+    let stored_after_disable = store.lock().unwrap().list_jobs(JobQuery::all()).unwrap();
     assert_eq!(jobs.len(), 2);
     assert!(jobs.iter().all(|job| job.key.company_id == "mollie"));
-    assert!(all.iter().any(|job| !job.classified.eligibility.eligible));
-    assert!(all.iter().any(|job| job.key.company_id == "atlas"));
+    assert!(
+        stored_after_disable
+            .iter()
+            .any(|job| !job.classified.eligibility.eligible)
+    );
+    assert!(
+        stored_after_disable
+            .iter()
+            .any(|job| job.key.company_id == "atlas")
+    );
 
     let screen = rendered(&App::new(config, jobs));
     assert!(screen.contains("Mollie"));
