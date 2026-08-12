@@ -16,7 +16,7 @@ use job_watch::{
     domain::ScanEvent,
     filter::EligibilityFilter,
     scanner::ScanService,
-    sources::{JobSource, ashby, ebay, greenhouse, jibe},
+    sources::{JobSource, ashby, ebay, greenhouse, jibe, recruitee},
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
 };
@@ -270,6 +270,9 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     brand,
                     client.clone(),
                 ))),
+                SourceConfig::Recruitee { base_url } => Ok(Arc::new(
+                    recruitee::RecruiteeSource::new(&company.id, base_url, client.clone()),
+                )),
                 SourceConfig::Ebay { listing_url } => Ok(Arc::new(ebay::EbaySource::new(
                     &company.id,
                     listing_url,
@@ -513,6 +516,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "adyen")
             .collect::<Vec<_>>();
+        let funda = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "funda")
+            .collect::<Vec<_>>();
         let rabobank = config
             .companies
             .iter()
@@ -529,6 +537,13 @@ mod tests {
         assert!(matches!(
             &adyen[0].source,
             SourceConfig::Greenhouse { board } if board == "adyen"
+        ));
+
+        assert_eq!(funda.len(), 1);
+        assert!(funda[0].enabled);
+        assert!(matches!(
+            &funda[0].source,
+            SourceConfig::Recruitee { base_url } if base_url == "https://jobs.funda.nl"
         ));
 
         assert_eq!(rabobank.len(), 1);
@@ -554,7 +569,14 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(
             enabled_ids,
-            ["mollie", "booking-com", "ebay", "airwallex", "adyen"]
+            [
+                "mollie",
+                "booking-com",
+                "ebay",
+                "airwallex",
+                "adyen",
+                "funda"
+            ]
         );
 
         let source_ids = build_sources(&config)

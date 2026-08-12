@@ -72,6 +72,14 @@ strategy = "greenhouse"
 board = "adyen"
 
 [[companies]]
+id = "funda"
+name = "Funda"
+enabled = true
+[companies.source]
+strategy = "recruitee"
+base_url = "https://jobs.funda.nl"
+
+[[companies]]
 id = "rabobank"
 name = "Rabobank"
 enabled = false

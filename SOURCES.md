@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Funda
+
+- Sponsor: the current IND public register for work lists `Funda Real Estate B.V.` with KvK `34242436`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. Funda's own applicant privacy statement identifies Funda as the same legal entity and KvK number: <https://www.funda.nl/en/voorwaarden-en-beleid/privacyverklaring/sollicitant/>.
+- Hiring entity: the applicant privacy statement applies to Funda vacancies and the application process, but does not prove the legal employer for every eventual contract. Confirm that the vacancy's employment entity is `Funda Real Estate B.V.` before relying on sponsor status.
+- Official source: <https://jobs.funda.nl/api/offers/>. The public Recruitee endpoint returns the board in one `offers` array; the adapter rejects a missing array, duplicate IDs, or any offer without its required fields before accepting a complete scan.
+- Live discovery: 8 jobs on 2026-08-12. IDs were unique and every job had the parser-required fields. The count is volatile and is not hardcoded in the smoke test.
+
 ## Adyen
 
 - Sponsor: the IND public register for work lists `Adyen N.V.` with KvK `34259528`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. Adyen's own legal information confirms the same entity and Dutch company number: <https://www.adyen.com/en_GB/licenses/europe>.
