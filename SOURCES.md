@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## ING
+
+- Sponsor: the current IND public register for work, updated 2026-07-01, lists `ING Bank N.V.` with KvK `33031431`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. ING's own articles of association identify `ING Bank N.V.` with the same Dutch trade-register number: <https://ing.com/binaries/content/assets/documents/files/articles_of_association_of_ing_bank_n.v.pdf>.
+- Hiring entity: the careers site labels Netherlands vacancies `ING Bank`, and its applicant privacy statement identifies `ING Bank N.V.`, but neither establishes the legal employer for every eventual contract. Mapping a vacancy branded `ING Bank` to the registered sponsor is therefore an inference; confirm the employment entity before relying on sponsor status: <https://careers.ing.com/en/privacy-statement>.
+- Official source: <https://careers.ing.com/en/location/netherlands-jobs/2618/2750405/2/en/search-jobs>. The listing publishes an exact total, page count, current page, and page size; each detail publishes matching `JobPosting` JSON-LD and an official apply URL. The adapter rejects pagination drift, count mismatches, duplicate IDs, listing/detail identity mismatches, unresolved countries, and missing required fields before accepting a complete scan.
+- Live discovery: 58 Netherlands jobs on 2026-08-13. All declared pages and details were fetched, IDs were unique, and every job had the parser-required fields. The count is volatile and is not hardcoded in the smoke test.
+
 ## bol.com
 
 - Sponsor: the current IND public register for work lists `Bol.com B.V.` with KvK `32147382`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. Bol.com's own legal information identifies `bol.com B.V.` with the same KvK number: <https://lowlands.bol.com/pages/algemene-voorwaarden>.

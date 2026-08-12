@@ -16,7 +16,7 @@ use job_watch::{
     domain::ScanEvent,
     filter::EligibilityFilter,
     scanner::ScanService,
-    sources::{JobSource, ashby, bol, ebay, greenhouse, jibe, recruitee},
+    sources::{JobSource, ashby, bol, ebay, greenhouse, ing, jibe, recruitee},
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
 };
@@ -278,6 +278,11 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     base_url,
                     client.clone(),
                 ))),
+                SourceConfig::Ing { listing_url } => Ok(Arc::new(ing::IngSource::new(
+                    &company.id,
+                    listing_url,
+                    client.clone(),
+                ))),
                 SourceConfig::Ebay { listing_url } => Ok(Arc::new(ebay::EbaySource::new(
                     &company.id,
                     listing_url,
@@ -531,6 +536,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "bol")
             .collect::<Vec<_>>();
+        let ing = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "ing")
+            .collect::<Vec<_>>();
         let rabobank = config
             .companies
             .iter()
@@ -566,6 +576,15 @@ mod tests {
         assert!(matches!(
             &bol[0].source,
             SourceConfig::Bol { base_url } if base_url == "https://careers.bol.com"
+        ));
+
+        assert_eq!(ing.len(), 1);
+        assert_eq!(ing[0].name, "ING");
+        assert!(ing[0].enabled);
+        assert!(matches!(
+            &ing[0].source,
+            SourceConfig::Ing { listing_url }
+                if listing_url == "https://careers.ing.com/en/location/netherlands-jobs/2618/2750405/2/en/search-jobs"
         ));
 
         assert_eq!(rabobank.len(), 1);
@@ -606,7 +625,8 @@ mod tests {
                 "airwallex",
                 "adyen",
                 "funda",
-                "bol"
+                "bol",
+                "ing"
             ]
         );
 

@@ -1,6 +1,6 @@
 # Job Watch
 
-Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. It enables Mollie's and Airwallex's Ashby boards, Adyen's Greenhouse board, Booking.com's Jibe API, Funda's Recruitee board, bol.com's official careers API, and eBay's official Netherlands careers pages.
+Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. It enables Mollie's and Airwallex's Ashby boards, Adyen's Greenhouse board, Booking.com's Jibe API, Funda's Recruitee board, bol.com's official careers API, ING's official Netherlands careers pages, and eBay's official Netherlands careers pages.
 
 ## Run
 
@@ -56,10 +56,11 @@ cargo test --test hosted_ats_test greenhouse_live_returns_complete_unique_jobs -
 cargo test --test hosted_ats_test jibe_live_returns_complete_unique_jobs -- --ignored --nocapture
 cargo test --test hosted_ats_test recruitee_live_returns_complete_unique_jobs -- --ignored --nocapture
 cargo test --test structured_sources_test bol_live_returns_complete_unique_jobs_and_working_urls -- --ignored --exact --nocapture
+cargo test --test html_sources_test ing_live_returns_complete_unique_jobs -- --ignored --exact --nocapture
 cargo test --test ebay_test ebay_live_returns_complete_unique_netherlands_jobs -- --ignored --nocapture
 ```
 
-The live smoke tests check Mollie's, Airwallex's, Adyen's, Booking.com's, Funda's, bol.com's, and eBay's current public payloads. The offline suite is the deterministic verification path.
+The live smoke tests check Mollie's, Airwallex's, Adyen's, Booking.com's, Funda's, bol.com's, ING's, and eBay's current public payloads. The offline suite is the deterministic verification path.
 
 ## Company onboarding
 

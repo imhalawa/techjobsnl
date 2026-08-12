@@ -110,3 +110,11 @@ enabled = false
 [companies.source]
 strategy = "unsupported"
 reason = "legal employer not established"
+
+[[companies]]
+id = "ing"
+name = "ING"
+enabled = true
+[companies.source]
+strategy = "ing"
+listing_url = "https://careers.ing.com/en/location/netherlands-jobs/2618/2750405/2/en/search-jobs"
