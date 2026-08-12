@@ -302,6 +302,10 @@ fn rejects_empty_source_fields() {
             base_url: "https://jobs.booking.com".into(),
             client: " ".into(),
         },
+        SourceConfig::Jibe {
+            base_url: " ".into(),
+            client: "Booking.com".into(),
+        },
         SourceConfig::Recruitee {
             base_url: "".into(),
         },
@@ -315,9 +319,18 @@ fn rejects_empty_source_fields() {
             base_url: "https://www.werkenbijabnamro.nl".into(),
             country_filter: Some(" ".into()),
         },
+        SourceConfig::Getnoticed {
+            base_url: "".into(),
+            country_filter: None,
+        },
         SourceConfig::PagedHtml {
             listing_url: "https://www.exact.com/careers/vacancies".into(),
             offset_parameter: "".into(),
+            page_size: 20,
+        },
+        SourceConfig::PagedHtml {
+            listing_url: " ".into(),
+            offset_parameter: "limitstart".into(),
             page_size: 20,
         },
         SourceConfig::Unsupported { reason: " ".into() },

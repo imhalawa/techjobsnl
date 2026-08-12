@@ -22,7 +22,11 @@ pub async fn send_text(request: RequestBuilder, source: &str) -> Result<String, 
                 StatusCode::REQUEST_TIMEOUT => SourceErrorKind::Timeout,
                 _ => SourceErrorKind::Transport,
             },
-            message: format!("{source} returned HTTP {status}"),
+            message: if status == StatusCode::TOO_MANY_REQUESTS {
+                format!("{source} rate limit exceeded")
+            } else {
+                format!("{source} returned HTTP {status}")
+            },
             http_status: Some(status.as_u16()),
             retry_after,
             retryable: status == StatusCode::TOO_MANY_REQUESTS

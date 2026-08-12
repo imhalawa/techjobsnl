@@ -39,7 +39,12 @@ async fn classifies_retryable_http_statuses() {
         };
         let url = serve_once(status, &headers, "unavailable");
 
-        let error = send_text(reqwest::Client::new().get(url), "test source")
+        let source = if status == 429 {
+            "Ashby"
+        } else {
+            "test source"
+        };
+        let error = send_text(reqwest::Client::new().get(url), source)
             .await
             .unwrap_err();
 
@@ -48,6 +53,7 @@ async fn classifies_retryable_http_statuses() {
         assert_eq!(error.http_status, Some(status), "status {status}");
         if status == 429 {
             assert_eq!(error.retry_after, Some(Duration::from_secs(9)));
+            assert_eq!(error.message, "Ashby rate limit exceeded");
         }
     }
 }
@@ -99,6 +105,20 @@ fn reports_json_ld_parser_failures_as_non_retryable_schema_errors() {
     assert!(!error.retryable);
     assert_eq!(error.http_status, None);
     assert_eq!(error.retry_after, None);
+}
+
+#[test]
+fn rejects_a_page_when_malformed_json_ld_precedes_a_valid_job_posting() {
+    let html = format!(
+        r#"<script type="application/ld+json">{{"@type":"BreadcrumbList"</script>{}"#,
+        include_str!("fixtures/common/job-posting.html")
+    );
+
+    let error = parse_job_posting(&html, "mixed fixture").unwrap_err();
+
+    assert_eq!(error.kind, SourceErrorKind::Schema);
+    assert!(!error.retryable);
+    assert!(error.message.contains("invalid JSON-LD"));
 }
 
 fn serve_once(status: u16, headers: &[(&str, &str)], body: &str) -> String {
