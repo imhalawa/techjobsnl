@@ -60,4 +60,6 @@ The live smoke tests check Mollie's, Airwallex's, Booking.com's, and eBay's curr
 
 ## Company onboarding
 
-The remaining allowlist is not enabled. Each company requires source-contract fixtures and live verification before it can be added safely.
+Rabobank is tracked but disabled. On 2026-08-12, its official Akamai edge returned HTTP 403 for normal unattended requests, and no complete official unattended source was available. Re-enable it only when such a source is accessible and passes source-contract fixtures plus live completeness verification; do not bypass the edge protection.
+
+The remaining allowlist is not enabled. Each company requires source-contract fixtures and live verification before it can be added safely. Re-check `SOURCES.md` before changing enabled policy.

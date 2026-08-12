@@ -250,6 +250,7 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
     config
         .companies
         .iter()
+        .filter(|company| company.enabled)
         .map(|company| -> Result<Arc<dyn JobSource>> {
             match &company.source {
                 SourceConfig::Ashby { board } => Ok(Arc::new(ashby::AshbySource::new(
@@ -502,28 +503,36 @@ mod tests {
     };
 
     #[test]
-    fn production_config_builds_mollie_booking_ebay_and_airwallex_sources() {
+    fn production_config_keeps_rabobank_disabled_and_unschedulable() {
         let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
-        let ebay = config
+        let rabobank = config
             .companies
             .iter()
-            .filter(|company| company.id == "ebay")
+            .filter(|company| company.id == "rabobank")
             .collect::<Vec<_>>();
 
-        assert_eq!(ebay.len(), 1);
-        assert!(ebay[0].enabled);
+        assert_eq!(rabobank.len(), 1);
+        assert!(!rabobank[0].enabled);
         assert!(matches!(
-            &ebay[0].source,
-            SourceConfig::Ebay { listing_url }
-                if listing_url == "https://jobs.ebayinc.com/us/en/jobs-in-netherlands"
+            &rabobank[0].source,
+            SourceConfig::Unsupported { reason }
+                if reason == "official sources reject unattended access (HTTP 403)"
         ));
+
+        let enabled_ids = config
+            .companies
+            .iter()
+            .filter(|company| company.enabled)
+            .map(|company| company.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(enabled_ids, ["mollie", "booking-com", "ebay", "airwallex"]);
 
         let source_ids = build_sources(&config)
             .unwrap()
             .into_iter()
             .map(|source| source.company_id().to_owned())
             .collect::<Vec<_>>();
-        assert_eq!(source_ids, ["mollie", "booking-com", "ebay", "airwallex"]);
+        assert_eq!(source_ids, enabled_ids);
     }
 
     struct CompleteSource;

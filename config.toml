@@ -62,3 +62,11 @@ enabled = true
 [companies.source]
 strategy = "ashby"
 board = "airwallex"
+
+[[companies]]
+id = "rabobank"
+name = "Rabobank"
+enabled = false
+[companies.source]
+strategy = "unsupported"
+reason = "official sources reject unattended access (HTTP 403)"

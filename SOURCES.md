@@ -1,5 +1,10 @@
 # Source and sponsor evidence
 
+## Rabobank
+
+- Official source limitation: on 2026-08-12, normal-user-agent direct GETs to the official listing/search pages, page 2, a vacancy detail, `robots.txt`, sitemaps, WordPress REST API, and feeds all returned HTTP 403 with an AkamaiNetStorage-branded unavailable page. No complete official unattended source was available.
+- Policy: Rabobank remains configured as disabled and unsupported. Re-enable it only when a complete official unattended source is accessible and passes source-contract fixtures plus live completeness verification; do not add browser impersonation or bypass the edge protection.
+
 ## Airwallex
 
 - Sponsor: the IND public register of recognised sponsors for work dated 2026-07-01 lists `Airwallex (Netherlands) B.V.` with KvK `77519256`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.
