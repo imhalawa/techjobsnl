@@ -16,7 +16,7 @@ use job_watch::{
     domain::ScanEvent,
     filter::EligibilityFilter,
     scanner::ScanService,
-    sources::{JobSource, ashby, ebay, jibe},
+    sources::{JobSource, ashby, ebay, greenhouse, jibe},
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
 };
@@ -258,6 +258,9 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     board,
                     client.clone(),
                 ))),
+                SourceConfig::Greenhouse { board } => Ok(Arc::new(
+                    greenhouse::GreenhouseSource::new(&company.id, board, client.clone()),
+                )),
                 SourceConfig::Jibe {
                     base_url,
                     client: brand,
@@ -503,13 +506,25 @@ mod tests {
     };
 
     #[test]
-    fn production_config_keeps_rabobank_disabled_and_unschedulable() {
+    fn production_config_enables_adyen_and_keeps_rabobank_unschedulable() {
         let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
+        let adyen = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "adyen")
+            .collect::<Vec<_>>();
         let rabobank = config
             .companies
             .iter()
             .filter(|company| company.id == "rabobank")
             .collect::<Vec<_>>();
+
+        assert_eq!(adyen.len(), 1);
+        assert!(adyen[0].enabled);
+        assert!(matches!(
+            &adyen[0].source,
+            SourceConfig::Greenhouse { board } if board == "adyen"
+        ));
 
         assert_eq!(rabobank.len(), 1);
         assert!(!rabobank[0].enabled);
@@ -525,7 +540,10 @@ mod tests {
             .filter(|company| company.enabled)
             .map(|company| company.id.as_str())
             .collect::<Vec<_>>();
-        assert_eq!(enabled_ids, ["mollie", "booking-com", "ebay", "airwallex"]);
+        assert_eq!(
+            enabled_ids,
+            ["mollie", "booking-com", "ebay", "airwallex", "adyen"]
+        );
 
         let source_ids = build_sources(&config)
             .unwrap()

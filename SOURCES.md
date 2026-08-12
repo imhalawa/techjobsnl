@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Adyen
+
+- Sponsor: the IND public register for work lists `Adyen N.V.` with KvK `34259528`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. Adyen's own legal information confirms the same entity and Dutch company number: <https://www.adyen.com/en_GB/licenses/europe>.
+- Hiring entity: treating a Netherlands vacancy branded `Adyen` as employment by `Adyen N.V.` is an inference. The Greenhouse payload names only `Adyen`, not the legal employer or its KvK number; sponsor status must therefore be checked against the vacancy's eventual employment entity.
+- Official source: <https://boards-api.greenhouse.io/v1/boards/adyen/jobs?content=true>. Its `meta.total` declares completeness for the single returned `jobs` array, which the adapter verifies before accepting a scan.
+- Live discovery: 218 jobs on 2026-08-12. IDs were unique and every job had the parser-required fields. The count is volatile and is not hardcoded in the smoke test.
+
 ## Rabobank
 
 - Official source limitation: on 2026-08-12, normal-user-agent direct GETs to the official listing/search pages, page 2, a vacancy detail, `robots.txt`, sitemaps, WordPress REST API, and feeds all returned HTTP 403 with an AkamaiNetStorage-branded unavailable page. No complete official unattended source was available.

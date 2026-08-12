@@ -64,6 +64,14 @@ strategy = "ashby"
 board = "airwallex"
 
 [[companies]]
+id = "adyen"
+name = "Adyen"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "adyen"
+
+[[companies]]
 id = "rabobank"
 name = "Rabobank"
 enabled = false
