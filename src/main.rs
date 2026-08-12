@@ -541,6 +541,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "eneco")
             .collect::<Vec<_>>();
+        let ahold = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "ahold")
+            .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
         assert!(adyen[0].enabled);
@@ -575,6 +580,14 @@ mod tests {
         assert!(!eneco[0].enabled);
         assert!(matches!(
             &eneco[0].source,
+            SourceConfig::Unsupported { reason } if reason == "legal employer not established"
+        ));
+
+        assert_eq!(ahold.len(), 1);
+        assert_eq!(ahold[0].name, "Albert Heijn Tech");
+        assert!(!ahold[0].enabled);
+        assert!(matches!(
+            &ahold[0].source,
             SourceConfig::Unsupported { reason } if reason == "legal employer not established"
         ));
 

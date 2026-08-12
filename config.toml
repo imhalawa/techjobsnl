@@ -102,3 +102,11 @@ enabled = false
 [companies.source]
 strategy = "unsupported"
 reason = "legal employer not established"
+
+[[companies]]
+id = "ahold"
+name = "Albert Heijn Tech"
+enabled = false
+[companies.source]
+strategy = "unsupported"
+reason = "legal employer not established"

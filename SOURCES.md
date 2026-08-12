@@ -46,3 +46,10 @@
 - Official source: Eneco's public careers source returned 21 live postings on 2026-08-12. Each posting's `hiringOrganization` was only `Eneco`; it did not identify a legal employer or a KvK number that could be matched to a sponsor candidate.
 - Privacy evidence: Eneco's privacy controller, `Eneco B.V.`, is not employment proof and must not be used to infer the hiring entity.
 - Policy: Eneco remains configured as disabled and unsupported because its legal employer is not established. Re-enable it only when an official vacancy or employment document names the legal entity and its KvK number matches a current IND-recognised sponsor.
+
+## Albert Heijn Tech
+
+- Sponsor candidates: the current IND public register for work lists `Albert Heijn B.V.` with KvK `35012085` and `Albert Heijn Support B.V.` with KvK `34305784`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.
+- Official source: the native official filtered source returned a technically complete set of 10 Tech/Data Science jobs on 2026-08-13. Every vacancy's `hiringOrganization` was only `Albert Heijn`.
+- Privacy evidence: the recruitment privacy notice spans four entities. It does not establish which legal entity employs a vacancy candidate.
+- Policy: Albert Heijn Tech remains configured as disabled and unsupported because the legal employer cannot be matched to an IND sponsor. Re-enable it only when an official vacancy, recruiter, or employment document names the legal entity and its KvK number matches a current IND-recognised sponsor.
