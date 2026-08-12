@@ -502,7 +502,7 @@ mod tests {
     };
 
     #[test]
-    fn production_config_builds_mollie_booking_and_ebay_sources() {
+    fn production_config_builds_mollie_booking_ebay_and_airwallex_sources() {
         let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
         let ebay = config
             .companies
@@ -523,7 +523,7 @@ mod tests {
             .into_iter()
             .map(|source| source.company_id().to_owned())
             .collect::<Vec<_>>();
-        assert_eq!(source_ids, ["mollie", "booking-com", "ebay"]);
+        assert_eq!(source_ids, ["mollie", "booking-com", "ebay", "airwallex"]);
     }
 
     struct CompleteSource;

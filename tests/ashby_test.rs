@@ -1,12 +1,58 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use job_watch::{
+    config::Config,
     domain::{SourceErrorKind, SourceScan},
+    filter::EligibilityFilter,
     sources::{
         JobSource,
         ashby::{AshbySource, build_client, parse_ashby_response},
     },
 };
+
+#[test]
+fn parses_and_filters_sanitized_airwallex_board() {
+    let jobs =
+        parse_ashby_response("airwallex", include_str!("fixtures/ashby/airwallex.json")).unwrap();
+
+    assert_eq!(jobs.len(), 3);
+    assert_eq!(jobs[0].source_id, "11111111-1111-4111-8111-111111111111");
+    assert_eq!(jobs[0].title, "Senior Software Engineer");
+    assert_eq!(jobs[0].department.as_deref(), Some("Engineering"));
+    assert_eq!(jobs[0].team.as_deref(), Some("Payments Platform"));
+    assert_eq!(jobs[0].employment_type.as_deref(), Some("FullTime"));
+    assert_eq!(jobs[0].locations, ["NL - Amsterdam"]);
+    assert_eq!(jobs[0].countries, ["NL"]);
+    assert_eq!(
+        jobs[0].job_url,
+        "https://jobs.example.test/airwallex/11111111-1111-4111-8111-111111111111"
+    );
+    assert_eq!(
+        jobs[0].apply_url,
+        "https://jobs.example.test/airwallex/11111111-1111-4111-8111-111111111111/application"
+    );
+    assert_eq!(jobs[0].description, "Build reliable payment services.");
+    assert!(jobs[0].published_at.is_some());
+    assert_eq!(jobs[0].raw_payload["workplaceType"], "Hybrid");
+
+    assert_eq!(jobs[1].locations, ["UK - London", "NL - Amsterdam"]);
+    assert_eq!(jobs[1].countries, ["United Kingdom", "NL"]);
+    assert_eq!(jobs[2].locations, ["SG - Singapore"]);
+    assert_eq!(jobs[2].countries, ["Singapore"]);
+
+    let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
+    let filter = EligibilityFilter::new(&config.filters).unwrap();
+    let results = jobs
+        .iter()
+        .map(|job| filter.classify(job, &HashMap::new()).unwrap())
+        .collect::<Vec<_>>();
+    assert!(results[0].eligible);
+    assert!(results[1].eligible);
+    assert_eq!(results[2].reason, "outside-netherlands");
+}
 
 #[test]
 fn parses_complete_ashby_board() {
@@ -136,6 +182,36 @@ async fn scans_live_mollie_board_as_a_complete_unique_result() {
         assert!(!job.description.is_empty());
         assert!(job.raw_payload.is_object());
     }
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn scans_live_airwallex_board_as_a_complete_unique_result() {
+    let client = build_client(
+        "job-watch/0.1 (+Airwallex live test)",
+        Duration::from_secs(20),
+    )
+    .unwrap();
+    let source = AshbySource::new("airwallex", "airwallex", client);
+
+    let SourceScan::Complete { observations } = source.scan().await.unwrap() else {
+        panic!("Ashby scans must be complete");
+    };
+    assert!(!observations.is_empty());
+
+    let mut source_ids = HashSet::new();
+    for job in &observations {
+        assert!(source_ids.insert(&job.source_id));
+        assert!(!job.source_id.trim().is_empty());
+        assert!(!job.title.trim().is_empty());
+        assert!(!job.locations.is_empty());
+        assert!(!job.countries.is_empty());
+        assert!(!job.job_url.trim().is_empty());
+        assert!(!job.apply_url.trim().is_empty());
+        assert!(!job.description.trim().is_empty());
+        assert!(job.raw_payload.is_object());
+    }
+    println!("Airwallex: {} complete jobs", observations.len());
 }
 
 fn fixture_board() -> serde_json::Value {

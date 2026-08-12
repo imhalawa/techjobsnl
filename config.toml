@@ -54,3 +54,11 @@ enabled = true
 [companies.source]
 strategy = "ebay"
 listing_url = "https://jobs.ebayinc.com/us/en/jobs-in-netherlands"
+
+[[companies]]
+id = "airwallex"
+name = "Airwallex"
+enabled = true
+[companies.source]
+strategy = "ashby"
+board = "airwallex"

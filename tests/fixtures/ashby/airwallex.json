@@ -1,0 +1,88 @@
+{
+  "jobs": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "title": "Senior Software Engineer",
+      "department": "Engineering",
+      "team": "Payments Platform",
+      "employmentType": "FullTime",
+      "location": "NL - Amsterdam",
+      "secondaryLocations": [],
+      "publishedAt": "2026-08-10T09:30:00.000+00:00",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "address": {
+        "postalAddress": {
+          "addressRegion": "Amsterdam",
+          "addressCountry": "Netherlands",
+          "addressLocality": "Amsterdam"
+        }
+      },
+      "jobUrl": "https://jobs.example.test/airwallex/11111111-1111-4111-8111-111111111111",
+      "applyUrl": "https://jobs.example.test/airwallex/11111111-1111-4111-8111-111111111111/application",
+      "descriptionHtml": "<p>Build reliable payment services.</p>",
+      "descriptionPlain": "Build reliable payment services."
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "title": "Platform Engineer",
+      "department": "Engineering",
+      "team": "Developer Experience",
+      "employmentType": "FullTime",
+      "location": "UK - London",
+      "secondaryLocations": [
+        {
+          "location": "NL - Amsterdam",
+          "address": {
+            "postalAddress": {
+              "addressRegion": "Amsterdam",
+              "addressCountry": "Netherlands",
+              "addressLocality": "Amsterdam"
+            }
+          }
+        }
+      ],
+      "publishedAt": "2026-08-09T08:15:00.000+00:00",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Office",
+      "address": {
+        "postalAddress": {
+          "addressRegion": "London",
+          "addressCountry": "United Kingdom",
+          "addressLocality": "London"
+        }
+      },
+      "jobUrl": "https://jobs.example.test/airwallex/22222222-2222-4222-8222-222222222222",
+      "applyUrl": "https://jobs.example.test/airwallex/22222222-2222-4222-8222-222222222222/application",
+      "descriptionHtml": "<p>Improve the internal developer platform.</p>",
+      "descriptionPlain": "Improve the internal developer platform."
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "title": "Data Engineer",
+      "department": "Data",
+      "team": "Analytics",
+      "employmentType": "FullTime",
+      "location": "SG - Singapore",
+      "secondaryLocations": [],
+      "publishedAt": "2026-08-08T07:00:00.000+00:00",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "address": {
+        "postalAddress": {
+          "addressRegion": "Singapore",
+          "addressCountry": "Singapore",
+          "addressLocality": "Singapore"
+        }
+      },
+      "jobUrl": "https://jobs.example.test/airwallex/33333333-3333-4333-8333-333333333333",
+      "applyUrl": "https://jobs.example.test/airwallex/33333333-3333-4333-8333-333333333333/application",
+      "descriptionHtml": "<p>Build trusted analytics pipelines.</p>",
+      "descriptionPlain": "Build trusted analytics pipelines."
+    }
+  ],
+  "apiVersion": "1"
+}

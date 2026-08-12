@@ -1,6 +1,6 @@
 # Job Watch
 
-Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. It enables Mollie's Ashby board, Booking.com's Jibe API, and eBay's official Netherlands careers pages.
+Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. It enables Mollie's and Airwallex's Ashby boards, Booking.com's Jibe API, and eBay's official Netherlands careers pages.
 
 ## Run
 
@@ -56,7 +56,7 @@ cargo test --test hosted_ats_test jibe_live_returns_complete_unique_jobs -- --ig
 cargo test --test ebay_test ebay_live_returns_complete_unique_netherlands_jobs -- --ignored --nocapture
 ```
 
-The live smoke tests check Mollie's, Booking.com's, and eBay's current public payloads. The offline suite is the deterministic verification path.
+The live smoke tests check Mollie's, Airwallex's, Booking.com's, and eBay's current public payloads. The offline suite is the deterministic verification path.
 
 ## Company onboarding
 
