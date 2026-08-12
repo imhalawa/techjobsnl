@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## bol.com
+
+- Sponsor: the current IND public register for work lists `Bol.com B.V.` with KvK `32147382`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. Bol.com's own legal information identifies `bol.com B.V.` with the same KvK number: <https://lowlands.bol.com/pages/algemene-voorwaarden>.
+- Hiring entity: bol.com's applicant privacy policy identifies `Bol. b.v.` as controller for applications made through the careers site, but it does not name the legal employer or publish its KvK number there. Treating a vacancy branded `bol` as employment by `Bol.com B.V.` is therefore an inference; confirm the employment entity before relying on sponsor status: <https://careers.bol.com/nl/privacywetgeving/>.
+- Official source: <https://careers.bol.com/api/v1/jobs/>. The paginated API declares an exact total; the adapter rejects non-exact or changing totals, incomplete pages, duplicate IDs, non-public records, unresolved offices, and missing required fields before accepting a complete scan.
+- Live discovery: 79 jobs on 2026-08-12. IDs were unique, every job had the parser-required fields, and every generated official detail URL returned success. The count is volatile and is not hardcoded in the smoke test.
+
 ## Funda
 
 - Sponsor: the current IND public register for work lists `Funda Real Estate B.V.` with KvK `34242436`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. Funda's own applicant privacy statement identifies Funda as the same legal entity and KvK number: <https://www.funda.nl/en/voorwaarden-en-beleid/privacyverklaring/sollicitant/>.

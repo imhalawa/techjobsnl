@@ -80,6 +80,14 @@ strategy = "recruitee"
 base_url = "https://jobs.funda.nl"
 
 [[companies]]
+id = "bol"
+name = "bol.com"
+enabled = true
+[companies.source]
+strategy = "bol"
+base_url = "https://careers.bol.com"
+
+[[companies]]
 id = "rabobank"
 name = "Rabobank"
 enabled = false
