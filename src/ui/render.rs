@@ -616,9 +616,10 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         }
         actions
     };
+    let help = Line::from(format!("{} help", keys.help));
     let footer = Layout::horizontal([
         Constraint::Min(0),
-        Constraint::Length(u16::try_from(keys.help.chars().count() + 5).unwrap_or(u16::MAX)),
+        Constraint::Length(u16::try_from(help.width()).unwrap_or(u16::MAX)),
     ])
     .split(area);
     frame.render_widget(
@@ -633,8 +634,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         footer[0],
     );
     frame.render_widget(
-        Paragraph::new(format!("{} help", keys.help))
-            .style(Style::new().fg(theme.muted_text).bg(theme.background)),
+        Paragraph::new(help).style(Style::new().fg(theme.muted_text).bg(theme.background)),
         footer[1],
     );
 }

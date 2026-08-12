@@ -582,6 +582,25 @@ fn footer_reserves_the_configured_help_hint_with_a_long_filter_label() {
 }
 
 #[test]
+fn footer_reserves_terminal_cell_width_for_a_wide_help_key() {
+    let mut configured = config();
+    configured.companies[0].name =
+        "A company name deliberately longer than the complete footer width".into();
+    configured.keybindings.help = "界".into();
+    let mut app = App::new(configured, vec![job("Backend Engineer", false, false)]);
+    app.handle_key(key('f'));
+
+    for width in [70, 100, 140] {
+        let buffer = rendered_buffer(&app, width, 25);
+        assert_eq!(buffer.cell((width - 7, 24)).unwrap().symbol(), "界");
+        let suffix = (width - 5..width)
+            .map(|x| buffer.cell((x, 24)).unwrap().symbol())
+            .collect::<String>();
+        assert_eq!(suffix, " help");
+    }
+}
+
+#[test]
 fn active_view_hides_closed_records_supplied_with_open_records() {
     let open = job("Open role", false, false);
     let mut closed = job("Closed role", false, false);
