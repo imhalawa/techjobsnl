@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 
 use chrono::{TimeZone, Utc};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use job_watch::{
     config::{
         CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig, SourceConfig,
         ThemeOverrides, UiConfig,
     },
-    domain::{ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob},
-    ui::{App, IconSet, Theme, render},
+    domain::{
+        ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanEvent, SourceErrorKind,
+    },
+    ui::{App, AppCommand, IconSet, InputMode, Theme, View, render},
 };
 use ratatui::{Terminal, backend::TestBackend, style::Color};
 use serde_json::json;
@@ -68,10 +71,22 @@ fn config() -> Config {
     }
 }
 
+fn key(character: char) -> KeyEvent {
+    KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE)
+}
+
+fn special(code: KeyCode) -> KeyEvent {
+    KeyEvent::new(code, KeyModifiers::NONE)
+}
+
 fn job(title: &str, is_new: bool, applied: bool) -> JobRecord {
+    job_for("acme", title, is_new, applied)
+}
+
+fn job_for(company_id: &str, title: &str, is_new: bool, applied: bool) -> JobRecord {
     let seen_at = Utc.with_ymd_and_hms(2026, 8, 11, 9, 0, 0).unwrap();
     JobRecord {
-        key: JobKey::new("acme", title),
+        key: JobKey::new(company_id, title),
         classified: ClassifiedJob {
             observed: ObservedJob {
                 source_id: title.into(),
@@ -100,6 +115,210 @@ fn job(title: &str, is_new: bool, applied: bool) -> JobRecord {
         reopened_at: None,
         applied_at: applied.then_some(seen_at),
     }
+}
+
+#[test]
+fn default_keys_emit_commands_and_move_the_selection() {
+    let mut app = App::new(
+        config(),
+        vec![
+            job("Backend Engineer", false, false),
+            job("Platform Engineer", false, false),
+        ],
+    );
+
+    assert_eq!(app.handle_key(key('j')), AppCommand::None);
+    assert_eq!(app.selected_index(), 1);
+    assert!(matches!(
+        app.handle_key(key('a')),
+        AppCommand::ToggleApplied(_)
+    ));
+    assert!(matches!(app.handle_key(key('o')), AppCommand::OpenUrl(_)));
+    assert_eq!(app.handle_key(key('r')), AppCommand::StartScan);
+    assert_eq!(app.handle_key(key('h')), AppCommand::ReloadJobs);
+    assert_eq!(app.view(), View::History);
+    assert_eq!(app.handle_key(key('q')), AppCommand::Quit);
+}
+
+#[test]
+fn configured_actions_replace_only_the_configurable_keys() {
+    let mut configured = config();
+    configured.keybindings.scan = "s".into();
+    configured.keybindings.search = "z".into();
+    configured.keybindings.filter = "v".into();
+    configured.keybindings.toggle_applied = "x".into();
+    configured.keybindings.history = "y".into();
+    configured.keybindings.open = "u".into();
+    configured.keybindings.help = "i".into();
+    configured.keybindings.quit = "e".into();
+    let mut app = App::new(configured, vec![job("Backend Engineer", false, false)]);
+
+    assert_eq!(app.handle_key(key('s')), AppCommand::StartScan);
+    assert!(matches!(
+        app.handle_key(key('x')),
+        AppCommand::ToggleApplied(_)
+    ));
+    assert_eq!(app.handle_key(key('r')), AppCommand::None);
+    assert_eq!(app.handle_key(key('a')), AppCommand::None);
+    assert_eq!(app.handle_key(key('z')), AppCommand::None);
+    assert_eq!(app.input_mode(), InputMode::Search);
+    assert_eq!(app.handle_key(special(KeyCode::Esc)), AppCommand::None);
+    assert!(matches!(app.handle_key(key('u')), AppCommand::OpenUrl(_)));
+    assert_eq!(app.handle_key(key('v')), AppCommand::ReloadJobs);
+    assert_eq!(app.view(), View::New);
+    assert_eq!(app.handle_key(key('y')), AppCommand::ReloadJobs);
+    assert_eq!(app.view(), View::History);
+    assert_eq!(app.handle_key(key('i')), AppCommand::None);
+    assert!(app.help_visible());
+    assert_eq!(app.handle_key(key('e')), AppCommand::Quit);
+}
+
+#[test]
+fn search_accepts_input_filters_by_title_or_company_and_escape_cancels() {
+    let mut configured = config();
+    configured.companies.push(CompanyConfig {
+        id: "beta".into(),
+        name: "Beta Labs".into(),
+        enabled: true,
+        location_country_overrides: HashMap::new(),
+        source: SourceConfig::Ashby {
+            board: "beta".into(),
+        },
+    });
+    let mut app = App::new(
+        configured,
+        vec![
+            job("Backend Engineer", false, false),
+            job_for("beta", "Platform Engineer", false, false),
+        ],
+    );
+
+    app.handle_key(key('/'));
+    app.handle_key(key('P'));
+    app.handle_key(key('l'));
+    assert_eq!(app.input_mode(), InputMode::Search);
+    assert_eq!(app.search_query(), "Pl");
+    assert_eq!(app.visible_jobs().count(), 1);
+    assert_eq!(app.selected_job().unwrap().key.company_id, "beta");
+
+    app.handle_key(special(KeyCode::Esc));
+    assert_eq!(app.input_mode(), InputMode::Normal);
+    assert_eq!(app.search_query(), "");
+    assert_eq!(app.visible_jobs().count(), 2);
+
+    app.handle_key(key('/'));
+    for character in "beta".chars() {
+        app.handle_key(key(character));
+    }
+    assert_eq!(app.visible_jobs().count(), 1);
+    assert_eq!(app.selected_job().unwrap().key.company_id, "beta");
+}
+
+#[test]
+fn fixed_navigation_controls_move_jobs_scroll_details_and_switch_views() {
+    let mut app = App::new(
+        config(),
+        vec![
+            job("Backend Engineer", false, false),
+            job("Platform Engineer", true, false),
+            job("Applied Engineer", false, true),
+        ],
+    );
+
+    assert_eq!(app.handle_key(special(KeyCode::Down)), AppCommand::None);
+    assert_eq!(app.selected_index(), 1);
+    assert_eq!(app.handle_key(key('k')), AppCommand::None);
+    assert_eq!(app.selected_index(), 0);
+    assert_eq!(app.handle_key(key('J')), AppCommand::None);
+    assert_eq!(app.detail_scroll(), 1);
+    assert_eq!(app.handle_key(key('K')), AppCommand::None);
+    assert_eq!(app.detail_scroll(), 0);
+
+    assert_eq!(
+        app.handle_key(special(KeyCode::Right)),
+        AppCommand::ReloadJobs
+    );
+    assert_eq!(app.view(), View::New);
+    assert_eq!(app.visible_jobs().count(), 1);
+    assert_eq!(
+        app.handle_key(special(KeyCode::Right)),
+        AppCommand::ReloadJobs
+    );
+    assert_eq!(app.view(), View::Applied);
+    assert_eq!(app.visible_jobs().count(), 1);
+    assert_eq!(
+        app.handle_key(special(KeyCode::Left)),
+        AppCommand::ReloadJobs
+    );
+    assert_eq!(app.view(), View::New);
+
+    assert_eq!(app.handle_key(key('h')), AppCommand::ReloadJobs);
+    assert_eq!(app.view(), View::History);
+    assert_eq!(app.handle_key(key('h')), AppCommand::ReloadJobs);
+    assert_eq!(app.view(), View::Active);
+}
+
+#[test]
+fn enter_toggles_narrow_details_but_opens_the_official_url_on_wide_terminals() {
+    let mut app = App::new(config(), vec![job("Backend Engineer", false, false)]);
+
+    assert_eq!(
+        app.handle_key_with_width(special(KeyCode::Enter), 79),
+        AppCommand::None
+    );
+    assert!(app.narrow_details_visible());
+    assert!(rendered(&app, 70, 25).contains("Job details"));
+    assert_eq!(
+        app.handle_key_with_width(special(KeyCode::Esc), 79),
+        AppCommand::None
+    );
+    assert!(!app.narrow_details_visible());
+    assert_eq!(
+        app.handle_key_with_width(special(KeyCode::Enter), 80),
+        AppCommand::OpenUrl("https://example.test/job".into())
+    );
+}
+
+#[test]
+fn scan_events_update_progress_and_health_without_moving_selection() {
+    let mut app = App::new(
+        config(),
+        vec![
+            job("Backend Engineer", false, false),
+            job("Platform Engineer", false, false),
+        ],
+    );
+    app.handle_key(key('j'));
+
+    app.handle_scan_event(ScanEvent::RunStarted {
+        run_id: "run-1".into(),
+        company_count: 1,
+    });
+    app.handle_scan_event(ScanEvent::CompanyStarted {
+        company_id: "acme".into(),
+    });
+    let scanning = rendered(&app, 140, 30);
+    assert!(scanning.contains("SCANNING 0/1"));
+    assert!(scanning.contains("acme scanning"));
+    assert_eq!(app.selected_index(), 1);
+
+    app.handle_scan_event(ScanEvent::CompanyFailed {
+        company_id: "acme".into(),
+        kind: SourceErrorKind::Timeout,
+        diagnostic: "timed out".into(),
+    });
+    let failed = rendered(&app, 140, 30);
+    assert!(failed.contains("acme timeout"));
+    assert_eq!(app.selected_index(), 1);
+
+    app.handle_scan_event(ScanEvent::RunFinished {
+        run_id: "run-1".into(),
+        completed: 0,
+        failed: 1,
+        incomplete: 0,
+    });
+    assert!(rendered(&app, 140, 30).contains("FAILED 1"));
+    assert_eq!(app.selected_index(), 1);
 }
 
 #[test]

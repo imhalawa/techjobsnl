@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
 
-use super::App;
+use super::{App, View};
 
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
@@ -16,10 +16,14 @@ pub fn render(frame: &mut Frame, app: &App) {
     let areas = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).split(area);
     let content = areas[0];
     let footer = areas[1];
-    match content.width {
-        120.. => render_navigation_list_details(frame, app, content),
-        80..=119 => render_list_details(frame, app, content),
-        _ => render_single_pane(frame, app, content),
+    if app.help_visible() {
+        render_help(frame, app, content);
+    } else {
+        match content.width {
+            120.. => render_navigation_list_details(frame, app, content),
+            80..=119 => render_list_details(frame, app, content),
+            _ => render_single_pane(frame, app, content),
+        }
     }
     render_footer(frame, app, footer);
 }
@@ -43,7 +47,11 @@ fn render_list_details(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_single_pane(frame: &mut Frame, app: &App, area: Rect) {
-    render_job_list(frame, app, area);
+    if app.narrow_details_visible() {
+        render_details(frame, app, area);
+    } else {
+        render_job_list(frame, app, area);
+    }
 }
 
 fn render_navigation(frame: &mut Frame, app: &App, area: Rect) {
@@ -63,8 +71,19 @@ fn render_navigation(frame: &mut Frame, app: &App, area: Rect) {
             theme.unfocused_border,
             theme.background,
         ))
-        .style(Style::new().fg(theme.primary_text).bg(theme.background));
-    frame.render_widget(list, area);
+        .style(Style::new().fg(theme.primary_text).bg(theme.background))
+        .highlight_style(Style::new().bg(theme.selected_row))
+        .highlight_symbol("› ");
+    let mut state = ListState::default();
+    state.select(Some(match app.view() {
+        View::Active => 0,
+        View::New => 1,
+        View::Applied => 2,
+        View::History => 3,
+        View::Scans => 4,
+        View::Sources => 5,
+    }));
+    frame.render_stateful_widget(list, area, &mut state);
 }
 
 fn render_job_list(frame: &mut Frame, app: &App, area: Rect) {
@@ -93,8 +112,16 @@ fn render_job_list(frame: &mut Frame, app: &App, area: Rect) {
         ));
         ListItem::new(Line::from(spans))
     });
+    let title = match app.view() {
+        View::Active => "Active jobs",
+        View::New => "New jobs",
+        View::Applied => "Applied jobs",
+        View::History => "Job history",
+        View::Scans => "Scans",
+        View::Sources => "Sources",
+    };
     let list = List::new(items)
-        .block(panel("Active jobs", theme.focused_border, theme.background))
+        .block(panel(title, theme.focused_border, theme.background))
         .highlight_style(Style::new().bg(theme.selected_row))
         .highlight_symbol("› ");
     let mut state = ListState::default();
@@ -137,6 +164,7 @@ fn render_details(frame: &mut Frame, app: &App, area: Rect) {
             theme.background,
         ))
         .style(Style::new().bg(theme.background))
+        .scroll((app.detail_scroll(), 0))
         .wrap(Wrap { trim: true });
     frame.render_widget(details, area);
 }
@@ -151,7 +179,8 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         .count();
     let keys = &app.config().keybindings;
     let text = format!(
-        "OK  {} scan  {} search  {} applied  {} quit  {enabled} companies  {} active jobs",
+        "{}  {} scan  {} search  {} applied  {} quit  {enabled} companies  {} active jobs",
+        app.footer_status(),
         keys.scan,
         keys.search,
         keys.toggle_applied,
@@ -160,6 +189,29 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     );
     frame.render_widget(
         Paragraph::new(text).style(Style::new().fg(theme.muted_text).bg(theme.background)),
+        area,
+    );
+}
+
+fn render_help(frame: &mut Frame, app: &App, area: Rect) {
+    let theme = app.theme();
+    let keys = &app.config().keybindings;
+    let text = format!(
+        "{} scan  {} search  {} filter  {} applied  {} history  {} open  {} help  {} quit\n\nArrow keys or j/k navigate. J/K scroll details. Esc closes this help.",
+        keys.scan,
+        keys.search,
+        keys.filter,
+        keys.toggle_applied,
+        keys.history,
+        keys.open,
+        keys.help,
+        keys.quit,
+    );
+    frame.render_widget(
+        Paragraph::new(text)
+            .block(panel("Help", theme.focused_border, theme.background))
+            .style(Style::new().fg(theme.primary_text).bg(theme.background))
+            .wrap(Wrap { trim: true }),
         area,
     );
 }
