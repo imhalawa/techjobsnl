@@ -178,7 +178,7 @@ fn configured_actions_replace_only_the_configurable_keys() {
     assert_eq!(app.input_mode(), InputMode::Search);
     assert_eq!(app.handle_key(special(KeyCode::Esc)), AppCommand::None);
     assert!(matches!(app.handle_key(key('u')), AppCommand::OpenUrl(_)));
-    assert_eq!(app.handle_key(key('v')), AppCommand::None);
+    assert_eq!(app.handle_key(key('v')), AppCommand::ReloadJobs);
     assert_eq!(app.company_filter(), Some("acme"));
     assert_eq!(app.handle_key(key('y')), AppCommand::ReloadJobs);
     assert_eq!(app.view(), View::History);
@@ -220,7 +220,7 @@ fn search_accepts_input_filters_by_title_or_company_and_escape_cancels() {
 }
 
 #[test]
-fn configured_filter_cycles_companies_and_clears_without_changing_view() {
+fn configured_filter_cycles_companies_new_applied_and_clears() {
     let mut app = App::new(
         config_with_two_companies(),
         vec![
@@ -229,10 +229,10 @@ fn configured_filter_cycles_companies_and_clears_without_changing_view() {
         ],
     );
 
-    assert_eq!(app.handle_key(key('f')), AppCommand::None);
+    assert_eq!(app.handle_key(key('f')), AppCommand::ReloadJobs);
     assert_eq!(app.company_filter(), Some("acme"));
     assert_eq!(app.visible_jobs().count(), 1);
-    assert!(rendered(&app, 100, 25).contains("company Acme"));
+    assert!(rendered(&app, 100, 25).contains("filter Acme"));
 
     app.handle_key(key('f'));
     assert_eq!(app.company_filter(), Some("beta"));
@@ -240,9 +240,18 @@ fn configured_filter_cycles_companies_and_clears_without_changing_view() {
 
     app.handle_key(key('f'));
     assert_eq!(app.company_filter(), None);
-    assert_eq!(app.visible_jobs().count(), 2);
+    assert_eq!(app.view(), View::New);
+    assert!(rendered(&app, 100, 25).contains("filter New"));
+
+    app.handle_key(key('f'));
+    assert_eq!(app.view(), View::Applied);
+    assert!(rendered(&app, 100, 25).contains("filter Applied"));
+
+    app.handle_key(key('f'));
+    assert_eq!(app.company_filter(), None);
     assert_eq!(app.view(), View::Active);
-    assert!(rendered(&app, 100, 25).contains("company All"));
+    assert_eq!(app.visible_jobs().count(), 2);
+    assert!(rendered(&app, 100, 25).contains("filter All"));
 }
 
 #[test]
@@ -265,6 +274,24 @@ fn replace_jobs_preserves_selected_identity_across_reorder_and_falls_back_if_rem
         app.selected_job().unwrap().classified.observed.title,
         "Data Engineer"
     );
+}
+
+#[test]
+fn explicit_view_change_keeps_first_row_after_reload_instead_of_stale_identity() {
+    let active = job("Active Engineer", false, false);
+    let mut reopened = job("Reopened Engineer", false, false);
+    reopened.reopened_at = Some(reopened.last_seen_at);
+    let mut closed = job("Closed Engineer", false, false);
+    closed.source_open = false;
+    closed.closed_at = Some(closed.last_seen_at);
+    let mut app = App::new(config(), vec![active, reopened.clone()]);
+    app.handle_key(key('j'));
+
+    assert_eq!(app.handle_key(key('h')), AppCommand::ReloadJobs);
+    app.replace_jobs(vec![closed.clone(), reopened], 1);
+
+    assert_eq!(app.selected_index(), 0);
+    assert_eq!(app.selected_job().unwrap().key, closed.key);
 }
 
 #[test]

@@ -225,10 +225,23 @@ impl KeybindingsConfig {
         ];
         let mut values = std::collections::HashSet::new();
         for (name, binding) in bindings {
-            if binding.chars().count() != 1 {
+            let mut characters = binding.chars();
+            let Some(character) = characters.next() else {
                 return Err(ConfigError::invalid(
                     format!("keybindings.{name}"),
                     "must be exactly one character",
+                ));
+            };
+            if characters.next().is_some() {
+                return Err(ConfigError::invalid(
+                    format!("keybindings.{name}"),
+                    "must be exactly one character",
+                ));
+            }
+            if character.is_control() {
+                return Err(ConfigError::invalid(
+                    format!("keybindings.{name}"),
+                    "must be a non-control character",
                 ));
             }
             if matches!(binding.as_str(), "j" | "k" | "J" | "K") {

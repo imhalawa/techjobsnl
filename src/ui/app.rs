@@ -62,6 +62,7 @@ pub struct App {
     selected_index: usize,
     active_job_count: usize,
     company_filter: Option<String>,
+    preserve_selection_on_replace: bool,
     search_query: String,
     detail_scroll: u16,
     narrow_details_visible: bool,
@@ -89,6 +90,7 @@ impl App {
             selected_index: 0,
             active_job_count,
             company_filter: None,
+            preserve_selection_on_replace: true,
             search_query: String::new(),
             detail_scroll: 0,
             narrow_details_visible: false,
@@ -99,7 +101,10 @@ impl App {
     }
 
     pub fn replace_jobs(&mut self, jobs: Vec<JobRecord>, active_job_count: usize) {
-        let selected_key = self.selected_job().map(|job| job.key.clone());
+        let selected_key = self
+            .preserve_selection_on_replace
+            .then(|| self.selected_job().map(|job| job.key.clone()))
+            .flatten();
         let fallback_index = self.selected_index;
         self.jobs = jobs;
         self.active_job_count = active_job_count;
@@ -107,6 +112,7 @@ impl App {
             .as_ref()
             .and_then(|key| self.visible_jobs().position(|job| &job.key == key))
             .unwrap_or_else(|| fallback_index.min(self.visible_jobs().count().saturating_sub(1)));
+        self.preserve_selection_on_replace = true;
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> AppCommand {
@@ -271,6 +277,18 @@ impl App {
             .unwrap_or("All")
     }
 
+    pub fn filter_label(&self) -> &str {
+        if self.company_filter.is_some() {
+            self.company_filter_label()
+        } else {
+            match self.view {
+                View::New => "New",
+                View::Applied => "Applied",
+                _ => "All",
+            }
+        }
+    }
+
     pub fn search_query(&self) -> &str {
         &self.search_query
     }
@@ -345,9 +363,10 @@ impl App {
             self.input_mode = InputMode::Search;
             AppCommand::None
         } else if key == keys.filter {
-            self.cycle_company_filter();
+            self.cycle_filter();
             self.reset_view_state();
-            AppCommand::None
+            self.preserve_selection_on_replace = false;
+            AppCommand::ReloadJobs
         } else if key == keys.toggle_applied {
             self.selected_job().map_or(AppCommand::None, |job| {
                 AppCommand::ToggleApplied(job.key.clone())
@@ -359,6 +378,7 @@ impl App {
                 View::History
             };
             self.reset_view_state();
+            self.preserve_selection_on_replace = false;
             AppCommand::ReloadJobs
         } else if key == keys.open {
             self.open_selected()
@@ -395,6 +415,7 @@ impl App {
         };
         self.view = VIEWS[next];
         self.reset_view_state();
+        self.preserve_selection_on_replace = false;
         AppCommand::ReloadJobs
     }
 
@@ -416,7 +437,7 @@ impl App {
             .min(self.visible_jobs().count().saturating_sub(1));
     }
 
-    fn cycle_company_filter(&mut self) {
+    fn cycle_filter(&mut self) {
         let enabled = self
             .config
             .companies
@@ -424,14 +445,22 @@ impl App {
             .filter(|company| company.enabled)
             .map(|company| company.id.as_str())
             .collect::<Vec<_>>();
-        self.company_filter = match self.company_filter.as_deref() {
-            None => enabled.first().map(|id| (*id).to_owned()),
-            Some(current) => enabled
+        match self.company_filter.as_deref() {
+            None if self.view == View::New => self.view = View::Applied,
+            None if self.view == View::Applied => self.view = View::Active,
+            None => self.company_filter = enabled.first().map(|id| (*id).to_owned()),
+            Some(current) => match enabled
                 .iter()
                 .position(|id| *id == current)
                 .and_then(|index| enabled.get(index + 1))
-                .map(|id| (*id).to_owned()),
-        };
+            {
+                Some(id) => self.company_filter = Some((*id).to_owned()),
+                None => {
+                    self.company_filter = None;
+                    self.view = View::New;
+                }
+            },
+        }
     }
 
     fn matches_search(&self, job: &JobRecord) -> bool {

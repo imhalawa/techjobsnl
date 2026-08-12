@@ -191,13 +191,13 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         String::new()
     };
     let text = format!(
-        "{input}{}  {} scan  {} search  {enabled} companies  {} active jobs  {} company {}  {} applied  {} quit",
+        "{input}{}  {} scan  {} search  {enabled} companies  {} active jobs  {} filter {}  {} applied  {} quit",
         app.footer_status(),
         keys.scan,
         keys.search,
         app.active_job_count(),
         keys.filter,
-        app.company_filter_label(),
+        app.filter_label(),
         keys.toggle_applied,
         keys.quit,
     );

@@ -236,3 +236,15 @@ fn rejects_action_bindings_that_collide_with_fixed_navigation_keys() {
         assert!(error.to_string().contains("fixed navigation"));
     }
 }
+
+#[test]
+fn rejects_control_character_action_bindings_that_key_dispatch_cannot_reach() {
+    for binding in ["\r", "\t", "\u{1b}", "\u{7f}"] {
+        let mut config = valid_config();
+        config.keybindings.scan = binding.into();
+
+        let error = config.validate().unwrap_err();
+        assert!(error.to_string().contains("keybindings.scan"));
+        assert!(error.to_string().contains("non-control"));
+    }
+}
