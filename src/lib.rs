@@ -6,3 +6,4 @@ pub mod filter;
 pub mod scanner;
 pub mod sources;
 pub mod storage;
+pub mod ui;
