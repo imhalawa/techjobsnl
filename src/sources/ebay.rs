@@ -2,11 +2,11 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream};
-use reqwest::{Client, Url};
+use reqwest::{Client, Url, redirect::Policy};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::domain::{ObservedJob, SourceScan};
+use crate::domain::{ObservedJob, SourceErrorKind, SourceScan};
 
 use super::{
     JobSource, SourceError, country_code_for_location,
@@ -15,6 +15,7 @@ use super::{
 };
 
 const PAGE_SIZE: usize = 10;
+const REDIRECT_LIMIT: usize = 5;
 const DDO_START: &str = "phApp.ddo = ";
 const DDO_END: &str = "; phApp.experimentData";
 
@@ -38,6 +39,32 @@ impl EbaySource {
     }
 }
 
+pub fn build_client(user_agent: &str, timeout: std::time::Duration) -> Result<Client, SourceError> {
+    Client::builder()
+        .user_agent(user_agent)
+        .timeout(timeout)
+        .cookie_store(true)
+        .redirect(Policy::custom(|attempt| {
+            if attempt.previous().len() >= REDIRECT_LIMIT {
+                return attempt.error("too many eBay redirects");
+            }
+            let initial_host = attempt.previous().first().and_then(Url::host_str);
+            if attempt.url().host_str() == initial_host {
+                attempt.follow()
+            } else {
+                attempt.error("eBay cross-host redirect blocked")
+            }
+        }))
+        .build()
+        .map_err(|error| SourceError {
+            kind: SourceErrorKind::Configuration,
+            message: format!("could not configure eBay HTTP client: {error}"),
+            http_status: None,
+            retry_after: None,
+            retryable: false,
+        })
+}
+
 #[async_trait::async_trait]
 impl JobSource for EbaySource {
     fn company_id(&self) -> &str {
@@ -45,8 +72,9 @@ impl JobSource for EbaySource {
     }
 
     async fn scan(&self) -> Result<SourceScan, SourceError> {
+        let listing_url = fetched_url(&self.listing_url, "listing", &self.company_id)?;
         let mut collection = EbayCollection::new(&self.company_id, &self.listing_url);
-        let first = send_text(self.client.get(&self.listing_url), "eBay").await?;
+        let first = send_text(self.client.get(listing_url), "eBay").await?;
         let mut complete = collection.add_page(&first)?;
         let mut offset = PAGE_SIZE;
         while !complete {
@@ -85,6 +113,7 @@ pub fn parse_ebay_pages(
     pages: &[&str],
     details: &[&str],
 ) -> Result<Vec<ObservedJob>, SourceError> {
+    fetched_url(listing_url, "listing", company_id)?;
     let mut collection = EbayCollection::new(company_id, listing_url);
     for page in pages {
         collection.add_page(page)?;
@@ -116,6 +145,7 @@ impl<'a> EbayCollection<'a> {
         if page.status != 200 {
             return Err(schema(self.company_id, "listing status is not 200"));
         }
+        let first_page = self.expected_total.is_none();
         let expected_total = *self.expected_total.get_or_insert(page.total_hits);
         if page.total_hits != expected_total {
             return Err(schema(
@@ -123,7 +153,7 @@ impl<'a> EbayCollection<'a> {
                 "listing totalHits changed between pages",
             ));
         }
-        if self.listings.len() == expected_total {
+        if !first_page && self.listings.len() == expected_total {
             return Err(schema(
                 self.company_id,
                 "listing returned a page after reaching totalHits",
@@ -212,7 +242,7 @@ impl EbayListing {
                 format!("listing job {source_id} has no locations"),
             ));
         }
-        let apply_url = official_url(&row.apply_url, "apply", company_id)?;
+        let apply_url = https_url(&row.apply_url, "apply", company_id)?;
         let published_at = DateTime::parse_from_str(&row.posted_date, "%Y-%m-%dT%H:%M:%S%.f%z")
             .map_err(|error| {
                 schema(
@@ -329,6 +359,12 @@ fn observed_job(
         push_unique(&mut locations, location.to_owned());
         push_unique(&mut countries, country.to_owned());
     }
+    if !countries.iter().any(|country| country == "NL") {
+        return Err(schema(
+            company_id,
+            format!("detail {detail_id} has no Netherlands location"),
+        ));
+    }
 
     listing
         .raw_payload
@@ -376,7 +412,7 @@ fn listing_page(html: &str, company_id: &str) -> Result<EbayPage, SourceError> {
 }
 
 fn page_url(listing_url: &str, offset: usize, company_id: &str) -> Result<Url, SourceError> {
-    let mut url = official_url(listing_url, "listing", company_id)?;
+    let mut url = fetched_url(listing_url, "listing", company_id)?;
     url.set_query(None);
     url.query_pairs_mut()
         .append_pair("from", &offset.to_string())
@@ -390,13 +426,24 @@ fn detail_url(
     title: &str,
     company_id: &str,
 ) -> Result<Url, SourceError> {
-    let mut url = official_url(listing_url, "listing", company_id)?;
+    let mut url = fetched_url(listing_url, "listing", company_id)?;
     url.set_path(&format!("/us/en/job/{source_id}/{}", slug(title)));
     url.set_query(None);
     Ok(url)
 }
 
-fn official_url(value: &str, kind: &str, company_id: &str) -> Result<Url, SourceError> {
+fn fetched_url(value: &str, kind: &str, company_id: &str) -> Result<Url, SourceError> {
+    let url = https_url(value, kind, company_id)?;
+    if url.host_str() != Some("jobs.ebayinc.com") {
+        return Err(schema(
+            company_id,
+            format!("{kind} URL is not on jobs.ebayinc.com"),
+        ));
+    }
+    Ok(url)
+}
+
+fn https_url(value: &str, kind: &str, company_id: &str) -> Result<Url, SourceError> {
     let url = Url::parse(value)
         .map_err(|error| schema(company_id, format!("invalid {kind} URL: {error}")))?;
     if url.scheme() != "https" || url.host_str().is_none() {

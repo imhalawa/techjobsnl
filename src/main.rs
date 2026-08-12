@@ -243,6 +243,10 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
         &config.scan.user_agent,
         Duration::from_secs(config.scan.timeout_seconds),
     )?;
+    let ebay_client = ebay::build_client(
+        &config.scan.user_agent,
+        Duration::from_secs(config.scan.timeout_seconds),
+    )?;
     config
         .companies
         .iter()
@@ -265,7 +269,7 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                 SourceConfig::Ebay { listing_url } => Ok(Arc::new(ebay::EbaySource::new(
                     &company.id,
                     listing_url,
-                    client.clone(),
+                    ebay_client.clone(),
                 ))),
                 _ => Err(std::io::Error::other(format!(
                     "source strategy for {} is not wired yet",

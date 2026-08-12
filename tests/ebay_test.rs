@@ -1,11 +1,17 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::HashSet,
+    io::{Read, Write},
+    net::TcpListener,
+    thread,
+    time::Duration,
+};
 
 use job_watch::{
     domain::{ObservedJob, SourceErrorKind, SourceScan},
     sources::{
         JobSource,
-        ashby::build_client,
-        ebay::{EbaySource, parse_ebay_pages},
+        ebay::{EbaySource, build_client as build_ebay_client, parse_ebay_pages},
+        http::send_text,
     },
 };
 
@@ -42,6 +48,18 @@ fn parses_exact_listing_total_and_full_official_details() {
     );
     assert!(jobs[0].raw_payload.get("detailHtml").is_none());
     assert_eq!(jobs[1].source_id, "R200");
+}
+
+#[test]
+fn accepts_an_initial_complete_empty_listing() {
+    let empty = mutate_listing(&listing_fixtures()[0], |ddo| {
+        ddo["eagerLoadRefineSearch"]["totalHits"] = 0.into();
+        ddo["eagerLoadRefineSearch"]["data"]["jobs"] = serde_json::json!([]);
+    });
+
+    let jobs = parse_ebay_pages("ebay", LISTING_URL, &[&empty], &[]).unwrap();
+
+    assert!(jobs.is_empty());
 }
 
 #[test]
@@ -96,10 +114,53 @@ fn rejects_detail_id_mismatch_missing_json_ld_location_and_description() {
     }
 }
 
+#[test]
+fn rejects_a_detail_without_a_netherlands_location() {
+    let [first, second] = listing_fixtures();
+    let [detail_1, detail_2] = detail_fixtures();
+    let us_only = detail_1
+        .replace("Amsterdam", "Portland")
+        .replace("North Holland", "Oregon")
+        .replace("Netherlands", "United States");
+
+    assert_schema_error(parse_ebay_pages(
+        "ebay",
+        LISTING_URL,
+        &[&first, &second],
+        &[&us_only, &detail_2],
+    ));
+}
+
+#[test]
+fn rejects_a_listing_url_outside_the_official_ebay_host() {
+    let listings = listing_fixtures();
+    let details = detail_fixtures();
+
+    assert_schema_error(parse_ebay_pages(
+        "ebay",
+        "https://careers.example.test/us/en/jobs-in-netherlands",
+        &[&listings[0], &listings[1]],
+        &[&details[0], &details[1]],
+    ));
+}
+
+#[tokio::test]
+async fn ebay_http_client_rejects_cross_host_redirects_before_fetching_the_target() {
+    let (source_url, target) = cross_host_redirect();
+    let client = build_ebay_client("job-watch-test", Duration::from_secs(5)).unwrap();
+
+    let error = send_text(client.get(source_url), "eBay").await.unwrap_err();
+
+    assert!(error.message.contains("redirect"));
+    target.set_nonblocking(true).unwrap();
+    assert!(target.accept().is_err(), "off-host target was requested");
+}
+
 #[tokio::test]
 #[ignore = "live external source"]
 async fn ebay_live_returns_complete_unique_netherlands_jobs() {
-    let client = build_client("job-watch/0.1 (+eBay live test)", Duration::from_secs(20)).unwrap();
+    let client =
+        build_ebay_client("job-watch/0.1 (+eBay live test)", Duration::from_secs(20)).unwrap();
     let source = EbaySource::new("ebay", LISTING_URL, client);
     let SourceScan::Complete { observations } = source.scan().await.unwrap() else {
         panic!("eBay scan must be complete");
@@ -185,4 +246,21 @@ fn assert_live_job(job: &ObservedJob) {
     assert!(!job.description.trim().is_empty());
     assert!(job.raw_payload.is_object());
     assert!(job.published_at.is_some());
+}
+
+fn cross_host_redirect() -> (String, TcpListener) {
+    let source = TcpListener::bind("127.0.0.1:0").unwrap();
+    let source_address = source.local_addr().unwrap();
+    let target = TcpListener::bind("127.0.0.1:0").unwrap();
+    let target_port = target.local_addr().unwrap().port();
+    thread::spawn(move || {
+        let (mut stream, _) = source.accept().unwrap();
+        let mut request = [0; 2048];
+        let _ = stream.read(&mut request).unwrap();
+        let response = format!(
+            "HTTP/1.1 302 Found\r\nLocation: http://localhost:{target_port}/off-host\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        );
+        stream.write_all(response.as_bytes()).unwrap();
+    });
+    (format!("http://{source_address}"), target)
 }
