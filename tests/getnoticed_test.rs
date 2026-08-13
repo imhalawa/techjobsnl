@@ -90,6 +90,23 @@ fn getnoticed_parses_exact_two_page_snapshot_and_full_details() {
 }
 
 #[test]
+fn getnoticed_accepts_an_official_empty_first_page_as_complete() {
+    let page = r#"{
+        "meta": {
+            "num_total_hits": 0,
+            "pageNumber": 1,
+            "maxPerPage": 8,
+            "totalPageCount": 0
+        },
+        "vacancies": []
+    }"#;
+
+    let jobs = parse_getnoticed_pages("abn-amro", BASE_URL, &[page], &[]).unwrap();
+
+    assert!(jobs.is_empty());
+}
+
+#[test]
 fn getnoticed_rejects_listing_drift_gaps_counts_and_duplicate_ids() {
     assert_schema(parse_fixture(vec![pages().remove(0)], details()));
 
@@ -188,6 +205,22 @@ fn getnoticed_rejects_detail_identity_url_and_required_field_drift() {
 }
 
 #[test]
+fn getnoticed_rejects_a_wrong_primary_id_even_when_a_related_card_has_the_expected_id() {
+    let mut details = details();
+    details[0] = details[0]
+        .replace(
+            r#"<div data-component="Favorite" data-vacancy-id="1001"></div>"#,
+            r#"<div data-component="Favorite" data-vacancy-id="9999"></div>"#,
+        )
+        .replace(
+            r#"data-vacancy-id="7777" class="partial partial_vacancy_list-item""#,
+            r#"data-vacancy-id="1001" class="partial partial_vacancy_list-item""#,
+        );
+
+    assert_schema(parse_fixture(pages(), details));
+}
+
+#[test]
 fn getnoticed_rejects_non_official_or_non_https_bases() {
     for base in [
         "https://careers.example.com",
@@ -231,6 +264,20 @@ async fn getnoticed_client_rejects_same_host_http_redirects_before_fetching_the_
     assert!(
         target.accept().is_err(),
         "HTTP redirect target was requested"
+    );
+}
+
+#[tokio::test]
+async fn getnoticed_client_rejects_alternate_port_redirects_before_fetching_the_target() {
+    let (source_url, target) = alternate_port_redirect();
+    let client = build_client("job-watch-test", Duration::from_secs(5)).unwrap();
+
+    let _ = send_text(client.get(source_url), "ABN AMRO").await;
+
+    target.set_nonblocking(true).unwrap();
+    assert!(
+        target.accept().is_err(),
+        "alternate-port redirect target was requested"
     );
 }
 
@@ -359,6 +406,10 @@ fn cross_host_redirect() -> (String, TcpListener) {
 
 fn same_host_http_redirect() -> (String, TcpListener) {
     redirect(|port| format!("http://127.0.0.1:{port}/downgrade"))
+}
+
+fn alternate_port_redirect() -> (String, TcpListener) {
+    redirect(|port| format!("https://127.0.0.1:{port}/alternate-port"))
 }
 
 fn redirect(location: impl FnOnce(u16) -> String + Send + 'static) -> (String, TcpListener) {

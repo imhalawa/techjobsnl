@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, future::Future};
 
 use chrono::{DateTime, Utc};
 use futures_util::{StreamExt, stream};
@@ -17,6 +17,7 @@ use super::{
 
 const OFFICIAL_HOST: &str = "www.werkenbijabnamro.nl";
 const REDIRECT_LIMIT: usize = 5;
+const MAX_PAGE_COUNT: usize = 100;
 
 pub struct GetnoticedSource {
     company_id: String,
@@ -61,6 +62,22 @@ impl GetnoticedSource {
             .get(url)
             .header("X-Requested-With", "XMLHttpRequest"))
     }
+
+    async fn fetch_listing_pages<F, Fut>(&self, mut fetch: F) -> Result<Vec<String>, SourceError>
+    where
+        F: FnMut(RequestBuilder) -> Fut,
+        Fut: Future<Output = Result<String, SourceError>>,
+    {
+        let first = fetch(self.listing_request(1)?).await?;
+        let first_page = listing_page(&first, &self.company_id)?;
+        validate_listing_page(&first_page, 1, 0, None, &self.company_id)?;
+        let page_count = first_page.meta.total_page_count;
+        let mut pages = vec![first];
+        for page in 2..=page_count {
+            pages.push(fetch(self.listing_request(page)?).await?);
+        }
+        Ok(pages)
+    }
 }
 
 pub fn build_client(user_agent: &str, timeout: std::time::Duration) -> Result<Client, SourceError> {
@@ -71,8 +88,11 @@ pub fn build_client(user_agent: &str, timeout: std::time::Duration) -> Result<Cl
             if attempt.previous().len() >= REDIRECT_LIMIT {
                 return attempt.error("too many Getnoticed redirects");
             }
-            let initial_host = attempt.previous().first().and_then(Url::host_str);
-            if attempt.url().scheme() == "https" && attempt.url().host_str() == initial_host {
+            let same_origin = attempt
+                .previous()
+                .first()
+                .is_some_and(|initial| attempt.url().origin() == initial.origin());
+            if attempt.url().scheme() == "https" && same_origin {
                 attempt.follow()
             } else {
                 attempt.error("Getnoticed non-HTTPS or cross-host redirect blocked")
@@ -95,14 +115,9 @@ impl JobSource for GetnoticedSource {
     }
 
     async fn scan(&self) -> Result<SourceScan, SourceError> {
-        let first = send_text(self.listing_request(1)?, "ABN AMRO").await?;
-        let page_count = listing_page(&first, &self.company_id)?
-            .meta
-            .total_page_count;
-        let mut pages = vec![first];
-        for page in 2..=page_count {
-            pages.push(send_text(self.listing_request(page)?, "ABN AMRO").await?);
-        }
+        let pages = self
+            .fetch_listing_pages(|request| send_text(request, "ABN AMRO"))
+            .await?;
         let page_refs = pages.iter().map(String::as_str).collect::<Vec<_>>();
         let listings = parse_listings(&self.company_id, &self.base_url, &page_refs)?;
 
@@ -148,29 +163,15 @@ fn parse_listings(
     for (index, raw) in pages.iter().enumerate() {
         let requested_page = index + 1;
         let page = listing_page(raw, company_id)?;
-        validate_meta(
-            &page.meta,
+        let prior = listings.len();
+        validate_listing_page(
+            &page,
             requested_page,
+            prior,
             expected_meta.as_ref(),
             company_id,
         )?;
         expected_meta.get_or_insert(page.meta.clone());
-
-        let prior = listings.len();
-        let expected_on_page = page
-            .meta
-            .num_total_hits
-            .saturating_sub(prior)
-            .min(page.meta.max_per_page);
-        if page.vacancies.len() != expected_on_page {
-            return Err(schema(
-                company_id,
-                format!(
-                    "listing page {requested_page} returned {} of {expected_on_page} expected vacancies",
-                    page.vacancies.len()
-                ),
-            ));
-        }
 
         for raw_listing in page.vacancies {
             let row: ListingRow = serde_json::from_value(raw_listing.clone())
@@ -196,7 +197,7 @@ fn parse_listings(
     }
 
     let meta = expected_meta.ok_or_else(|| schema(company_id, "returned no listing pages"))?;
-    if pages.len() != meta.total_page_count || listings.len() != meta.num_total_hits {
+    if pages.len() != meta.total_page_count.max(1) || listings.len() != meta.num_total_hits {
         return Err(schema(
             company_id,
             format!(
@@ -365,8 +366,12 @@ fn validate_meta(
     expected: Option<&ListingMeta>,
     company_id: &str,
 ) -> Result<(), SourceError> {
-    if meta.max_per_page == 0 || meta.total_page_count == 0 {
+    if meta.max_per_page == 0 {
         return Err(schema(company_id, "listing has zero page metadata"));
+    }
+    // ponytail: 100 pages bounds corrupt request amplification; raise only if ABN's board grows past it.
+    if meta.total_page_count > MAX_PAGE_COUNT {
+        return Err(schema(company_id, "listing declares too many pages"));
     }
     if meta.page_number != requested_page {
         return Err(schema(
@@ -377,7 +382,7 @@ fn validate_meta(
             ),
         ));
     }
-    let calculated = meta.num_total_hits.div_ceil(meta.max_per_page).max(1);
+    let calculated = meta.num_total_hits.div_ceil(meta.max_per_page);
     if meta.total_page_count != calculated {
         return Err(schema(
             company_id,
@@ -391,8 +396,33 @@ fn validate_meta(
     {
         return Err(schema(company_id, "listing metadata changed between pages"));
     }
-    if requested_page > meta.total_page_count {
+    if meta.num_total_hits > 0 && requested_page > meta.total_page_count {
         return Err(schema(company_id, "listing returned an undeclared page"));
+    }
+    Ok(())
+}
+
+fn validate_listing_page(
+    page: &ListingPage,
+    requested_page: usize,
+    prior: usize,
+    expected: Option<&ListingMeta>,
+    company_id: &str,
+) -> Result<(), SourceError> {
+    validate_meta(&page.meta, requested_page, expected, company_id)?;
+    let expected_on_page = page
+        .meta
+        .num_total_hits
+        .saturating_sub(prior)
+        .min(page.meta.max_per_page);
+    if page.vacancies.len() != expected_on_page {
+        return Err(schema(
+            company_id,
+            format!(
+                "listing page {requested_page} returned {} of {expected_on_page} expected vacancies",
+                page.vacancies.len()
+            ),
+        ));
     }
     Ok(())
 }
@@ -402,7 +432,10 @@ fn validate_vacancy_id(
     expected: u64,
     company_id: &str,
 ) -> Result<(), SourceError> {
-    let selector = Selector::parse("[data-vacancy-id]").expect("static vacancy ID selector");
+    let selector = Selector::parse(
+        r#"[data-component="Favorite"][data-vacancy-id]:not(.partial_vacancy_list-item)"#,
+    )
+    .expect("static primary vacancy ID selector");
     let ids = document
         .select(&selector)
         .map(|element| {
@@ -414,7 +447,7 @@ fn validate_vacancy_id(
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| schema(company_id, format!("invalid data-vacancy-id: {error}")))?;
-    if !ids.contains(&expected) {
+    if ids.is_empty() || ids.iter().any(|id| *id != expected) {
         return Err(schema(
             company_id,
             format!("detail data-vacancy-id does not match listing {expected}"),
@@ -624,4 +657,46 @@ struct Listing {
     department: Option<String>,
     detail_url: Url,
     raw: Value,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{cell::Cell, future::ready};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn corrupt_first_page_does_not_request_page_two() {
+        let source = GetnoticedSource::new(
+            "abn-amro",
+            "https://www.werkenbijabnamro.nl",
+            Some("Nederland".to_owned()),
+            Client::new(),
+        );
+        let requests = Cell::new(0);
+        let corrupt = serde_json::json!({
+            "meta": {
+                "num_total_hits": 800_000,
+                "pageNumber": 1,
+                "maxPerPage": 8,
+                "totalPageCount": 100_000
+            },
+            "vacancies": [{}, {}, {}, {}, {}, {}, {}, {}]
+        })
+        .to_string();
+
+        let result = source
+            .fetch_listing_pages(|request| {
+                requests.set(requests.get() + 1);
+                assert_eq!(
+                    request.build().unwrap().url().query_pairs().next().unwrap(),
+                    ("pageNumber".into(), "1".into())
+                );
+                ready(Ok(corrupt.clone()))
+            })
+            .await;
+
+        assert_eq!(result.unwrap_err().kind, SourceErrorKind::Schema);
+        assert_eq!(requests.get(), 1);
+    }
 }

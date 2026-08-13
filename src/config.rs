@@ -168,16 +168,32 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
             validate_https_url(base_url, path("base_url"))?;
             validate_non_empty(client, path("client"))
         }
-        SourceConfig::Recruitee { base_url }
-        | SourceConfig::Bol { base_url }
-        | SourceConfig::Getnoticed { base_url, .. } => {
+        SourceConfig::Recruitee { base_url } | SourceConfig::Bol { base_url } => {
             validate_https_url(base_url, path("base_url"))?;
-            if let SourceConfig::Getnoticed {
-                country_filter: Some(country_filter),
-                ..
-            } = &company.source
-            {
-                validate_non_empty(country_filter, path("country_filter"))?;
+            Ok(())
+        }
+        SourceConfig::Getnoticed {
+            base_url,
+            country_filter,
+        } => {
+            validate_https_url(base_url, path("base_url"))?;
+            if company.id != "abn-amro" {
+                return Err(ConfigError::invalid(
+                    path("strategy"),
+                    "getnoticed is supported only for abn-amro",
+                ));
+            }
+            if base_url != "https://www.werkenbijabnamro.nl" {
+                return Err(ConfigError::invalid(
+                    path("base_url"),
+                    "must be the official ABN AMRO careers URL",
+                ));
+            }
+            if country_filter.as_deref() != Some("Nederland") {
+                return Err(ConfigError::invalid(
+                    path("country_filter"),
+                    "must be Nederland",
+                ));
             }
             Ok(())
         }

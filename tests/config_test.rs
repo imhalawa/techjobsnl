@@ -265,45 +265,58 @@ fn rejects_control_character_action_bindings_that_key_dispatch_cannot_reach() {
 #[test]
 fn parses_and_validates_every_source_strategy() {
     let cases = [
-        ("strategy = \"ashby\"\nboard = \"mollie\"", true),
-        ("strategy = \"greenhouse\"\nboard = \"adyen\"", true),
+        ("strategy = \"ashby\"\nboard = \"mollie\"", true, "mollie"),
+        (
+            "strategy = \"greenhouse\"\nboard = \"adyen\"",
+            true,
+            "mollie",
+        ),
         (
             "strategy = \"jibe\"\nbase_url = \"https://jobs.booking.com\"\nclient = \"Booking.com\"",
             true,
+            "mollie",
         ),
         (
             "strategy = \"ebay\"\nlisting_url = \"https://jobs.ebayinc.com/us/en/jobs-in-netherlands\"",
             true,
+            "mollie",
         ),
         (
             "strategy = \"recruitee\"\nbase_url = \"https://jobs.funda.nl\"",
             true,
+            "mollie",
         ),
         (
             "strategy = \"bol\"\nbase_url = \"https://careers.bol.com\"",
             true,
+            "mollie",
         ),
         (
             "strategy = \"ing\"\nlisting_url = \"https://careers.ing.com/en/search-jobs\"",
             true,
+            "mollie",
         ),
         (
             "strategy = \"getnoticed\"\nbase_url = \"https://www.werkenbijabnamro.nl\"\ncountry_filter = \"Nederland\"",
             true,
+            "abn-amro",
         ),
         (
             "strategy = \"paged-html\"\nlisting_url = \"https://www.exact.com/careers/vacancies\"\noffset_parameter = \"limitstart\"\npage_size = 20",
             true,
+            "mollie",
         ),
         (
             "strategy = \"unsupported\"\nreason = \"official source blocks unattended requests\"",
             false,
+            "mollie",
         ),
     ];
 
-    for (raw, enabled) in cases {
+    for (raw, enabled, company_id) in cases {
         let source: SourceConfig = toml::from_str(raw).unwrap();
         let mut config = valid_config();
+        config.companies[0].id = company_id.into();
         config.companies[0].enabled = enabled;
         config.companies[0].source = source;
         config.validate().unwrap();
@@ -413,6 +426,47 @@ fn rejects_zero_paged_html_page_size() {
 
     let error = config.validate().unwrap_err();
     assert!(error.to_string().contains("source.page_size"));
+}
+
+#[test]
+fn getnoticed_is_only_valid_for_the_exact_abn_amro_source() {
+    let exact = SourceConfig::Getnoticed {
+        base_url: "https://www.werkenbijabnamro.nl".into(),
+        country_filter: Some("Nederland".into()),
+    };
+    let mut config = valid_config();
+    config.companies[0].id = "abn-amro".into();
+    config.companies[0].source = exact.clone();
+    config.validate().unwrap();
+
+    for (id, source) in [
+        ("other", exact.clone()),
+        (
+            "abn-amro",
+            SourceConfig::Getnoticed {
+                base_url: "https://careers.example.com".into(),
+                country_filter: Some("Nederland".into()),
+            },
+        ),
+        (
+            "abn-amro",
+            SourceConfig::Getnoticed {
+                base_url: "https://www.werkenbijabnamro.nl".into(),
+                country_filter: None,
+            },
+        ),
+        (
+            "abn-amro",
+            SourceConfig::Getnoticed {
+                base_url: "https://www.werkenbijabnamro.nl".into(),
+                country_filter: Some("Netherlands".into()),
+            },
+        ),
+    ] {
+        config.companies[0].id = id.into();
+        config.companies[0].source = source;
+        assert!(config.validate().is_err());
+    }
 }
 
 #[test]
