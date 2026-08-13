@@ -7,7 +7,7 @@ Job Watch is a local terminal application for reviewing eligible Netherlands vac
 From the repository root:
 
 ```bash
-cd tools/job-watch && cargo run --release
+cargo run --release
 ```
 
 The application reads `config.toml` from the current directory. It loads stored active jobs at startup and does not contact a source until you press `r`.
