@@ -118,3 +118,12 @@ enabled = true
 [companies.source]
 strategy = "ing"
 listing_url = "https://careers.ing.com/en/location/netherlands-jobs/2618/2750405/2/en/search-jobs"
+
+[[companies]]
+id = "abn-amro"
+name = "ABN AMRO"
+enabled = true
+[companies.source]
+strategy = "getnoticed"
+base_url = "https://www.werkenbijabnamro.nl"
+country_filter = "Nederland"

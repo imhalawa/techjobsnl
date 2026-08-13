@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "num_total_hits": 3,
+    "pageNumber": 1,
+    "maxPerPage": 2,
+    "totalPageCount": 2
+  },
+  "vacancies": [
+    {
+      "id": 1001,
+      "slug": "platform-engineer-stale",
+      "title": "Platform Engineer",
+      "city": "Amsterdam",
+      "country": "Netherlands",
+      "option_values": [
+        { "value": "Nederland" },
+        { "value": "ABN AMRO" }
+      ],
+      "subtitle": {
+        "option_values": [{ "title": "IT Engineering" }]
+      }
+    },
+    {
+      "id": 1002,
+      "slug": "security-engineer",
+      "title": "Security Engineer",
+      "city": "Amstelveen",
+      "country": "Netherlands",
+      "option_values": [
+        { "value": "Nederland" },
+        { "value": "ABN AMRO" }
+      ],
+      "subtitle": {
+        "option_values": [{ "title": "Security" }]
+      }
+    }
+  ]
+}

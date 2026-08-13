@@ -1,0 +1,627 @@
+use std::collections::HashSet;
+
+use chrono::{DateTime, Utc};
+use futures_util::{StreamExt, stream};
+use reqwest::{Client, RequestBuilder, Url, redirect::Policy};
+use scraper::{Html, Selector};
+use serde::Deserialize;
+use serde_json::Value;
+
+use crate::domain::{ObservedJob, SourceErrorKind, SourceScan};
+
+use super::{
+    JobSource, SourceError,
+    http::send_text,
+    json_ld::{html_text, job_posting_value, parse_job_posting},
+};
+
+const OFFICIAL_HOST: &str = "www.werkenbijabnamro.nl";
+const REDIRECT_LIMIT: usize = 5;
+
+pub struct GetnoticedSource {
+    company_id: String,
+    base_url: String,
+    country_filter: Option<String>,
+    client: Client,
+}
+
+impl GetnoticedSource {
+    pub fn new(
+        company_id: impl Into<String>,
+        base_url: impl Into<String>,
+        country_filter: Option<String>,
+        client: Client,
+    ) -> Self {
+        Self {
+            company_id: company_id.into(),
+            base_url: base_url.into(),
+            country_filter,
+            client,
+        }
+    }
+
+    pub fn listing_request(&self, page: usize) -> Result<RequestBuilder, SourceError> {
+        if page == 0 {
+            return Err(schema(&self.company_id, "listing page must be at least 1"));
+        }
+        let mut url = official_base(&self.base_url, &self.company_id)?;
+        url.set_path("/api/vacancy/");
+        {
+            let mut query = url.query_pairs_mut();
+            query
+                .append_pair("pageNumber", &page.to_string())
+                .append_pair("sort", "created")
+                .append_pair("sortDir", "DESC");
+            if let Some(country) = self.country_filter.as_deref() {
+                query.append_pair("filters[Land][]", country);
+            }
+        }
+        Ok(self
+            .client
+            .get(url)
+            .header("X-Requested-With", "XMLHttpRequest"))
+    }
+}
+
+pub fn build_client(user_agent: &str, timeout: std::time::Duration) -> Result<Client, SourceError> {
+    Client::builder()
+        .user_agent(user_agent)
+        .timeout(timeout)
+        .redirect(Policy::custom(|attempt| {
+            if attempt.previous().len() >= REDIRECT_LIMIT {
+                return attempt.error("too many Getnoticed redirects");
+            }
+            let initial_host = attempt.previous().first().and_then(Url::host_str);
+            if attempt.url().scheme() == "https" && attempt.url().host_str() == initial_host {
+                attempt.follow()
+            } else {
+                attempt.error("Getnoticed non-HTTPS or cross-host redirect blocked")
+            }
+        }))
+        .build()
+        .map_err(|error| SourceError {
+            kind: SourceErrorKind::Configuration,
+            message: format!("could not configure Getnoticed HTTP client: {error}"),
+            http_status: None,
+            retry_after: None,
+            retryable: false,
+        })
+}
+
+#[async_trait::async_trait]
+impl JobSource for GetnoticedSource {
+    fn company_id(&self) -> &str {
+        &self.company_id
+    }
+
+    async fn scan(&self) -> Result<SourceScan, SourceError> {
+        let first = send_text(self.listing_request(1)?, "ABN AMRO").await?;
+        let page_count = listing_page(&first, &self.company_id)?
+            .meta
+            .total_page_count;
+        let mut pages = vec![first];
+        for page in 2..=page_count {
+            pages.push(send_text(self.listing_request(page)?, "ABN AMRO").await?);
+        }
+        let page_refs = pages.iter().map(String::as_str).collect::<Vec<_>>();
+        let listings = parse_listings(&self.company_id, &self.base_url, &page_refs)?;
+
+        let requests = listings
+            .iter()
+            .map(|listing| (self.client.clone(), listing.detail_url.clone()))
+            .collect::<Vec<_>>();
+        let details = stream::iter(requests)
+            .map(|(client, url)| async move { send_text(client.get(url), "ABN AMRO").await })
+            .buffered(4)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        let detail_refs = details.iter().map(String::as_str).collect::<Vec<_>>();
+
+        Ok(SourceScan::Complete {
+            observations: parse_details(&self.company_id, &self.base_url, listings, &detail_refs)?,
+        })
+    }
+}
+
+pub fn parse_getnoticed_pages(
+    company_id: &str,
+    base_url: &str,
+    pages: &[&str],
+    details: &[&str],
+) -> Result<Vec<ObservedJob>, SourceError> {
+    let listings = parse_listings(company_id, base_url, pages)?;
+    parse_details(company_id, base_url, listings, details)
+}
+
+fn parse_listings(
+    company_id: &str,
+    base_url: &str,
+    pages: &[&str],
+) -> Result<Vec<Listing>, SourceError> {
+    let base = official_base(base_url, company_id)?;
+    let mut expected_meta = None;
+    let mut ids = HashSet::new();
+    let mut listings = Vec::new();
+
+    for (index, raw) in pages.iter().enumerate() {
+        let requested_page = index + 1;
+        let page = listing_page(raw, company_id)?;
+        validate_meta(
+            &page.meta,
+            requested_page,
+            expected_meta.as_ref(),
+            company_id,
+        )?;
+        expected_meta.get_or_insert(page.meta.clone());
+
+        let prior = listings.len();
+        let expected_on_page = page
+            .meta
+            .num_total_hits
+            .saturating_sub(prior)
+            .min(page.meta.max_per_page);
+        if page.vacancies.len() != expected_on_page {
+            return Err(schema(
+                company_id,
+                format!(
+                    "listing page {requested_page} returned {} of {expected_on_page} expected vacancies",
+                    page.vacancies.len()
+                ),
+            ));
+        }
+
+        for raw_listing in page.vacancies {
+            let row: ListingRow = serde_json::from_value(raw_listing.clone())
+                .map_err(|error| schema(company_id, format!("invalid listing vacancy: {error}")))?;
+            if !ids.insert(row.id) {
+                return Err(schema(
+                    company_id,
+                    format!("duplicate listing vacancy ID {}", row.id),
+                ));
+            }
+            let slug = required(&row.slug, "slug", row.id, company_id)?;
+            let title = required(&row.title, "title", row.id, company_id)?;
+            let detail_url = detail_url(&base, row.id, &slug, company_id)?;
+            let department = joined_categories(&row.subtitle.option_values);
+            listings.push(Listing {
+                id: row.id,
+                title,
+                department,
+                detail_url,
+                raw: raw_listing,
+            });
+        }
+    }
+
+    let meta = expected_meta.ok_or_else(|| schema(company_id, "returned no listing pages"))?;
+    if pages.len() != meta.total_page_count || listings.len() != meta.num_total_hits {
+        return Err(schema(
+            company_id,
+            format!(
+                "listing returned {} pages and {} vacancies; expected {} pages and {} vacancies",
+                pages.len(),
+                listings.len(),
+                meta.total_page_count,
+                meta.num_total_hits
+            ),
+        ));
+    }
+    Ok(listings)
+}
+
+fn parse_details(
+    company_id: &str,
+    base_url: &str,
+    listings: Vec<Listing>,
+    details: &[&str],
+) -> Result<Vec<ObservedJob>, SourceError> {
+    if listings.len() != details.len() {
+        return Err(schema(
+            company_id,
+            format!(
+                "received {} details for {} listings",
+                details.len(),
+                listings.len()
+            ),
+        ));
+    }
+    listings
+        .into_iter()
+        .zip(details)
+        .map(|(listing, detail)| observed_job(company_id, base_url, listing, detail))
+        .collect()
+}
+
+fn observed_job(
+    company_id: &str,
+    base_url: &str,
+    listing: Listing,
+    detail: &str,
+) -> Result<ObservedJob, SourceError> {
+    let base = official_base(base_url, company_id)?;
+    let document = Html::parse_document(detail);
+    validate_vacancy_id(&document, listing.id, company_id)?;
+    let application_endpoint = application_endpoint(&document, &base, listing.id, company_id)?;
+    let canonical = canonical_url(&document, &base, company_id)?;
+    validate_canonical_identity(&canonical, listing.id, company_id)?;
+
+    let posting = parse_job_posting(detail, "ABN AMRO")?;
+    let raw_posting = job_posting_value(detail, "ABN AMRO")?;
+    let title = posting
+        .title
+        .as_deref()
+        .map(str::trim)
+        .filter(|title| !title.is_empty())
+        .ok_or_else(|| schema(company_id, format!("detail {} has no title", listing.id)))?;
+    if title != listing.title {
+        return Err(schema(
+            company_id,
+            format!("detail {} title does not match its listing", listing.id),
+        ));
+    }
+    let hiring_organization = posting
+        .hiring_organization
+        .as_ref()
+        .and_then(|organization| organization.name.as_deref())
+        .map(str::trim);
+    if hiring_organization != Some("ABN AMRO") {
+        return Err(schema(
+            company_id,
+            format!(
+                "detail {} has an unexpected hiring organization",
+                listing.id
+            ),
+        ));
+    }
+    let date = posting.date_posted.as_deref().ok_or_else(|| {
+        schema(
+            company_id,
+            format!("detail {} has no datePosted", listing.id),
+        )
+    })?;
+    let published_at = DateTime::parse_from_rfc3339(date)
+        .map_err(|error| {
+            schema(
+                company_id,
+                format!("detail {} has invalid datePosted: {error}", listing.id),
+            )
+        })?
+        .with_timezone(&Utc);
+    let description = html_text(&posting.description);
+    if description.is_empty() {
+        return Err(schema(
+            company_id,
+            format!("detail {} has an empty description", listing.id),
+        ));
+    }
+    if posting.job_location.is_empty() {
+        return Err(schema(
+            company_id,
+            format!("detail {} has no locations", listing.id),
+        ));
+    }
+    let mut locations = Vec::new();
+    for place in &posting.job_location {
+        let location = place
+            .name
+            .as_deref()
+            .or(place.address.address_locality.as_deref())
+            .map(str::trim)
+            .filter(|location| !location.is_empty())
+            .ok_or_else(|| {
+                schema(
+                    company_id,
+                    format!("detail {} has an unnamed location", listing.id),
+                )
+            })?;
+        let country_is_nl = place
+            .address
+            .address_country
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|country| matches!(country, "Nederland" | "NLD"));
+        if !country_is_nl {
+            return Err(schema(
+                company_id,
+                format!("detail {} has an unresolved country", listing.id),
+            ));
+        }
+        if !locations.iter().any(|existing| existing == location) {
+            locations.push(location.to_owned());
+        }
+    }
+
+    let apply_url = apply_url(&base, listing.id);
+    Ok(ObservedJob {
+        source_id: listing.id.to_string(),
+        title: listing.title,
+        department: listing.department,
+        team: None,
+        employment_type: None,
+        locations,
+        countries: vec!["NL".to_owned()],
+        job_url: canonical.to_string(),
+        apply_url: apply_url.to_string(),
+        description,
+        raw_payload: serde_json::json!({
+            "listing": listing.raw,
+            "jobPosting": raw_posting,
+            "applicationEndpoint": application_endpoint,
+        }),
+        published_at: Some(published_at),
+    })
+}
+
+fn listing_page(raw: &str, company_id: &str) -> Result<ListingPage, SourceError> {
+    serde_json::from_str(raw)
+        .map_err(|error| schema(company_id, format!("invalid listing response: {error}")))
+}
+
+fn validate_meta(
+    meta: &ListingMeta,
+    requested_page: usize,
+    expected: Option<&ListingMeta>,
+    company_id: &str,
+) -> Result<(), SourceError> {
+    if meta.max_per_page == 0 || meta.total_page_count == 0 {
+        return Err(schema(company_id, "listing has zero page metadata"));
+    }
+    if meta.page_number != requested_page {
+        return Err(schema(
+            company_id,
+            format!(
+                "listing page gap: requested {requested_page}, got {}",
+                meta.page_number
+            ),
+        ));
+    }
+    let calculated = meta.num_total_hits.div_ceil(meta.max_per_page).max(1);
+    if meta.total_page_count != calculated {
+        return Err(schema(
+            company_id,
+            "listing totalPageCount disagrees with num_total_hits and maxPerPage",
+        ));
+    }
+    if let Some(expected) = expected
+        && (meta.num_total_hits != expected.num_total_hits
+            || meta.max_per_page != expected.max_per_page
+            || meta.total_page_count != expected.total_page_count)
+    {
+        return Err(schema(company_id, "listing metadata changed between pages"));
+    }
+    if requested_page > meta.total_page_count {
+        return Err(schema(company_id, "listing returned an undeclared page"));
+    }
+    Ok(())
+}
+
+fn validate_vacancy_id(
+    document: &Html,
+    expected: u64,
+    company_id: &str,
+) -> Result<(), SourceError> {
+    let selector = Selector::parse("[data-vacancy-id]").expect("static vacancy ID selector");
+    let ids = document
+        .select(&selector)
+        .map(|element| {
+            element
+                .value()
+                .attr("data-vacancy-id")
+                .expect("selected attribute exists")
+                .parse::<u64>()
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| schema(company_id, format!("invalid data-vacancy-id: {error}")))?;
+    if !ids.contains(&expected) {
+        return Err(schema(
+            company_id,
+            format!("detail data-vacancy-id does not match listing {expected}"),
+        ));
+    }
+    Ok(())
+}
+
+fn application_endpoint(
+    document: &Html,
+    base: &Url,
+    id: u64,
+    company_id: &str,
+) -> Result<String, SourceError> {
+    let selector = Selector::parse("[data-endpoint]").expect("static application selector");
+    let endpoints = document
+        .select(&selector)
+        .filter_map(|element| element.value().attr("data-endpoint"))
+        .collect::<Vec<_>>();
+    if endpoints.len() != 1 {
+        return Err(schema(
+            company_id,
+            format!("detail {id} must have one application endpoint"),
+        ));
+    }
+    let url = base.join(endpoints[0]).map_err(|error| {
+        schema(
+            company_id,
+            format!("detail {id} has an invalid application endpoint: {error}"),
+        )
+    })?;
+    require_official_origin(base, &url, "application endpoint", company_id)?;
+    if url.path() != format!("/en/solliciteren/{id}/inline") || url.query().is_some() {
+        return Err(schema(
+            company_id,
+            format!("detail {id} application endpoint has a mismatched ID"),
+        ));
+    }
+    Ok(url.to_string())
+}
+
+fn canonical_url(document: &Html, base: &Url, company_id: &str) -> Result<Url, SourceError> {
+    let selector =
+        Selector::parse(r#"link[rel~="canonical"][href]"#).expect("static canonical selector");
+    let mut links = document.select(&selector);
+    let href = links
+        .next()
+        .and_then(|link| link.value().attr("href"))
+        .ok_or_else(|| schema(company_id, "detail has no canonical URL"))?;
+    if links.next().is_some() {
+        return Err(schema(company_id, "detail has multiple canonical URLs"));
+    }
+    let canonical = base
+        .join(href)
+        .map_err(|error| schema(company_id, format!("invalid canonical URL: {error}")))?;
+    require_official_origin(base, &canonical, "canonical", company_id)?;
+    Ok(canonical)
+}
+
+fn validate_canonical_identity(
+    canonical: &Url,
+    expected_id: u64,
+    company_id: &str,
+) -> Result<(), SourceError> {
+    let segments = canonical
+        .path_segments()
+        .map(Iterator::collect::<Vec<_>>)
+        .unwrap_or_default();
+    if segments.len() != 4
+        || segments[0] != "en"
+        || segments[1] != "vacancy"
+        || segments[2].parse::<u64>().ok() != Some(expected_id)
+        || segments[3].is_empty()
+        || canonical.query().is_some()
+        || canonical.fragment().is_some()
+    {
+        return Err(schema(
+            company_id,
+            format!("detail {expected_id} canonical URL has a mismatched identity"),
+        ));
+    }
+    Ok(())
+}
+
+fn detail_url(base: &Url, id: u64, slug: &str, company_id: &str) -> Result<Url, SourceError> {
+    let mut url = base.clone();
+    url.path_segments_mut()
+        .map_err(|()| schema(company_id, "official base URL cannot be a base"))?
+        .clear()
+        .push("en")
+        .push("vacancy")
+        .push(&id.to_string())
+        .push(slug);
+    Ok(url)
+}
+
+fn apply_url(base: &Url, id: u64) -> Url {
+    let mut url = base.clone();
+    url.set_path(&format!("/vacature-solliciteren/{id}"));
+    url
+}
+
+fn official_base(value: &str, company_id: &str) -> Result<Url, SourceError> {
+    let url = Url::parse(value)
+        .map_err(|error| schema(company_id, format!("invalid base URL: {error}")))?;
+    if url.scheme() != "https"
+        || url.host_str() != Some(OFFICIAL_HOST)
+        || url.port().is_some()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || !matches!(url.path(), "" | "/")
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(schema(
+            company_id,
+            format!("base URL must be exactly https://{OFFICIAL_HOST}"),
+        ));
+    }
+    Ok(url)
+}
+
+fn require_official_origin(
+    base: &Url,
+    url: &Url,
+    kind: &str,
+    company_id: &str,
+) -> Result<(), SourceError> {
+    if url.scheme() != "https"
+        || url.host_str() != Some(OFFICIAL_HOST)
+        || url.origin() != base.origin()
+    {
+        return Err(schema(
+            company_id,
+            format!("{kind} URL is not on the exact official HTTPS origin"),
+        ));
+    }
+    Ok(())
+}
+
+fn required(value: &str, field: &str, id: u64, company_id: &str) -> Result<String, SourceError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(schema(
+            company_id,
+            format!("listing vacancy {id} has no {field}"),
+        ));
+    }
+    Ok(value.to_owned())
+}
+
+fn joined_categories(values: &[Category]) -> Option<String> {
+    let mut categories = Vec::new();
+    for value in values {
+        let title = value.title.trim();
+        if !title.is_empty() && !categories.contains(&title) {
+            categories.push(title);
+        }
+    }
+    (!categories.is_empty()).then(|| categories.join(" / "))
+}
+
+fn schema(company_id: &str, message: impl std::fmt::Display) -> SourceError {
+    SourceError::schema(format!("Getnoticed response for {company_id}: {message}"))
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+struct ListingMeta {
+    num_total_hits: usize,
+    #[serde(rename = "pageNumber")]
+    page_number: usize,
+    #[serde(rename = "maxPerPage")]
+    max_per_page: usize,
+    #[serde(rename = "totalPageCount")]
+    total_page_count: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct ListingPage {
+    meta: ListingMeta,
+    vacancies: Vec<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ListingRow {
+    id: u64,
+    slug: String,
+    title: String,
+    #[serde(default)]
+    subtitle: Subtitle,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct Subtitle {
+    #[serde(default)]
+    option_values: Vec<Category>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Category {
+    title: String,
+}
+
+struct Listing {
+    id: u64,
+    title: String,
+    department: Option<String>,
+    detail_url: Url,
+    raw: Value,
+}

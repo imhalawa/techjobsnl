@@ -1,5 +1,13 @@
 # Source and sponsor evidence
 
+## ABN AMRO
+
+- Sponsor: the current IND public register for work, updated 2026-08-03, lists `ABN AMRO Bank N.V.` with KvK `34334259`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. ABN AMRO's own disclaimer identifies `ABN AMRO Bank N.V.` with the same Chamber of Commerce number: <https://www.abnamro.com/research/en/home/information/disclaimer>.
+- Hiring entity: each accepted vacancy names only `ABN AMRO` as its hiring organization. Mapping that brand to `ABN AMRO Bank N.V.` is an inference; confirm the employment entity before relying on sponsor status. The careers privacy statement covers ABN AMRO's recruitment process but does not establish the legal employer for every contract: <https://www.werkenbijabnamro.nl/en/privacy-statement>.
+- Official source: <https://www.werkenbijabnamro.nl/api/vacancy/?pageNumber=1&sort=created&sortDir=DESC&filters%5BLand%5D%5B%5D=Nederland>. The API declares the exact total, current page, maximum records per page, and total page count. Every detail publishes a matching numeric vacancy ID, canonical URL, application endpoint, and full `JobPosting` JSON-LD. The adapter uses the numeric Getnoticed vacancy ID rather than the different, potentially non-unique ATS identifier in JSON-LD, and rejects pagination drift, gaps, early empty pages, count mismatches, duplicates, identity or URL mismatches, unresolved countries, and missing required detail fields.
+- Source cache: listing and detail responses advertised `Cache-Control: public, s-maxage=86400` on 2026-08-13, so live discovery can lag source changes by up to 24 hours.
+- Live discovery: 65 Netherlands jobs on 2026-08-13. All nine declared pages and details were fetched, IDs were unique, and every job had the parser-required fields. The count is volatile and is not hardcoded in the smoke test.
+
 ## ING
 
 - Sponsor: the current IND public register for work, updated 2026-08-03, lists `ING Bank N.V.` with KvK `33031431`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. ING's own articles of association identify `ING Bank N.V.` with the same Dutch trade-register number: <https://ing.com/binaries/content/assets/documents/files/articles_of_association_of_ing_bank_n.v.pdf>.

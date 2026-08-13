@@ -1,6 +1,7 @@
 pub mod ashby;
 pub mod bol;
 pub mod ebay;
+pub mod getnoticed;
 pub mod greenhouse;
 pub mod http;
 pub mod ing;

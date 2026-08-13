@@ -16,7 +16,7 @@ use job_watch::{
     domain::ScanEvent,
     filter::EligibilityFilter,
     scanner::ScanService,
-    sources::{JobSource, ashby, bol, ebay, greenhouse, ing, jibe, recruitee},
+    sources::{JobSource, ashby, bol, ebay, getnoticed, greenhouse, ing, jibe, recruitee},
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
 };
@@ -247,6 +247,10 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
         &config.scan.user_agent,
         Duration::from_secs(config.scan.timeout_seconds),
     )?;
+    let getnoticed_client = getnoticed::build_client(
+        &config.scan.user_agent,
+        Duration::from_secs(config.scan.timeout_seconds),
+    )?;
     config
         .companies
         .iter()
@@ -287,6 +291,15 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     &company.id,
                     listing_url,
                     ebay_client.clone(),
+                ))),
+                SourceConfig::Getnoticed {
+                    base_url,
+                    country_filter,
+                } => Ok(Arc::new(getnoticed::GetnoticedSource::new(
+                    &company.id,
+                    base_url,
+                    country_filter.clone(),
+                    getnoticed_client.clone(),
                 ))),
                 _ => Err(std::io::Error::other(format!(
                     "source strategy for {} is not wired yet",
@@ -541,6 +554,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "ing")
             .collect::<Vec<_>>();
+        let abn_amro = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "abn-amro")
+            .collect::<Vec<_>>();
         let rabobank = config
             .companies
             .iter()
@@ -587,6 +605,17 @@ mod tests {
                 if listing_url == "https://careers.ing.com/en/location/netherlands-jobs/2618/2750405/2/en/search-jobs"
         ));
 
+        assert_eq!(abn_amro.len(), 1);
+        assert_eq!(abn_amro[0].name, "ABN AMRO");
+        assert!(abn_amro[0].enabled);
+        assert!(matches!(
+            &abn_amro[0].source,
+            SourceConfig::Getnoticed {
+                base_url,
+                country_filter: Some(country_filter),
+            } if base_url == "https://www.werkenbijabnamro.nl" && country_filter == "Nederland"
+        ));
+
         assert_eq!(rabobank.len(), 1);
         assert!(!rabobank[0].enabled);
         assert!(matches!(
@@ -626,7 +655,8 @@ mod tests {
                 "adyen",
                 "funda",
                 "bol",
-                "ing"
+                "ing",
+                "abn-amro"
             ]
         );
 

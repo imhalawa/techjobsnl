@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "num_total_hits": 3,
+    "pageNumber": 2,
+    "maxPerPage": 2,
+    "totalPageCount": 2
+  },
+  "vacancies": [
+    {
+      "id": 1003,
+      "slug": "data-engineer",
+      "title": "Data Engineer",
+      "city": "Utrecht",
+      "country": "Netherlands",
+      "option_values": [
+        { "value": "Nederland" },
+        { "value": "ABN AMRO" }
+      ],
+      "subtitle": {
+        "option_values": [
+          { "title": "Data" },
+          { "title": "IT Engineering" }
+        ]
+      }
+    }
+  ]
+}
