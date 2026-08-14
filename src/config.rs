@@ -189,6 +189,9 @@ pub enum SourceConfig {
     Exact {
         listing_url: String,
     },
+    Afas {
+        listing_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -228,6 +231,7 @@ impl SourceConfig {
             Self::Rabobank { .. } => "Rabobank API",
             Self::Eneco { .. } => "Eneco HTML",
             Self::Exact { .. } => "Exact HTML + JSON-LD",
+            Self::Afas { .. } => "AFAS HTML + JSON-LD",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -260,6 +264,7 @@ impl SourceConfig {
             | Self::Coolblue { listing_url }
             | Self::Eneco { listing_url }
             | Self::Exact { listing_url }
+            | Self::Afas { listing_url }
             | Self::Ing { listing_url }
             | Self::PagedHtml { listing_url, .. } => listing_url,
             Self::Unsupported { reason } => reason,
@@ -359,6 +364,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("listing_url"),
                     "must be the official Exact vacancy URL",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Afas { listing_url } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            if listing_url != "https://www.werkenbijafas.nl/alle-vacatures" {
+                return Err(ConfigError::invalid(
+                    path("listing_url"),
+                    "must be the official AFAS vacancy URL",
                 ));
             }
             Ok(())

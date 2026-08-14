@@ -541,3 +541,13 @@ enabled = true
 [companies.source]
 strategy = "exact"
 listing_url = "https://www.exact.com/careers/vacancies"
+
+[[companies]]
+id = "afas"
+name = "AFAS Software"
+industry = "HR software, Payroll software, ERP, B2B SaaS"
+scale = "500–999 · Large company"
+enabled = true
+[companies.source]
+strategy = "afas"
+listing_url = "https://www.werkenbijafas.nl/alle-vacatures"

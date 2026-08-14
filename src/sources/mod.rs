@@ -1,3 +1,4 @@
+pub mod afas;
 pub mod albert_heijn;
 pub mod ashby;
 pub mod bol;

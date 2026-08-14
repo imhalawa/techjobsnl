@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## AFAS Software
+
+- Official source: <https://www.werkenbijafas.nl/alle-vacatures>. The board declares a complete one-page result with a 75-vacancy capacity; the adapter verifies that state, deduplicates stable official job links, reads each JobPosting detail, and keeps only explicit Netherlands locations.
+- Current vacancy pages report approximately 650 colleagues. The configured `500–999` band is approximate and should be rechecked when AFAS publishes a newer company-wide figure.
+- Current software vacancies require Dutch. AFAS is therefore lower priority for applicants who do not speak Dutch, regardless of residence status.
+- The official details identify AFAS Software B.V.; confirm the employment entity and sponsor conditions on each contract before relying on sponsorship.
+
 ## Exact
 
 - Official source: <https://www.exact.com/careers/vacancies>. The board exposes complete 20-item pagination, explicit country labels, stable vacancy IDs, and JobPosting JSON-LD details.
