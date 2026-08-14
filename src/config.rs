@@ -396,7 +396,7 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
         }
         SourceConfig::Coolblue { listing_url } => {
             validate_https_url(listing_url, path("listing_url"))?;
-            if listing_url != "https://www.coolblue.nl/en/vacancies/search" {
+            if listing_url != "https://www.coolblue.nl/vacatures/zoeken" {
                 return Err(ConfigError::invalid(
                     path("listing_url"),
                     "must be the official Coolblue Netherlands vacancy URL",

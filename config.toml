@@ -215,10 +215,10 @@ id = "coolblue"
 name = "Coolblue"
 industry = "E-commerce, Retail, Logistics, Energy"
 scale = "2,000+ · Large company"
-enabled = true
+enabled = false
 [companies.source]
 strategy = "coolblue"
-listing_url = "https://www.coolblue.nl/en/vacancies/search"
+listing_url = "https://www.coolblue.nl/vacatures/zoeken"
 
 [[companies]]
 id = "topicus"

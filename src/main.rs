@@ -1254,7 +1254,7 @@ mod tests {
         ));
 
         assert_eq!(coolblue.len(), 1);
-        assert!(coolblue[0].enabled);
+        assert!(!coolblue[0].enabled);
         assert_eq!(
             coolblue[0].industry,
             "E-commerce, Retail, Logistics, Energy"
@@ -1262,7 +1262,7 @@ mod tests {
         assert!(matches!(
             &coolblue[0].source,
             SourceConfig::Coolblue { listing_url }
-                if listing_url == "https://www.coolblue.nl/en/vacancies/search"
+                if listing_url == "https://www.coolblue.nl/vacatures/zoeken"
         ));
 
         assert_eq!(topicus.len(), 1);
@@ -1351,7 +1351,6 @@ mod tests {
                 "abn-amro",
                 "datasnipper",
                 "databricks",
-                "coolblue",
                 "topicus",
                 "centric",
                 "cmcom",
