@@ -566,7 +566,7 @@ fn rejects_zero_paged_html_page_size() {
 }
 
 #[test]
-fn getnoticed_is_only_valid_for_the_exact_abn_amro_source() {
+fn getnoticed_is_only_valid_for_approved_exact_company_sources() {
     let exact = SourceConfig::Getnoticed {
         base_url: "https://www.werkenbijabnamro.nl".into(),
         country_filter: Some("Nederland".into()),
@@ -574,6 +574,13 @@ fn getnoticed_is_only_valid_for_the_exact_abn_amro_source() {
     let mut config = valid_config();
     config.companies[0].id = "abn-amro".into();
     config.companies[0].source = exact.clone();
+    config.validate().unwrap();
+
+    config.companies[0].id = "brand-new-day".into();
+    config.companies[0].source = SourceConfig::Getnoticed {
+        base_url: "https://werkenbij.brandnewday.nl".into(),
+        country_filter: None,
+    };
     config.validate().unwrap();
 
     for (id, source) in [

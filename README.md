@@ -137,6 +137,7 @@ cargo test --test hosted_ats_test recruitee_live_returns_complete_unique_jobs --
 cargo test --test structured_sources_test bol_live_returns_complete_unique_jobs_and_working_urls -- --ignored --exact --nocapture
 cargo test --test html_sources_test ing_live_returns_complete_unique_jobs -- --ignored --exact --nocapture
 cargo test --test getnoticed_test getnoticed_live_returns_complete_unique_abn_jobs -- --ignored --exact --nocapture
+cargo test --test getnoticed_test getnoticed_live_returns_complete_unique_brand_new_day_jobs -- --ignored --exact --nocapture
 cargo test --test ebay_test ebay_live_returns_complete_unique_netherlands_jobs -- --ignored --nocapture
 cargo test --test uber_test uber_live_returns_complete_unique_netherlands_jobs -- --ignored --exact --nocapture
 cargo test --test successfactors_test flatexdegiro_live_returns_every_nl_job -- --ignored --exact --nocapture

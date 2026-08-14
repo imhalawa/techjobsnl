@@ -1058,7 +1058,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 65);
+        assert_eq!(migrated.companies.len(), 66);
         assert!(
             migrated
                 .companies
@@ -1419,7 +1419,8 @@ mod tests {
                 "google",
                 "worldline",
                 "buckaroo",
-                "pay"
+                "pay",
+                "brand-new-day"
             ]
         );
 

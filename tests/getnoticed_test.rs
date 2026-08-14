@@ -18,6 +18,7 @@ use serde_json::Value;
 
 const BASE_URL: &str = "https://www.werkenbijabnamro.nl";
 const TOPICUS_BASE_URL: &str = "https://www.werkenbijtopicus.nl";
+const BRAND_NEW_DAY_BASE_URL: &str = "https://werkenbij.brandnewday.nl";
 
 #[test]
 fn getnoticed_builds_the_exact_abn_listing_request() {
@@ -87,6 +88,71 @@ fn getnoticed_parses_exact_two_page_snapshot_and_full_details() {
     assert_eq!(
         jobs[1].raw_payload["jobPosting"]["identifier"]["value"],
         "ATS-77"
+    );
+}
+
+#[test]
+fn getnoticed_parses_brand_new_day_listing_and_application_form() {
+    let source = GetnoticedSource::new(
+        "brand-new-day",
+        BRAND_NEW_DAY_BASE_URL,
+        None,
+        reqwest::Client::new(),
+    );
+    assert_eq!(
+        source
+            .listing_request(2)
+            .unwrap()
+            .build()
+            .unwrap()
+            .url()
+            .as_str(),
+        "https://werkenbij.brandnewday.nl/api/vacancy/?pageNumber=2&sort=created&sortDir=DESC"
+    );
+
+    let page = r#"{
+        "meta": {"num_total_hits": 1, "pageNumber": 1, "maxPerPage": 10, "totalPageCount": 1},
+        "vacancies": [{
+            "id": 230,
+            "slug": "new-businessmanager",
+            "title": "New Businessmanager",
+            "city": "Amsterdam",
+            "subtitle": {"option_values": [{"title": "Sales"}]}
+        }]
+    }"#;
+    let detail = r#"
+        <link rel="canonical" href="/vacature/230/new-businessmanager">
+        <div data-component="Favorite" data-vacancy-id="230"></div>
+        <div data-endpoint="/contact/headless_form"></div>
+        <div data-endpoint="/solliciteren/230/inline"></div>
+        <script type="application/ld+json">{
+            "@context": "https://schema.org",
+            "@type": "JobPosting",
+            "datePosted": "2026-08-07T10:30:12+02:00",
+            "description": "<p>Help employers arrange pensions.</p>",
+            "hiringOrganization": {"@type": "Organization", "name": "Brand New Day"},
+            "jobLocation": {"@type": "Place", "address": {
+                "@type": "PostalAddress", "addressLocality": "", "addressCountry": "Nederland"
+            }},
+            "title": "New Businessmanager",
+            "identifier": {"@type": "PropertyValue", "value": "new-businessmanager"}
+        }</script>
+    "#;
+
+    let jobs = parse_getnoticed_pages("brand-new-day", BRAND_NEW_DAY_BASE_URL, &[page], &[detail])
+        .unwrap();
+
+    assert_eq!(jobs.len(), 1);
+    assert_eq!(jobs[0].source_id, "230");
+    assert_eq!(jobs[0].department.as_deref(), Some("Sales"));
+    assert_eq!(jobs[0].locations, ["Amsterdam"]);
+    assert_eq!(
+        jobs[0].job_url,
+        "https://werkenbij.brandnewday.nl/vacature/230/new-businessmanager"
+    );
+    assert_eq!(
+        jobs[0].apply_url,
+        "https://werkenbij.brandnewday.nl/vacature-solliciteren/230"
     );
 }
 
@@ -363,6 +429,44 @@ async fn getnoticed_live_returns_complete_unique_topicus_jobs() {
         assert!(job.published_at.is_some());
     }
     println!("Topicus: {} jobs", observations.len());
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn getnoticed_live_returns_complete_unique_brand_new_day_jobs() {
+    let source = GetnoticedSource::new(
+        "brand-new-day",
+        BRAND_NEW_DAY_BASE_URL,
+        None,
+        build_client(
+            "job-watch/0.1 (+Brand New Day live test)",
+            Duration::from_secs(30),
+        )
+        .unwrap(),
+    );
+    let SourceScan::Complete { observations } = source.scan().await.unwrap() else {
+        panic!("Brand New Day scan must be complete");
+    };
+
+    assert!(!observations.is_empty());
+    let mut ids = HashSet::new();
+    for job in &observations {
+        assert!(ids.insert(&job.source_id));
+        assert!(!job.title.trim().is_empty());
+        assert!(!job.description.trim().is_empty());
+        assert_eq!(job.locations, ["Amsterdam"]);
+        assert_eq!(job.countries, ["NL"]);
+        assert!(job.job_url.starts_with(BRAND_NEW_DAY_BASE_URL));
+        assert_eq!(
+            job.apply_url,
+            format!(
+                "https://werkenbij.brandnewday.nl/vacature-solliciteren/{}",
+                job.source_id
+            )
+        );
+        assert!(job.published_at.is_some());
+    }
+    println!("Brand New Day: {} jobs", observations.len());
 }
 
 fn pages() -> Vec<String> {
