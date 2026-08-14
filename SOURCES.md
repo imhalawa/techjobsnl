@@ -157,6 +157,7 @@ The following enabled companies use the same complete-board adapters documented 
 
 - IMC Trading: <https://boards-api.greenhouse.io/v1/boards/imc/jobs?content=true>
 - Flow Traders: <https://boards-api.greenhouse.io/v1/boards/flowtraders/jobs?content=true>
+- Maven Securities: <https://boards-api.greenhouse.io/v1/boards/mavensecuritiesholdingltd/jobs?content=true>. Maven's official careers page embeds this exact board: <https://www.mavensecurities.com/jobs/>.
 - bunq: <https://bunq.recruitee.com/api/offers/>
 - DPG Media: <https://vacatures.dpgmedia.nl/api/offers/>
 - Miro: <https://api.ashbyhq.com/posting-api/job-board/miro>
@@ -173,6 +174,8 @@ The following enabled companies use the same complete-board adapters documented 
 - ACT Commodities: <https://boards-api.greenhouse.io/v1/boards/testendouble/jobs?content=true>. The unusual board token is linked by ACT's official careers site.
 
 Each board names the company brand, not necessarily the legal employer for every contract. Confirm the employment entity before relying on sponsor status. Scale bands are approximate public headcount bands and should be rechecked when companies publish newer first-party figures.
+
+Maven's Greenhouse payload declares the complete global total; the configured country filter keeps only vacancies with an explicit Netherlands office. Live verification on 2026-08-14 returned 37 unique global jobs and 4 Amsterdam jobs with complete descriptions. Maven's official history reports 386 employees in 2023 and an Amsterdam office for 46 people, so the configured `200+` band is conservative: <https://www.mavensecurities.com/>. Its emerging-talent page states that graduate roles can offer visa sponsorship, but internship applicants need existing regional work rights; experienced roles do not make a general sponsorship promise: <https://www.mavensecurities.com/emerging-talent/>.
 
 ## Da Vinci
 

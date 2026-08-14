@@ -130,6 +130,7 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
             "Reddit",
             "IMC Trading",
             "Flow Traders",
+            "Maven Securities",
             "bunq",
             "DPG Media",
             "Miro",

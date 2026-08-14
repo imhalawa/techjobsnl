@@ -341,6 +341,20 @@ async fn da_vinci_live_returns_complete_unique_netherlands_jobs() {
 
 #[tokio::test]
 #[ignore = "live external source"]
+async fn maven_live_returns_complete_unique_netherlands_jobs() {
+    let source = GreenhouseSource::new(
+        "maven-securities",
+        "mavensecuritiesholdingltd",
+        live_client(),
+    )
+    .with_country_filter(Some("NL"));
+    let jobs = complete_jobs(source.scan().await.unwrap());
+    assert_live_jobs("Maven Securities", &jobs);
+    println!("Maven Securities: {} NL jobs", jobs.len());
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
 async fn hosted_candidate_batch_live_returns_complete_unique_netherlands_jobs() {
     let client = live_client();
     let sources: Vec<(&str, Box<dyn JobSource>)> = vec![
