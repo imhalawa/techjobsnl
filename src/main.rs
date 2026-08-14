@@ -24,8 +24,8 @@ use job_watch::{
     insights::{AnalyticsFilters, AnalyticsResult, LibraryState},
     scanner::ScanService,
     sources::{
-        JobSource, albert_heijn, ashby, bol, coolblue, ebay, eneco, exact, getnoticed, greenhouse,
-        ing, jibe, lever, personio, rabobank, recruitee, workable, workday, yuki,
+        JobSource, afas, albert_heijn, ashby, bol, coolblue, ebay, eneco, exact, getnoticed,
+        greenhouse, ing, jibe, lever, personio, rabobank, recruitee, workable, workday, yuki,
     },
     storage::{JobQuery, ScanReadModel, SourceReadModel, Store},
     ui::{App, AppCommand, View, render},
@@ -598,6 +598,11 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     listing_url,
                     client.clone(),
                 ))),
+                SourceConfig::Afas { listing_url } => Ok(Arc::new(afas::AfasSource::new(
+                    &company.id,
+                    listing_url,
+                    client.clone(),
+                ))),
                 SourceConfig::AlbertHeijn { base_url } => Ok(Arc::new(
                     albert_heijn::AlbertHeijnSource::new(&company.id, base_url, client.clone()),
                 )),
@@ -979,7 +984,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 48);
+        assert_eq!(migrated.companies.len(), 49);
         assert!(
             migrated
                 .companies
@@ -1324,7 +1329,8 @@ mod tests {
                 "wolters-kluwer",
                 "vanderlande",
                 "bitvavo",
-                "exact"
+                "exact",
+                "afas"
             ]
         );
 
