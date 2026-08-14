@@ -973,6 +973,22 @@ mod tests {
             .filter(|company| company.enabled)
             .map(|company| company.id.as_str())
             .collect::<Vec<_>>();
+        let scale_ranges = [
+            "1–50",
+            "51–200",
+            "201–500",
+            "501–1,000",
+            "1,001–5,000",
+            "5,001–10,000",
+            "10,001–50,000",
+            "50,001+",
+        ];
+        assert!(
+            config
+                .companies
+                .iter()
+                .all(|company| scale_ranges.contains(&company.scale.as_str()))
+        );
         assert_eq!(
             enabled_ids,
             [
