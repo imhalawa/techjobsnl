@@ -1,0 +1,32 @@
+{
+  "jobs": [
+    {
+      "id": 301,
+      "title": "Staff Site Reliability Engineer, Ads",
+      "updated_at": "2026-08-14T11:00:00Z",
+      "absolute_url": "https://jobs.example.test/reddit/301",
+      "content": "&lt;p&gt;Keep advertising systems reliable.&lt;/p&gt;",
+      "offices": [
+        {
+          "id": 1,
+          "name": "Amsterdam",
+          "location": "Amsterdam, North Holland, Netherlands"
+        }
+      ],
+      "departments": [
+        { "id": 10, "name": "Engineering" }
+      ]
+    },
+    {
+      "id": 302,
+      "title": "Software Engineer",
+      "updated_at": "2026-08-14T11:00:00Z",
+      "absolute_url": "https://jobs.example.test/reddit/302",
+      "content": "&lt;p&gt;Build community products.&lt;/p&gt;",
+      "offices": [
+        { "id": 2, "name": "New York", "location": "New York" }
+      ]
+    }
+  ],
+  "meta": { "total": 2 }
+}

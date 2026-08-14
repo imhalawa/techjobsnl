@@ -144,3 +144,12 @@ enabled = true
 strategy = "greenhouse"
 board = "databricks"
 country_filter = "NL"
+
+[[companies]]
+id = "reddit"
+name = "Reddit"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "reddit"
+country_filter = "NL"

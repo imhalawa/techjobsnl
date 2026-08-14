@@ -588,6 +588,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "databricks")
             .collect::<Vec<_>>();
+        let reddit = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "reddit")
+            .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
         assert!(adyen[0].enabled);
@@ -673,6 +678,16 @@ mod tests {
             } if board == "databricks" && country_filter == "NL"
         ));
 
+        assert_eq!(reddit.len(), 1);
+        assert!(reddit[0].enabled);
+        assert!(matches!(
+            &reddit[0].source,
+            SourceConfig::Greenhouse {
+                board,
+                country_filter: Some(country_filter),
+            } if board == "reddit" && country_filter == "NL"
+        ));
+
         let enabled_ids = config
             .companies
             .iter()
@@ -692,7 +707,8 @@ mod tests {
                 "ing",
                 "abn-amro",
                 "datasnipper",
-                "databricks"
+                "databricks",
+                "reddit"
             ]
         );
 

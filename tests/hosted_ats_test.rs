@@ -37,6 +37,24 @@ fn parses_and_filters_sanitized_databricks_board() {
 }
 
 #[test]
+fn parses_and_filters_sanitized_reddit_board() {
+    let jobs = parse_greenhouse_response_for_country(
+        "reddit",
+        include_str!("fixtures/greenhouse/reddit.json"),
+        "NL",
+    )
+    .unwrap();
+    let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
+    let filter = EligibilityFilter::new(&config.filters).unwrap();
+
+    assert_eq!(jobs.len(), 1);
+    assert_eq!(jobs[0].title, "Staff Site Reliability Engineer, Ads");
+    assert_eq!(jobs[0].locations, ["Amsterdam, North Holland, Netherlands"]);
+    assert_eq!(jobs[0].countries, ["NL"]);
+    assert!(filter.classify(&jobs[0], &HashMap::new()).unwrap().eligible);
+}
+
+#[test]
 fn parses_complete_greenhouse_board() {
     let jobs =
         parse_greenhouse_response("adyen", include_str!("fixtures/greenhouse/adyen.json")).unwrap();
@@ -263,6 +281,23 @@ async fn databricks_live_returns_complete_unique_netherlands_jobs() {
         .with_country_filter(Some("NL"));
     let jobs = complete_jobs(source.scan().await.unwrap());
     assert_live_jobs("Databricks", &jobs);
+
+    let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
+    let filter = EligibilityFilter::new(&config.filters).unwrap();
+    assert!(jobs.iter().any(|job| {
+        filter
+            .classify(job, &HashMap::new())
+            .is_ok_and(|result| result.eligible)
+    }));
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn reddit_live_returns_complete_unique_netherlands_jobs() {
+    let source =
+        GreenhouseSource::new("reddit", "reddit", live_client()).with_country_filter(Some("NL"));
+    let jobs = complete_jobs(source.scan().await.unwrap());
+    assert_live_jobs("Reddit", &jobs);
 
     let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
     let filter = EligibilityFilter::new(&config.filters).unwrap();

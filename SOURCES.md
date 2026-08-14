@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Reddit
+
+- Sponsor: the IND public register for work dated 2026-08-03 lists `Reddit Netherlands B.V.` with KvK `83433880`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.
+- Hiring entity: the vacancies identify Reddit, not the Dutch legal employer or its KvK number. Confirm that `Reddit Netherlands B.V.` is the employment entity before relying on sponsor status.
+- Official source: <https://boards-api.greenhouse.io/v1/boards/reddit/jobs?content=true>. The API's `meta.total` verifies the complete global payload; the configured country filter accepts only jobs with an explicit Netherlands office.
+- Live discovery: 7 complete Netherlands jobs on 2026-08-14. IDs were unique and every accepted job had the parser-required fields. The count is volatile and is not hardcoded in the smoke test.
+
 ## Databricks
 
 - Sponsor: the IND public register for work dated 2026-08-03 lists `Databricks` with KvK `51208121`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.
