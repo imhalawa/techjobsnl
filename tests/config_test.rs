@@ -369,6 +369,11 @@ fn parses_and_validates_every_source_strategy() {
             "mollie",
         ),
         (
+            "strategy = \"successfactors\"\nlisting_url = \"https://jobs.flatexdegiro.com/search/?q=&locationsearch=NL\"\nemployer = \"flatexDEGIRO AG\"",
+            true,
+            "flatexdegiro",
+        ),
+        (
             "strategy = \"unsupported\"\nreason = \"official source blocks unattended requests\"",
             false,
             "mollie",
@@ -444,6 +449,10 @@ fn rejects_empty_source_fields() {
             offset_parameter: "limitstart".into(),
             page_size: 20,
         },
+        SourceConfig::Successfactors {
+            listing_url: " ".into(),
+            employer: "flatexDEGIRO AG".into(),
+        },
         SourceConfig::Unsupported { reason: " ".into() },
     ];
 
@@ -495,6 +504,10 @@ fn rejects_non_https_source_urls() {
             listing_url: "http://www.exact.com/careers/vacancies".into(),
             offset_parameter: "limitstart".into(),
             page_size: 20,
+        },
+        SourceConfig::Successfactors {
+            listing_url: "http://jobs.flatexdegiro.com/search/?q=&locationsearch=NL".into(),
+            employer: "flatexDEGIRO AG".into(),
         },
     ];
 

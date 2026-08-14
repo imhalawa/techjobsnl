@@ -213,6 +213,10 @@ pub enum SourceConfig {
     Uber {
         api_url: String,
     },
+    Successfactors {
+        listing_url: String,
+        employer: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -260,6 +264,7 @@ impl SourceConfig {
             Self::Postnl { .. } => "PostNL paged API",
             Self::Amazon { .. } => "Amazon Jobs API",
             Self::Uber { .. } => "Uber Oracle HCM API",
+            Self::Successfactors { .. } => "SAP SuccessFactors HTML",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -302,6 +307,7 @@ impl SourceConfig {
             Self::Postnl { api_url } => api_url,
             Self::Amazon { search_url } => search_url,
             Self::Uber { api_url } => api_url,
+            Self::Successfactors { listing_url, .. } => listing_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -481,6 +487,23 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("api_url"),
                     "must be the official Uber Oracle HCM API",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Successfactors {
+            listing_url,
+            employer,
+        } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            validate_non_empty(employer, path("employer"))?;
+            if company.id != "flatexdegiro"
+                || listing_url != "https://jobs.flatexdegiro.com/search/?q=&locationsearch=NL"
+                || employer != "flatexDEGIRO AG"
+            {
+                return Err(ConfigError::invalid(
+                    path("listing_url"),
+                    "must match flatexDEGIRO's exact official NL SuccessFactors board",
                 ));
             }
             Ok(())

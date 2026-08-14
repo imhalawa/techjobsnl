@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## flatexDEGIRO
+
+- Official source: <https://jobs.flatexdegiro.com/search/?q=&locationsearch=NL>. The SAP SuccessFactors board declares the exact Netherlands total and page size. The adapter follows every declared page, requires unique numeric IDs, fetches every detail, and validates the title, explicit `NL` address, publication date, full description, employer marker, job URL, and official application URL before accepting a complete scan.
+- flatexDEGIRO reports more than 1,200 employees across Europe: <https://flatexdegiro.com/English/esg/social/default.aspx>. It describes itself as a pan-European online broker that operates proprietary technology and a regulated bank: <https://www.flatexdegiro.com/>. The configured `1,000+` band follows the app's EU large-company classification.
+- The Netherlands board currently contains English-language roles and roles that explicitly require Dutch. Language, relocation, work-authorisation, and visa sponsorship conditions are role-specific; confirm them on each vacancy.
+- The ATS metadata still names `flatexDEGIRO AG`, while current corporate pages and vacancy text name `flatexDEGIRO SE`. Confirm the contract entity before relying on recognised-sponsor status.
+
 ## Amazon / AWS
 
 - Official source: <https://www.amazon.jobs/en/search?country=NLD>. Its JSON API at <https://www.amazon.jobs/en/search.json?normalized_country_code%5B%5D=NLD&offset=0&result_limit=100> declares the exact Netherlands total. The adapter follows every result page and validates unique feed IDs, public job IDs, official paths, Netherlands locations, dates, full descriptions, and Amazon-owned application URLs.
