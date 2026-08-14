@@ -125,6 +125,7 @@ jobs:
           pattern: techjobsnl-*
           path: dist
           merge-multiple: true
+          skip-decompress: true
       - name: Generate checksums
         run: |
           set -euo pipefail
