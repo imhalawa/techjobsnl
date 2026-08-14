@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use chrono::{TimeZone, Utc};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use job_watch::{
+    analytics::{SkillKind, SkillSuggestion, SuggestionStatus},
     config::{
         AnalyticsConfig, CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig,
         SourceConfig, ThemeOverrides, UiConfig,
@@ -458,12 +459,12 @@ fn mouse_hover_click_focus_and_wheel_match_the_existing_ui_actions() {
     assert_eq!(app.view(), View::New);
 
     app.handle_mouse(
-        mouse(MouseEventKind::Down(MouseButton::Left), 2, 8),
+        mouse(MouseEventKind::Down(MouseButton::Left), 2, 9),
         140,
         30,
     );
     assert_eq!(
-        app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 2, 8), 140, 30,),
+        app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 2, 9), 140, 30,),
         AppCommand::ReloadJobs
     );
     assert_eq!(app.view(), View::Settings);
@@ -571,7 +572,7 @@ fn settings_edits_new_job_age_and_new_view_uses_publication_date() {
         "Recent Engineer"
     );
 
-    open_view(&mut app, 7);
+    open_view(&mut app, 8);
     assert!(rendered(&app, 120, 24).contains("New job age  7 days"));
     assert_eq!(app.handle_key(special(KeyCode::Enter)), AppCommand::None);
     assert_eq!(app.input_mode(), InputMode::Setting);
@@ -593,7 +594,7 @@ fn settings_can_clear_title_filters_to_show_every_job_type() {
     configured.filters.exclude_title_patterns = vec!["manager".into()];
     let mut app = App::new(configured.clone(), vec![]);
 
-    open_view(&mut app, 7);
+    open_view(&mut app, 8);
     app.handle_key(special(KeyCode::Down));
     app.handle_key(special(KeyCode::Down));
     app.handle_key(special(KeyCode::Enter));
@@ -614,10 +615,7 @@ fn settings_can_clear_title_filters_to_show_every_job_type() {
 #[test]
 fn analytics_counts_description_skills_and_lists_matching_cached_jobs() {
     let mut configured = config();
-    configured.analytics.skills = std::collections::BTreeMap::from([
-        ("AWS".into(), vec!["aws".into()]),
-        ("Go".into(), vec!["go".into(), "golang".into()]),
-    ]);
+    configured.analytics.minimum_skill_occurrence = 1;
     configured.analytics.minimum_cooccurrence = 1;
     let mut cloud = job("Cloud Engineer", false, false);
     cloud.classified.observed.description = "Build services in AWS and Go.".into();
@@ -628,6 +626,7 @@ fn analytics_counts_description_skills_and_lists_matching_cached_jobs() {
     let mut app = App::new(configured, vec![cloud, data, legal]);
 
     open_view(&mut app, 6);
+    app.handle_key(key('2'));
     assert_eq!(
         app.skill_stats()
             .iter()
@@ -636,11 +635,10 @@ fn analytics_counts_description_skills_and_lists_matching_cached_jobs() {
         vec![("AWS", 2), ("Go", 1)]
     );
     let screen = rendered(&app, 160, 24);
-    assert!(screen.contains("Observed skills · 2 skills · 3 jobs · 3/3 descriptions"));
+    assert!(screen.contains("Hard skills · 2"));
     assert!(screen.contains("AWS"));
-    assert!(screen.contains("2 jobs · 66%"));
-    assert!(screen.contains("Related skills · 1 · minimum 1 shared jobs"));
-    assert!(screen.contains("50.0% · 1 jobs"));
+    assert!(screen.contains("2 · 66%"));
+    assert!(screen.contains("Evidence · 2 matching jobs"));
     let coverage = app.analytics_coverage();
     assert_eq!(coverage.descriptions, 3);
     assert_eq!(coverage.employment_type, 3);
@@ -651,17 +649,79 @@ fn analytics_counts_description_skills_and_lists_matching_cached_jobs() {
 
     app.handle_key(special(KeyCode::Down));
     let details = normalized_interior(&rendered_buffer(&app, 120, 24));
-    assert!(details.contains("Observed in 1 of 3 descriptions"));
-    assert!(details.contains("(33%)."));
+    assert!(details.contains("Evidence · 1 matching jobs"));
     assert!(details.contains("Cloud Engineer"));
     assert!(!details.contains("Legal Counsel"));
 }
 
 #[test]
+fn analytics_splits_hard_and_soft_trends_with_independent_navigation() {
+    let mut configured = config();
+    configured.analytics.minimum_skill_occurrence = 1;
+    let descriptions = [
+        "Python Java AWS communication skills teamwork",
+        "Python Java AWS communication skills teamwork",
+        "Python Java communication skills teamwork",
+        "Python communication skills",
+    ];
+    let jobs = descriptions
+        .into_iter()
+        .enumerate()
+        .map(|(index, description)| {
+            let mut item = job(&format!("Engineer {index}"), false, false);
+            item.classified.observed.description = description.into();
+            item
+        })
+        .collect();
+    let mut app = App::new(configured, jobs);
+    open_view(&mut app, 6);
+    app.handle_key(key('2'));
+
+    let screen = rendered(&app, 200, 24);
+    assert!(screen.contains("Hard skills · 3"));
+    assert!(screen.contains("Soft skills · 2"));
+    assert!(screen.contains("Python"));
+    assert!(screen.contains("4 · 100%"));
+    assert_eq!(
+        app.skill_stats_for(SkillKind::Soft)
+            .first()
+            .map(|skill| skill.name.as_str()),
+        Some("Communication")
+    );
+
+    app.handle_key(special(KeyCode::Down));
+    app.handle_key(special(KeyCode::Down));
+    assert_eq!(app.analytics_skill_kind(), SkillKind::Hard);
+    assert_eq!(app.selected_index(), 2);
+    app.handle_key(special(KeyCode::Right));
+    assert_eq!(app.analytics_skill_kind(), SkillKind::Soft);
+    assert_eq!(app.selected_index(), 0);
+    app.handle_key(special(KeyCode::Down));
+    assert_eq!(app.selected_index(), 1);
+    app.handle_key(special(KeyCode::Left));
+    assert_eq!(app.analytics_skill_kind(), SkillKind::Hard);
+    assert_eq!(app.selected_index(), 2);
+    app.handle_key(special(KeyCode::Right));
+    assert_eq!(app.selected_index(), 1);
+
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 24, 5),
+        200,
+        24,
+    );
+    assert_eq!(app.analytics_skill_kind(), SkillKind::Hard);
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 90, 5),
+        200,
+        24,
+    );
+    assert_eq!(app.analytics_skill_kind(), SkillKind::Soft);
+}
+
+#[test]
 fn analytics_matching_jobs_are_bounded_and_open_with_keyboard_or_mouse() {
     let mut configured = config();
-    configured.analytics.skills =
-        std::collections::BTreeMap::from([("Python".into(), vec!["python".into()])]);
+    configured.analytics.minimum_skill_occurrence = 1;
     let mut first = job("Backend Engineer", false, false);
     first.classified.observed.description = "Build services with Python.".into();
     first.classified.observed.job_url = "https://example.test/first".into();
@@ -686,7 +746,7 @@ fn analytics_matching_jobs_are_bounded_and_open_with_keyboard_or_mouse() {
 
     assert_eq!(
         app.handle_mouse(
-            mouse(MouseEventKind::Down(MouseButton::Left), 75, 17),
+            mouse(MouseEventKind::Down(MouseButton::Left), 100, 3),
             120,
             24,
         ),
@@ -694,7 +754,7 @@ fn analytics_matching_jobs_are_bounded_and_open_with_keyboard_or_mouse() {
     );
     assert_eq!(
         app.handle_mouse(
-            mouse(MouseEventKind::Up(MouseButton::Left), 75, 17),
+            mouse(MouseEventKind::Up(MouseButton::Left), 100, 3),
             120,
             24,
         ),
@@ -705,8 +765,7 @@ fn analytics_matching_jobs_are_bounded_and_open_with_keyboard_or_mouse() {
 #[test]
 fn overflowing_analytics_evidence_has_a_visible_scrollbar() {
     let mut configured = config();
-    configured.analytics.skills =
-        std::collections::BTreeMap::from([("Python".into(), vec!["python".into()])]);
+    configured.analytics.minimum_skill_occurrence = 1;
     let jobs = (0..12)
         .map(|index| {
             let mut item = job(&format!("Python Engineer {index}"), false, false);
@@ -724,8 +783,7 @@ fn overflowing_analytics_evidence_has_a_visible_scrollbar() {
 #[test]
 fn reported_listing_views_show_their_totals() {
     let mut configured = config_with_two_companies();
-    configured.analytics.skills =
-        std::collections::BTreeMap::from([("Python".into(), vec!["python".into()])]);
+    configured.analytics.minimum_skill_occurrence = 1;
     let mut first = job("Python Engineer", true, false);
     first.classified.observed.description = "Build Python services.".into();
     let second = job_for("beta", "Platform Engineer", false, false);
@@ -756,14 +814,16 @@ fn reported_listing_views_show_their_totals() {
     assert!(rendered(&app, 120, 24).contains("Active jobs · 2"));
     open_view(&mut app, 6);
     let analytics = rendered(&app, 120, 24);
-    assert!(analytics.contains("Observed skills · 1 skill · 2 jobs"));
-    assert!(analytics.contains("Related skills · 0"));
-    assert!(analytics.contains("Evidence and matching jobs · 1"));
+    assert!(
+        analytics.contains("Career opportunities · 1 recommendations · 2 active jobs"),
+        "{analytics}"
+    );
+    assert!(analytics.contains("Evidence · 1 matching jobs"));
     open_view(&mut app, 4);
     assert!(rendered(&app, 120, 24).contains("Recent scans · 1"));
     open_view(&mut app, 5);
     assert!(rendered(&app, 120, 24).contains("Sources · 1"));
-    open_view(&mut app, 7);
+    open_view(&mut app, 8);
     assert!(rendered(&app, 120, 24).contains("Settings · 4"));
 }
 
@@ -811,11 +871,13 @@ fn reported_description_scroll_is_visible_and_stops_at_the_real_end() {
 
 #[test]
 fn reported_default_analytics_include_dotnet_without_matching_unrelated_text() {
+    let mut configured = config();
+    configured.analytics.minimum_skill_occurrence = 1;
     let mut dotnet = job(".NET Engineer", false, false);
     dotnet.classified.observed.description = "Build ASP.NET services with C# and dotnet.".into();
     let mut unrelated = job("Writer", false, false);
     unrelated.classified.observed.description = "Maintain the intranet documentation.".into();
-    let mut app = App::new(config(), vec![dotnet, unrelated]);
+    let mut app = App::new(configured, vec![dotnet, unrelated]);
 
     open_view(&mut app, 6);
     let screen = rendered(&app, 120, 24);
@@ -827,12 +889,7 @@ fn reported_default_analytics_include_dotnet_without_matching_unrelated_text() {
 #[test]
 fn reported_mouse_wheel_burst_moves_one_analytics_item() {
     let mut configured = config();
-    configured.analytics.skills = std::collections::BTreeMap::from([
-        ("Azure".into(), vec!["azure".into()]),
-        ("Go".into(), vec!["go".into()]),
-        ("Java".into(), vec!["java".into()]),
-        ("Python".into(), vec!["python".into()]),
-    ]);
+    configured.analytics.minimum_skill_occurrence = 1;
     let jobs = [
         "Python Go Java Azure",
         "Python Go Java",
@@ -849,9 +906,10 @@ fn reported_mouse_wheel_burst_moves_one_analytics_item() {
     .collect();
     let mut app = App::new(configured, jobs);
     open_view(&mut app, 6);
+    app.handle_key(key('2'));
 
     for _ in 0..3 {
-        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 24, 1), 140, 24);
+        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 24, 5), 140, 24);
     }
 
     assert_eq!(app.selected_index(), 1);
@@ -860,10 +918,7 @@ fn reported_mouse_wheel_burst_moves_one_analytics_item() {
 #[test]
 fn reported_short_skill_bar_does_not_duplicate_percentage_digits() {
     let mut configured = config();
-    configured.analytics.skills = std::collections::BTreeMap::from([
-        ("Python".into(), vec!["python".into()]),
-        ("TypeScript".into(), vec!["typescript".into()]),
-    ]);
+    configured.analytics.minimum_skill_occurrence = 1;
     let jobs = (0..76)
         .map(|index| {
             let mut item = job(&format!("Engineer {index}"), false, false);
@@ -878,14 +933,79 @@ fn reported_short_skill_bar_does_not_duplicate_percentage_digits() {
         .collect();
     let mut app = App::new(configured, jobs);
     open_view(&mut app, 6);
+    app.handle_key(key('2'));
+    let typescript_index = app
+        .analytics_report()
+        .hard_skills
+        .iter()
+        .position(|skill| skill.metric.name == "TypeScript")
+        .unwrap();
+    for _ in 0..typescript_index {
+        app.handle_key(special(KeyCode::Down));
+    }
 
-    let buffer = rendered_buffer(&app, 160, 24);
+    let width = 284;
+    let buffer = rendered_buffer(&app, width, 24);
     let typescript = (0..buffer.area.height)
         .map(|y| row(&buffer, y))
-        .find(|line| line.contains("TypeScript"))
+        .find(|line| line.contains("TypeScript") && line.contains("6 · 7%"))
         .unwrap();
-    assert!(typescript.contains("6 jobs · 7%"), "{typescript}");
+    assert!(typescript.contains("6 · 7%"), "{typescript}");
     assert!(!typescript.contains("77%"), "{typescript}");
+}
+
+#[test]
+fn emerging_skill_suggestions_are_reviewed_before_they_enter_analytics() {
+    let mut app = App::new(config(), vec![]);
+    app.replace_skill_suggestions(vec![SkillSuggestion {
+        name: "NewMesh".into(),
+        kind: SkillKind::Hard,
+        aliases: vec!["NM runtime".into()],
+        evidence: vec!["Build with NewMesh and NM runtime".into()],
+        status: SuggestionStatus::Pending,
+    }]);
+    open_view(&mut app, 7);
+    app.handle_key(key('2'));
+
+    let screen = rendered(&app, 140, 24);
+    assert!(screen.contains("AI suggestions require review"));
+    assert!(screen.contains("NewMesh"));
+    assert_eq!(
+        app.handle_key(key('a')),
+        AppCommand::ReviewSkillSuggestion("NewMesh".into(), SuggestionStatus::Approved)
+    );
+}
+
+#[test]
+fn analytics_discovers_skills_without_a_configured_taxonomy() {
+    let configured = config();
+    let jobs = [
+        (
+            "Backend Engineer",
+            "Required experience with Python and .NET.",
+        ),
+        (
+            "Platform Engineer",
+            "Strong proficiency in Python and .NET.",
+        ),
+    ]
+    .into_iter()
+    .map(|(title, description)| {
+        let mut item = job(title, false, false);
+        item.classified.observed.description = description.into();
+        item
+    })
+    .collect();
+    let mut app = App::new(configured, jobs);
+
+    open_view(&mut app, 6);
+    assert_eq!(
+        app.skill_stats()
+            .into_iter()
+            .map(|skill| skill.name)
+            .collect::<Vec<_>>(),
+        vec![".NET", "Python"]
+    );
 }
 
 #[test]
@@ -1378,7 +1498,7 @@ fn configured_help_opens_an_overlay_with_fixed_and_contextual_controls() {
     assert!(screen.contains("Tab/Esc focus navigation"));
     assert!(screen.contains("Inside a tab: ↑/↓ or j/k select"));
     assert!(screen.contains("J/K scroll details"));
-    assert!(screen.contains("Analytics: ↑/↓ skills; J/K matches"));
+    assert!(screen.contains("Analytics: [/] or 1-4 sections"));
     assert!(screen.contains("s scan"));
     assert!(screen.contains("z search jobs"));
     assert!(screen.contains("v filter company/New/Applied"));

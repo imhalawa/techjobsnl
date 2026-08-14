@@ -138,14 +138,35 @@ fn initialize(config_path: &Path) -> Result<Startup> {
             config_path.display()
         ))
     })?);
-    let (jobs, facts, scans, sources) = {
+    let (
+        jobs,
+        facts,
+        scans,
+        sources,
+        analytics_filters,
+        library,
+        analytics_scans,
+        skill_suggestions,
+    ) = {
         let store = store.lock().unwrap();
         let jobs = store.list_jobs(JobQuery::active())?;
         let facts = store.analytics_facts(&jobs, &config.analytics)?;
-        (jobs, facts, store.recent_scans()?, store.source_health()?)
+        let (analytics_filters, library) = store.analytics_state()?;
+        (
+            jobs,
+            facts,
+            store.recent_scans()?,
+            store.source_health()?,
+            analytics_filters,
+            library,
+            store.analytics_scans()?,
+            store.skill_suggestions()?,
+        )
     };
     let mut app = App::new_with_facts(config, jobs, facts);
     app.replace_read_models(scans, sources);
+    app.replace_analytics_state(analytics_filters, library, analytics_scans);
+    app.replace_skill_suggestions(skill_suggestions);
     Ok(Startup {
         app,
         store,
@@ -424,7 +445,8 @@ fn reload_jobs(store: &Arc<Mutex<Store>>, app: &mut App) -> rusqlite::Result<()>
     let query = match app.view() {
         View::Active => JobQuery::active(),
         View::New => JobQuery::active(),
-        View::Analytics => JobQuery::active(),
+        View::Analytics => JobQuery::analytics(),
+        View::Library => JobQuery::all(),
         View::Applied => JobQuery::applied(),
         View::History => JobQuery::history(),
         View::Scans | View::Sources | View::Settings => JobQuery::all(),
@@ -432,13 +454,22 @@ fn reload_jobs(store: &Arc<Mutex<Store>>, app: &mut App) -> rusqlite::Result<()>
     let analytics_config = app.config().analytics.clone();
     let store = store.lock().unwrap();
     let jobs = store.list_jobs(query)?;
-    let facts = store.analytics_facts(&jobs, &analytics_config)?;
+    let facts = if app.view() == View::Analytics {
+        store.enriched_analytics_facts(&jobs, &analytics_config)?
+    } else {
+        store.analytics_facts(&jobs, &analytics_config)?
+    };
     let active_job_count = store.list_jobs(JobQuery::active())?.len();
     let scans = store.recent_scans()?;
     let sources = store.source_health()?;
+    let (analytics_filters, library) = store.analytics_state()?;
+    let analytics_scans = store.analytics_scans()?;
+    let skill_suggestions = store.skill_suggestions()?;
     drop(store);
     app.replace_jobs_with_facts(jobs, active_job_count, facts);
     app.replace_read_models(scans, sources);
+    app.replace_analytics_state(analytics_filters, library, analytics_scans);
+    app.replace_skill_suggestions(skill_suggestions);
     Ok(())
 }
 
@@ -468,6 +499,21 @@ fn execute_command(
             save_filters(filters.clone())?;
             app.apply_filters(filters);
             Ok(CommandEffect::FiltersChanged)
+        }
+        AppCommand::SaveAnalyticsState(filters, library) => {
+            store
+                .lock()
+                .unwrap()
+                .save_analytics_state(&filters, &library)?;
+            Ok(CommandEffect::Continue)
+        }
+        AppCommand::ReviewSkillSuggestion(name, status) => {
+            store
+                .lock()
+                .unwrap()
+                .review_skill_suggestion(&name, status)?;
+            reload_jobs(store, app)?;
+            Ok(CommandEffect::Continue)
         }
         AppCommand::StartScan => Ok(CommandEffect::StartScan),
         AppCommand::ReloadJobs => {

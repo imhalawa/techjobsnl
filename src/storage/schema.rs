@@ -81,6 +81,26 @@ pub(super) fn migrate(connection: &Connection) -> Result<()> {
             FOREIGN KEY (company_id, source_id, content_hash)
                 REFERENCES job_snapshots(company_id, source_id, content_hash)
         );
+
+        CREATE TABLE IF NOT EXISTS analytics_discovery (
+            cache_key TEXT PRIMARY KEY,
+            provider TEXT NOT NULL,
+            result_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS analytics_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            filters_json TEXT NOT NULL,
+            library_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS skill_suggestions (
+            name TEXT PRIMARY KEY,
+            aliases_json TEXT NOT NULL,
+            evidence_json TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+            created_at TEXT NOT NULL
+        );
         "#,
     )
 }

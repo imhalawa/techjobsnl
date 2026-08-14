@@ -40,13 +40,17 @@ Job eligibility is controlled by `[filters]` in `config.toml`. The shipped count
 
 ## Analytics
 
-The Analytics tab describes the currently observed jobs; it does not claim to represent the whole labour market. It shows native horizontal charts for configured skills and related-skill overlap, exact counts and denominators, extraction coverage, source health, remote mode, seniority, experience, education, employment type, and evidence from matching descriptions. It runs locally without an AI service or network request.
+The Analytics tab describes the observed postings; it does not claim to represent the whole labour market. Its Overview, Skills, Stacks, and Market sections combine tables with terminal charts. They show active demand, current-versus-previous posting momentum, role families, seniority, experience, work mode, employment, education, companies, common 2–5 skill stacks, personal learn-next signals, confidence, and exact evidence. The default window is 30 days. Use `t` for 7/30/90 days, `+`/`-` for a custom day count, `C`/`R`/`S`/`W` for shared filters, and `x` to clear filters.
 
-Edit `[analytics.skills]` in the user `config.toml` to add, remove, or rename canonical skill labels and their literal aliases. For example, `SQL = ["sql", "postgres", "postgresql"]`. Short aliases use word boundaries, so `Go` does not match `ongoing`. `analytics.minimum_cooccurrence` controls the minimum shared-job count for related skills; its default is 10.
+Matching is local by default and uses the versioned software-industry bank in `assets/software-skills.json`. The bank keeps canonical hard and soft skills plus developer-community acronyms and aliases observed in real job postings. Unknown words are never promoted to skills. `analytics.minimum_skill_occurrence` filters one-off matches, `analytics.maximum_skills` limits each skill list, and `analytics.minimum_cooccurrence` controls the minimum shared-job count for stacks.
+
+Set `analytics.provider` to `claude` or `codex` to optionally discover emerging terms with an installed, authenticated CLI. The app sends bounded job-description excerpts only when Analytics is opened, disables Claude tools or gives Codex an isolated empty working directory, validates strict JSON against exact posting text, and caches each attempt. Suggestions appear in Library → Skills for `a` approval or `d` rejection. They never change analytics automatically. Missing executables, invalid output, failure, and timeout safely fall back to the local bank. `analytics.ai_timeout_seconds` defaults to 60. No AI provider is required.
+
+The Library stores starred jobs, skills, stacks, roles, and companies in SQLite. Skill status can be Known, Learning, or Interested; saved roles can be marked as targets. Closed and reopened starred jobs remain visible.
 
 ## Local data
 
-The SQLite database is `.data/job-watch.sqlite3`, relative to the user configuration directory. It stores jobs, scan history, lifecycle changes, applied status, snapshots, and versioned analytics facts. Unchanged descriptions reuse their cached extraction.
+The SQLite database is `.data/job-watch.sqlite3`, relative to the user configuration directory. It stores jobs, scan history, lifecycle changes, applied status, snapshots, versioned analytics facts, persistent Analytics filters, the Library, and reviewed AI suggestions. Unchanged descriptions reuse their cached extraction.
 
 It is safe to delete the database while Job Watch is not running. Deletion permanently removes all local history and applied markers; the next run creates an empty database, and the next complete scan treats every eligible job as new.
 

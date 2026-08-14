@@ -21,26 +21,11 @@ include_title_patterns = [
 exclude_title_patterns = ["manager", "director", "product manager", "sales engineer", "support"]
 
 [analytics]
-minimum_cooccurrence = 10
-
-[analytics.skills]
-AWS = ["aws", "amazon web services"]
-Azure = ["azure"]
-"CI/CD" = ["ci/cd", "continuous integration"]
-Docker = ["docker"]
-GCP = ["gcp", "google cloud"]
-Go = ["go", "golang"]
-Java = ["java"]
-Kafka = ["kafka"]
-Kotlin = ["kotlin"]
-Kubernetes = ["kubernetes", "k8s"]
-".NET" = [".net", "dotnet", "asp.net", "aspnet", "c#"]
-Python = ["python"]
-React = ["react", "reactjs", "react.js"]
-Rust = ["rust"]
-SQL = ["sql", "postgres", "postgresql"]
-Terraform = ["terraform"]
-TypeScript = ["typescript"]
+provider = "local"
+minimum_skill_occurrence = 2
+maximum_skills = 50
+ai_timeout_seconds = 60
+minimum_cooccurrence = 3
 
 [ui]
 theme = "clean-dark"

@@ -10,11 +10,12 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    analytics::{self, JobFacts},
+    analytics::{self, JobFacts, SkillSuggestion, SuggestionStatus},
     config::{AnalyticsConfig, CompanyConfig},
     domain::{
         ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanFailure, SourceErrorKind,
     },
+    insights::{AnalyticsFilters, LibraryState},
 };
 
 use super::schema;
@@ -71,6 +72,7 @@ enum QueryKind {
     New,
     Applied,
     History,
+    Analytics,
     All,
 }
 
@@ -90,6 +92,10 @@ impl JobQuery {
 
     pub fn history() -> Self {
         Self(QueryKind::History)
+    }
+
+    pub fn analytics() -> Self {
+        Self(QueryKind::Analytics)
     }
 
     pub fn all() -> Self {
@@ -217,6 +223,7 @@ impl Store {
             QueryKind::History => {
                 "c.enabled = 1 AND j.eligible = 1 AND (j.source_open = 0 OR j.reopened_at IS NOT NULL)"
             }
+            QueryKind::Analytics => "c.enabled = 1 AND j.eligible = 1",
             QueryKind::All => "1 = 1",
         };
         let sql = format!(
@@ -241,9 +248,9 @@ impl Store {
     pub fn analytics_facts(
         &self,
         jobs: &[JobRecord],
-        config: &AnalyticsConfig,
+        _config: &AnalyticsConfig,
     ) -> Result<HashMap<JobKey, JobFacts>> {
-        let extractor_version = analytics::cache_version(config);
+        let extractor_version = analytics::cache_version();
         let mut select = self.connection.prepare(
             "SELECT j.content_hash, a.facts_json
              FROM jobs j
@@ -275,7 +282,7 @@ impl Store {
                     rusqlite::Error::FromSqlConversionFailure(1, Type::Text, Box::new(error))
                 })?,
                 None => {
-                    let facts = analytics::extract(job, &config.skills);
+                    let facts = analytics::extract(job);
                     insert.execute(params![
                         job.key.company_id,
                         job.key.source_id,
@@ -289,6 +296,101 @@ impl Store {
             facts_by_job.insert(job.key.clone(), facts);
         }
         Ok(facts_by_job)
+    }
+
+    pub fn enriched_analytics_facts(
+        &self,
+        jobs: &[JobRecord],
+        config: &AnalyticsConfig,
+    ) -> Result<HashMap<JobKey, JobFacts>> {
+        let mut facts = self.analytics_facts(jobs, config)?;
+        let approved = self
+            .skill_suggestions()?
+            .into_iter()
+            .filter(|item| item.status == SuggestionStatus::Approved)
+            .collect::<Vec<_>>();
+        analytics::apply_approved_suggestions(&mut facts, jobs, &approved);
+        if config.provider == crate::config::AnalyticsProvider::Local || jobs.is_empty() {
+            return Ok(facts);
+        }
+        let fingerprint = jobs
+            .iter()
+            .map(|job| {
+                format!(
+                    "{}/{}:{}",
+                    job.key.company_id, job.key.source_id, job.last_seen_at
+                )
+            })
+            .collect::<Vec<_>>();
+        let cache_key = analytics::discovery_cache_key(config, &fingerprint);
+        let seen = self
+            .connection
+            .query_row(
+                "SELECT 1 FROM analytics_discovery WHERE cache_key = ?1",
+                [&cache_key],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        if !seen && let Some((_, suggestions)) = analytics::discover_emerging_skills(config, jobs) {
+            for suggestion in &suggestions {
+                self.connection.execute(
+                    "INSERT OR IGNORE INTO skill_suggestions (
+                            name, aliases_json, evidence_json, status, created_at
+                         ) VALUES (?1, ?2, ?3, 'pending', ?4)",
+                    params![
+                        suggestion.name,
+                        json_text(suggestion),
+                        json_text(&suggestion.evidence),
+                        Utc::now().to_rfc3339(),
+                    ],
+                )?;
+            }
+            self.connection.execute(
+                "INSERT INTO analytics_discovery (cache_key, provider, result_json)
+                     VALUES (?1, ?2, ?3)",
+                params![cache_key, config.provider.as_str(), json_text(&suggestions)],
+            )?;
+        }
+        Ok(facts)
+    }
+
+    pub fn skill_suggestions(&self) -> Result<Vec<SkillSuggestion>> {
+        let mut statement = self.connection.prepare(
+            "SELECT aliases_json, status FROM skill_suggestions
+             ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+                      created_at DESC, name",
+        )?;
+        statement
+            .query_map([], |row| {
+                let json: String = row.get(0)?;
+                let mut suggestion =
+                    serde_json::from_str::<SkillSuggestion>(&json).map_err(|error| {
+                        rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(error))
+                    })?;
+                suggestion.status = match row.get::<_, String>(1)?.as_str() {
+                    "pending" => SuggestionStatus::Pending,
+                    "approved" => SuggestionStatus::Approved,
+                    "rejected" => SuggestionStatus::Rejected,
+                    value => {
+                        return Err(rusqlite::Error::FromSqlConversionFailure(
+                            1,
+                            Type::Text,
+                            format!("invalid suggestion status {value}").into(),
+                        ));
+                    }
+                };
+                Ok(suggestion)
+            })?
+            .collect()
+    }
+
+    pub fn review_skill_suggestion(&self, name: &str, status: SuggestionStatus) -> Result<()> {
+        self.connection.execute(
+            "UPDATE skill_suggestions SET status = ?2 WHERE name = ?1",
+            params![name, status.as_str()],
+        )?;
+        Ok(())
     }
 
     pub fn recent_scans(&self) -> Result<Vec<ScanReadModel>> {
@@ -305,6 +407,56 @@ impl Store {
         statement
             .query_map([], scan_read_model_from_row)?
             .collect::<Result<Vec<_>>>()
+    }
+
+    pub fn analytics_scans(&self) -> Result<Vec<ScanReadModel>> {
+        let mut statement = self.connection.prepare(
+            "SELECT
+                s.run_id, s.company_id, c.name, s.completed_at, s.outcome,
+                s.observed_count, s.error_kind, s.diagnostic
+             FROM scans s
+             JOIN companies c ON c.id = s.company_id
+             ORDER BY s.completed_at DESC, s.id DESC",
+        )?;
+        statement
+            .query_map([], scan_read_model_from_row)?
+            .collect::<Result<Vec<_>>>()
+    }
+
+    pub fn analytics_state(&self) -> Result<(AnalyticsFilters, LibraryState)> {
+        let stored = self
+            .connection
+            .query_row(
+                "SELECT filters_json, library_json FROM analytics_state WHERE id = 1",
+                [],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?;
+        stored.map_or_else(
+            || Ok((AnalyticsFilters::default(), LibraryState::default())),
+            |(filters, library)| {
+                Ok((
+                    parse_json_column(0, &filters)?,
+                    parse_json_column(1, &library)?,
+                ))
+            },
+        )
+    }
+
+    pub fn save_analytics_state(
+        &self,
+        filters: &AnalyticsFilters,
+        library: &LibraryState,
+    ) -> Result<()> {
+        self.connection.execute(
+            "INSERT INTO analytics_state (id, filters_json, library_json)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET
+                filters_json = excluded.filters_json,
+                library_json = excluded.library_json",
+            params![json_text(filters), json_text(library)],
+        )?;
+        Ok(())
     }
 
     pub fn source_health(&self) -> Result<Vec<SourceReadModel>> {
@@ -645,6 +797,12 @@ fn invalid_text(index: usize, field: &str, value: &str) -> rusqlite::Error {
 fn json_from_row<T: serde::de::DeserializeOwned>(row: &Row<'_>, index: usize) -> Result<T> {
     let value = row.get::<_, String>(index)?;
     serde_json::from_str(&value).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(index, Type::Text, Box::new(error))
+    })
+}
+
+fn parse_json_column<T: serde::de::DeserializeOwned>(index: usize, value: &str) -> Result<T> {
+    serde_json::from_str(value).map_err(|error| {
         rusqlite::Error::FromSqlConversionFailure(index, Type::Text, Box::new(error))
     })
 }

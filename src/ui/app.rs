@@ -1,13 +1,23 @@
-use std::{cell::Cell, collections::HashMap};
+use std::{
+    cell::Cell,
+    collections::HashMap,
+    time::{Duration as StdDuration, Instant},
+};
 
 use chrono::{Duration, Utc};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Constraint, Layout, Rect};
 
 use crate::{
-    analytics::{self, JobFacts, Seniority, SkillEvidence, WorkMode},
+    analytics::{
+        self, JobFacts, Seniority, SkillEvidence, SkillKind, SkillSuggestion, SuggestionStatus,
+        WorkMode,
+    },
     config::{Config, FiltersConfig},
     domain::{JobKey, JobRecord, ScanEvent, SourceScan},
+    insights::{
+        self, AnalyticsFilters, AnalyticsReport, LibraryState, MetricRow, SkillStatus, StackKey,
+    },
     storage::{ScanReadModel, SourceHealth, SourceReadModel},
 };
 
@@ -22,12 +32,75 @@ pub enum View {
     Scans,
     Sources,
     Analytics,
+    Library,
     Settings,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnalyticsTab {
+    Overview,
+    Skills,
+    Stacks,
+    Market,
+}
+
+impl AnalyticsTab {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Overview => "Overview",
+            Self::Skills => "Skills",
+            Self::Stacks => "Stacks",
+            Self::Market => "Market",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarketSection {
+    Roles,
+    Seniority,
+    Experience,
+    Work,
+    Companies,
+}
+
+impl MarketSection {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Roles => "Roles",
+            Self::Seniority => "Seniority",
+            Self::Experience => "Experience",
+            Self::Work => "Work",
+            Self::Companies => "Companies",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryTab {
+    Jobs,
+    Skills,
+    Stacks,
+    Roles,
+    Companies,
+}
+
+impl LibraryTab {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Jobs => "Jobs",
+            Self::Skills => "Skills",
+            Self::Stacks => "Stacks",
+            Self::Roles => "Roles",
+            Self::Companies => "Companies",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillStat {
     pub name: String,
+    pub kind: SkillKind,
     pub job_count: usize,
 }
 
@@ -83,7 +156,12 @@ pub enum Setting {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MouseTarget {
     Navigation(usize),
+    AnalyticsTab(usize),
+    MarketSection(usize),
+    LibraryTab(usize),
     Item(usize),
+    HardSkill(usize),
+    SoftSkill(usize),
     Evidence(usize),
     Details,
     Divider,
@@ -100,6 +178,8 @@ pub enum AppCommand {
     CopyUrl(String),
     ReloadJobs,
     SaveFilters(FiltersConfig),
+    SaveAnalyticsState(AnalyticsFilters, LibraryState),
+    ReviewSkillSuggestion(String, SuggestionStatus),
     Quit,
 }
 
@@ -125,6 +205,16 @@ pub struct App {
     focus: Focus,
     navigation_index: usize,
     selected_index: usize,
+    analytics_kind: SkillKind,
+    hard_skill_index: usize,
+    soft_skill_index: usize,
+    analytics_tab: AnalyticsTab,
+    market_section: MarketSection,
+    library_tab: LibraryTab,
+    analytics_filters: AnalyticsFilters,
+    library: LibraryState,
+    analytics_scans: Vec<ScanReadModel>,
+    skill_suggestions: Vec<SkillSuggestion>,
     evidence_index: usize,
     active_job_count: usize,
     company_filter: Option<String>,
@@ -141,11 +231,12 @@ pub struct App {
     scan_progress: ScanProgress,
     hovered: Option<MouseTarget>,
     pressed: Option<MouseTarget>,
+    last_list_scroll: Option<(isize, Instant)>,
 }
 
 impl App {
     pub fn new(config: Config, jobs: Vec<JobRecord>) -> Self {
-        let job_facts = extract_job_facts(&jobs, &config);
+        let job_facts = extract_job_facts(&jobs);
         Self::new_with_facts(config, jobs, job_facts)
     }
 
@@ -174,6 +265,16 @@ impl App {
             focus: Focus::Content,
             navigation_index: 0,
             selected_index: 0,
+            analytics_kind: SkillKind::Hard,
+            hard_skill_index: 0,
+            soft_skill_index: 0,
+            analytics_tab: AnalyticsTab::Overview,
+            market_section: MarketSection::Roles,
+            library_tab: LibraryTab::Jobs,
+            analytics_filters: AnalyticsFilters::default(),
+            library: LibraryState::default(),
+            analytics_scans: Vec::new(),
+            skill_suggestions: Vec::new(),
             evidence_index: 0,
             active_job_count,
             company_filter: None,
@@ -190,11 +291,12 @@ impl App {
             scan_progress: ScanProgress::default(),
             hovered: None,
             pressed: None,
+            last_list_scroll: None,
         }
     }
 
     pub fn replace_jobs(&mut self, jobs: Vec<JobRecord>, active_job_count: usize) {
-        let job_facts = extract_job_facts(&jobs, &self.config);
+        let job_facts = extract_job_facts(&jobs);
         self.replace_jobs_with_facts(jobs, active_job_count, job_facts);
     }
 
@@ -207,14 +309,22 @@ impl App {
         self.job_facts = job_facts;
         if matches!(
             self.view,
-            View::Scans | View::Sources | View::Analytics | View::Settings
+            View::Scans | View::Sources | View::Analytics | View::Library | View::Settings
         ) {
             self.jobs = jobs;
             self.active_job_count = active_job_count;
             if self.view == View::Analytics {
-                self.selected_index = self
-                    .selected_index
-                    .min(self.skill_stats().len().saturating_sub(1));
+                self.hard_skill_index = self.hard_skill_index.min(
+                    self.skill_stats_for(SkillKind::Hard)
+                        .len()
+                        .saturating_sub(1),
+                );
+                self.soft_skill_index = self.soft_skill_index.min(
+                    self.skill_stats_for(SkillKind::Soft)
+                        .len()
+                        .saturating_sub(1),
+                );
+                self.selected_index = self.analytics_skill_index(self.analytics_kind);
                 self.evidence_index = self
                     .evidence_index
                     .min(self.selected_skill_evidence().len().saturating_sub(1));
@@ -256,6 +366,214 @@ impl App {
             .unwrap_or_else(|| self.selected_index.min(self.item_count().saturating_sub(1)));
     }
 
+    pub fn replace_analytics_state(
+        &mut self,
+        filters: AnalyticsFilters,
+        library: LibraryState,
+        scans: Vec<ScanReadModel>,
+    ) {
+        self.analytics_filters = filters;
+        self.library = library;
+        self.analytics_scans = scans;
+        self.selected_index = self.selected_index.min(self.item_count().saturating_sub(1));
+    }
+
+    pub fn replace_skill_suggestions(&mut self, suggestions: Vec<SkillSuggestion>) {
+        self.skill_suggestions = suggestions;
+        self.selected_index = self.selected_index.min(self.item_count().saturating_sub(1));
+    }
+
+    pub fn analytics_filters(&self) -> &AnalyticsFilters {
+        &self.analytics_filters
+    }
+
+    pub fn library(&self) -> &LibraryState {
+        &self.library
+    }
+
+    pub fn analytics_tab(&self) -> AnalyticsTab {
+        self.analytics_tab
+    }
+
+    pub fn market_section(&self) -> MarketSection {
+        self.market_section
+    }
+
+    pub fn library_tab(&self) -> LibraryTab {
+        self.library_tab
+    }
+
+    pub fn analytics_report(&self) -> AnalyticsReport {
+        let mut report = AnalyticsReport::build(
+            &self.jobs,
+            &self.job_facts,
+            &self.analytics_scans,
+            &self.analytics_filters,
+            &self.library,
+            Utc::now(),
+            self.config.analytics.minimum_cooccurrence,
+        );
+        let minimum = self.config.analytics.minimum_skill_occurrence;
+        let maximum = self.config.analytics.maximum_skills;
+        report
+            .hard_skills
+            .retain(|item| item.metric.current_count >= minimum);
+        report
+            .soft_skills
+            .retain(|item| item.metric.current_count >= minimum);
+        report
+            .recommendations
+            .retain(|item| item.demand_count >= minimum);
+        report.hard_skills.truncate(maximum);
+        report.soft_skills.truncate(maximum);
+        report.recommendations.truncate(maximum);
+        report
+    }
+
+    pub fn market_rows(&self) -> Vec<MetricRow> {
+        let report = self.analytics_report();
+        match self.market_section {
+            MarketSection::Roles => report.roles,
+            MarketSection::Seniority => report.seniority,
+            MarketSection::Experience => report.experience,
+            MarketSection::Work => report
+                .work
+                .into_iter()
+                .chain(report.employment)
+                .chain(report.education)
+                .collect(),
+            MarketSection::Companies => report.companies,
+        }
+    }
+
+    pub fn analytics_evidence_jobs(&self) -> Vec<&JobRecord> {
+        let report = self.analytics_report();
+        let selected_skill = match self.analytics_tab {
+            AnalyticsTab::Overview => report
+                .recommendations
+                .get(self.selected_index)
+                .map(|item| item.skill.as_str()),
+            AnalyticsTab::Skills => {
+                let rows = match self.analytics_kind {
+                    SkillKind::Hard => &report.hard_skills,
+                    SkillKind::Soft => &report.soft_skills,
+                };
+                rows.get(self.selected_index)
+                    .map(|item| item.metric.name.as_str())
+            }
+            AnalyticsTab::Stacks | AnalyticsTab::Market => None,
+        };
+        let selected_stack = (self.analytics_tab == AnalyticsTab::Stacks)
+            .then(|| report.stacks.get(self.selected_index))
+            .flatten();
+        let selected_market = (self.analytics_tab == AnalyticsTab::Market)
+            .then(|| self.market_rows().get(self.selected_index).cloned())
+            .flatten();
+        self.jobs
+            .iter()
+            .filter(|job| job.source_open)
+            .filter(|job| {
+                self.job_facts.get(&job.key).is_some_and(|facts| {
+                    insights::matches_filters(job, facts, &self.analytics_filters)
+                })
+            })
+            .filter(|job| {
+                let Some(facts) = self.job_facts.get(&job.key) else {
+                    return false;
+                };
+                if let Some(skill) = selected_skill {
+                    return facts.skills.contains_key(skill);
+                }
+                if let Some(stack) = selected_stack {
+                    return stack
+                        .key
+                        .0
+                        .iter()
+                        .all(|skill| facts.skills.contains_key(skill));
+                }
+                let Some(metric) = &selected_market else {
+                    return false;
+                };
+                match self.market_section {
+                    MarketSection::Roles => facts.role_family == metric.name,
+                    MarketSection::Seniority => {
+                        insights::seniority_name(facts.seniority) == metric.name
+                    }
+                    MarketSection::Experience => insights::experience_bucket(facts) == metric.name,
+                    MarketSection::Work => {
+                        insights::work_mode_name(facts.work_mode) == metric.name
+                            || job.classified.observed.employment_type.as_deref()
+                                == Some(metric.name.as_str())
+                            || facts.education.as_ref().map_or(
+                                metric.name == "Not stated",
+                                |education| {
+                                    if education.allows_equivalent_experience {
+                                        metric.name == "Degree or equivalent experience"
+                                    } else {
+                                        metric.name == "Degree stated"
+                                    }
+                                },
+                            )
+                    }
+                    MarketSection::Companies => job.key.company_id == metric.name,
+                }
+            })
+            .collect()
+    }
+
+    pub fn analytics_evidence_text(&self, job: &JobRecord) -> String {
+        let Some(facts) = self.job_facts.get(&job.key) else {
+            return "No extracted evidence".to_owned();
+        };
+        let report = self.analytics_report();
+        let skill = match self.analytics_tab {
+            AnalyticsTab::Overview => report
+                .recommendations
+                .get(self.selected_index)
+                .map(|item| item.skill.as_str()),
+            AnalyticsTab::Skills => match self.analytics_kind {
+                SkillKind::Hard => report.hard_skills.get(self.selected_index),
+                SkillKind::Soft => report.soft_skills.get(self.selected_index),
+            }
+            .map(|item| item.metric.name.as_str()),
+            AnalyticsTab::Stacks | AnalyticsTab::Market => None,
+        };
+        if let Some(evidence) = skill.and_then(|name| facts.skills.get(name)) {
+            return evidence.context.clone();
+        }
+        if self.analytics_tab == AnalyticsTab::Stacks
+            && let Some(stack) = report.stacks.get(self.selected_index)
+        {
+            return stack
+                .key
+                .0
+                .iter()
+                .filter_map(|name| facts.skills.get(name))
+                .map(|evidence| evidence.context.as_str())
+                .collect::<Vec<_>>()
+                .join(" | ");
+        }
+        match self.market_section {
+            MarketSection::Roles | MarketSection::Seniority => {
+                format!("Job title: {}", job.classified.observed.title)
+            }
+            MarketSection::Experience => facts
+                .experience
+                .first()
+                .map(|fact| fact.evidence.clone())
+                .unwrap_or_else(|| "Experience not stated".to_owned()),
+            MarketSection::Work => facts
+                .education
+                .as_ref()
+                .map(|fact| fact.evidence.clone())
+                .or_else(|| job.classified.observed.employment_type.clone())
+                .unwrap_or_else(|| insights::work_mode_name(facts.work_mode).to_owned()),
+            MarketSection::Companies => {
+                format!("Company: {}", self.company_name(&job.key.company_id))
+            }
+        }
+    }
+
     pub fn handle_key(&mut self, key: KeyEvent) -> AppCommand {
         self.handle_key_with_width(key, u16::MAX)
     }
@@ -281,8 +599,28 @@ impl App {
         if self.focus == Focus::Navigation {
             return self.handle_navigation_key(key.code);
         }
+        if self.view == View::Analytics
+            && let Some(command) = self.handle_analytics_key(key.code)
+        {
+            return command;
+        }
+        if self.view == View::Library
+            && let Some(command) = self.handle_library_key(key.code)
+        {
+            return command;
+        }
 
         match key.code {
+            KeyCode::Left
+                if self.view == View::Analytics && self.analytics_tab == AnalyticsTab::Skills =>
+            {
+                self.select_analytics_kind(SkillKind::Hard)
+            }
+            KeyCode::Right
+                if self.view == View::Analytics && self.analytics_tab == AnalyticsTab::Skills =>
+            {
+                self.select_analytics_kind(SkillKind::Soft)
+            }
             KeyCode::Up | KeyCode::Char('k') => self.move_selection(-1),
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
             KeyCode::Char('J') if self.view == View::Analytics => self.move_evidence_selection(1),
@@ -300,10 +638,200 @@ impl App {
                 self.narrow_details_visible = !self.narrow_details_visible;
             }
             KeyCode::Enter => return self.open_selected(),
+            KeyCode::Char('*') => {
+                if let Some(key) = self.selected_job().map(|job| job.key.clone()) {
+                    if !self.library.jobs.remove(&key) {
+                        self.library.jobs.insert(key);
+                    }
+                    return self.save_analytics_state_command();
+                }
+            }
             KeyCode::Char(character) => return self.handle_action_key(character),
             _ => {}
         }
         AppCommand::None
+    }
+
+    fn handle_analytics_key(&mut self, code: KeyCode) -> Option<AppCommand> {
+        match code {
+            KeyCode::Char('[') => {
+                self.analytics_tab =
+                    ANALYTICS_TABS[analytics_tab_index(self.analytics_tab).saturating_sub(1)];
+                self.reset_analytics_selection();
+                Some(AppCommand::None)
+            }
+            KeyCode::Char(']') => {
+                self.analytics_tab = ANALYTICS_TABS
+                    [(analytics_tab_index(self.analytics_tab) + 1).min(ANALYTICS_TABS.len() - 1)];
+                self.reset_analytics_selection();
+                Some(AppCommand::None)
+            }
+            KeyCode::Char(value @ '1'..='4') => {
+                self.analytics_tab =
+                    ANALYTICS_TABS[(value as usize - '1' as usize).min(ANALYTICS_TABS.len() - 1)];
+                self.reset_analytics_selection();
+                Some(AppCommand::None)
+            }
+            KeyCode::Char('t') => {
+                self.analytics_filters.window_days = match self.analytics_filters.window_days {
+                    7 => 30,
+                    30 => 90,
+                    _ => 7,
+                };
+                self.selected_index = 0;
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('+') | KeyCode::Char('=') => {
+                self.analytics_filters.window_days =
+                    self.analytics_filters.window_days.saturating_add(1);
+                self.reset_analytics_selection();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('-') => {
+                self.analytics_filters.window_days =
+                    self.analytics_filters.window_days.saturating_sub(1).max(1);
+                self.reset_analytics_selection();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('C') => {
+                self.cycle_analytics_company();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('R') => {
+                self.cycle_analytics_role();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('S') => {
+                self.analytics_filters.seniority = cycle_option(
+                    self.analytics_filters.seniority,
+                    &[
+                        Seniority::Intern,
+                        Seniority::Junior,
+                        Seniority::Mid,
+                        Seniority::Senior,
+                        Seniority::Lead,
+                        Seniority::Manager,
+                        Seniority::Unknown,
+                    ],
+                );
+                self.reset_analytics_selection();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('W') => {
+                self.analytics_filters.work_mode = cycle_option(
+                    self.analytics_filters.work_mode,
+                    &[
+                        WorkMode::Remote,
+                        WorkMode::Hybrid,
+                        WorkMode::OnSite,
+                        WorkMode::Unknown,
+                    ],
+                );
+                self.reset_analytics_selection();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('x') => {
+                let window_days = self.analytics_filters.window_days;
+                self.analytics_filters = AnalyticsFilters {
+                    window_days,
+                    ..AnalyticsFilters::default()
+                };
+                self.reset_analytics_selection();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('*') => {
+                self.toggle_selected_analytics_item();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('m') if self.analytics_tab == AnalyticsTab::Skills => {
+                self.cycle_selected_skill_status();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Left if self.analytics_tab == AnalyticsTab::Skills => {
+                self.select_analytics_kind(SkillKind::Hard);
+                Some(AppCommand::None)
+            }
+            KeyCode::Right if self.analytics_tab == AnalyticsTab::Skills => {
+                self.select_analytics_kind(SkillKind::Soft);
+                Some(AppCommand::None)
+            }
+            KeyCode::Left if self.analytics_tab == AnalyticsTab::Market => {
+                self.market_section =
+                    MARKET_SECTIONS[market_section_index(self.market_section).saturating_sub(1)];
+                self.selected_index = 0;
+                Some(AppCommand::None)
+            }
+            KeyCode::Right if self.analytics_tab == AnalyticsTab::Market => {
+                self.market_section = MARKET_SECTIONS[(market_section_index(self.market_section)
+                    + 1)
+                .min(MARKET_SECTIONS.len() - 1)];
+                self.selected_index = 0;
+                Some(AppCommand::None)
+            }
+            _ => None,
+        }
+    }
+
+    fn handle_library_key(&mut self, code: KeyCode) -> Option<AppCommand> {
+        match code {
+            KeyCode::Char('[') => {
+                self.library_tab =
+                    LIBRARY_TABS[library_tab_index(self.library_tab).saturating_sub(1)];
+                self.selected_index = 0;
+                Some(AppCommand::None)
+            }
+            KeyCode::Char(']') => {
+                self.library_tab = LIBRARY_TABS
+                    [(library_tab_index(self.library_tab) + 1).min(LIBRARY_TABS.len() - 1)];
+                self.selected_index = 0;
+                Some(AppCommand::None)
+            }
+            KeyCode::Char(value @ '1'..='5') => {
+                self.library_tab =
+                    LIBRARY_TABS[(value as usize - '1' as usize).min(LIBRARY_TABS.len() - 1)];
+                self.selected_index = 0;
+                Some(AppCommand::None)
+            }
+            KeyCode::Char('*') => {
+                self.remove_selected_library_item();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('m') if self.library_tab == LibraryTab::Skills => {
+                self.cycle_selected_library_skill_status();
+                Some(self.save_analytics_state_command())
+            }
+            KeyCode::Char('a') if self.library_tab == LibraryTab::Skills => Some(
+                self.selected_pending_suggestion()
+                    .map_or(AppCommand::None, |item| {
+                        AppCommand::ReviewSkillSuggestion(
+                            item.name.clone(),
+                            SuggestionStatus::Approved,
+                        )
+                    }),
+            ),
+            KeyCode::Char('d') if self.library_tab == LibraryTab::Skills => Some(
+                self.selected_pending_suggestion()
+                    .map_or(AppCommand::None, |item| {
+                        AppCommand::ReviewSkillSuggestion(
+                            item.name.clone(),
+                            SuggestionStatus::Rejected,
+                        )
+                    }),
+            ),
+            KeyCode::Char('m') if self.library_tab == LibraryTab::Roles => {
+                if let Some((role, target)) = self
+                    .library
+                    .roles
+                    .iter()
+                    .nth(self.selected_index)
+                    .map(|(role, target)| (role.clone(), *target))
+                {
+                    self.library.roles.insert(role, !target);
+                }
+                Some(self.save_analytics_state_command())
+            }
+            _ => None,
+        }
     }
 
     pub fn handle_mouse(&mut self, mouse: MouseEvent, width: u16, height: u16) -> AppCommand {
@@ -417,7 +945,9 @@ impl App {
                 View::New => job.source_open && self.is_job_new(job),
                 View::Applied => job.applied_at.is_some(),
                 View::History => !job.source_open || job.reopened_at.is_some(),
-                View::Scans | View::Sources | View::Analytics | View::Settings => false,
+                View::Scans | View::Sources | View::Analytics | View::Library | View::Settings => {
+                    false
+                }
             };
             let in_company = self
                 .company_filter
@@ -492,7 +1022,49 @@ impl App {
     }
 
     pub fn selected_job(&self) -> Option<&JobRecord> {
+        if self.view == View::Library && self.library_tab == LibraryTab::Jobs {
+            return self.library_jobs().get(self.selected_index).copied();
+        }
         self.visible_jobs().nth(self.selected_index)
+    }
+
+    pub fn library_jobs(&self) -> Vec<&JobRecord> {
+        self.library
+            .jobs
+            .iter()
+            .filter_map(|key| self.jobs.iter().find(|job| &job.key == key))
+            .collect()
+    }
+
+    pub fn library_skills(&self) -> Vec<(&str, Option<SkillStatus>)> {
+        self.library
+            .skills
+            .iter()
+            .map(|(name, status)| (name.as_str(), *status))
+            .collect()
+    }
+
+    pub fn pending_skill_suggestions(&self) -> Vec<&SkillSuggestion> {
+        self.skill_suggestions
+            .iter()
+            .filter(|item| item.status == SuggestionStatus::Pending)
+            .collect()
+    }
+
+    pub fn library_stacks(&self) -> Vec<StackKey> {
+        self.library.stacks.iter().cloned().map(StackKey).collect()
+    }
+
+    pub fn library_roles(&self) -> Vec<(&str, bool)> {
+        self.library
+            .roles
+            .iter()
+            .map(|(name, target)| (name.as_str(), *target))
+            .collect()
+    }
+
+    pub fn library_companies(&self) -> Vec<&str> {
+        self.library.companies.iter().map(String::as_str).collect()
     }
 
     pub fn analytics_job_count(&self) -> usize {
@@ -500,19 +1072,43 @@ impl App {
     }
 
     pub fn skill_stats(&self) -> Vec<SkillStat> {
+        let mut stats = self.all_skill_stats();
+        stats.truncate(self.config.analytics.maximum_skills);
+        stats
+    }
+
+    pub fn skill_stats_for(&self, kind: SkillKind) -> Vec<SkillStat> {
+        self.all_skill_stats()
+            .into_iter()
+            .filter(|skill| skill.kind == kind)
+            .take(self.config.analytics.maximum_skills)
+            .collect()
+    }
+
+    fn all_skill_stats(&self) -> Vec<SkillStat> {
         let jobs = self.analytics_jobs().collect::<Vec<_>>();
-        let mut stats = self
-            .config
-            .analytics
-            .skills
-            .keys()
+        let names = jobs
+            .iter()
+            .filter_map(|job| self.job_facts.get(&job.key))
+            .flat_map(|facts| facts.skills.keys().cloned())
+            .collect::<std::collections::BTreeSet<_>>();
+        let mut stats = names
+            .into_iter()
             .filter_map(|name| {
                 let job_count = jobs
                     .iter()
-                    .filter(|job| self.job_has_skill(job, name))
+                    .filter(|job| self.job_has_skill(job, &name))
                     .count();
-                (job_count > 0).then(|| SkillStat {
-                    name: name.clone(),
+                let kind = jobs.iter().find_map(|job| {
+                    self.job_facts
+                        .get(&job.key)?
+                        .skills
+                        .get(&name)
+                        .map(|evidence| evidence.kind)
+                })?;
+                (job_count >= self.config.analytics.minimum_skill_occurrence).then_some(SkillStat {
+                    kind,
+                    name,
                     job_count,
                 })
             })
@@ -526,8 +1122,35 @@ impl App {
         stats
     }
 
+    pub fn analytics_skill_kind(&self) -> SkillKind {
+        self.analytics_kind
+    }
+
+    pub fn analytics_skill_index(&self, kind: SkillKind) -> usize {
+        match kind {
+            SkillKind::Hard => self.hard_skill_index,
+            SkillKind::Soft => self.soft_skill_index,
+        }
+    }
+
+    pub fn analytics_skill_job_count(&self, kind: SkillKind) -> usize {
+        self.analytics_jobs()
+            .filter(|job| {
+                self.job_facts.get(&job.key).is_some_and(|facts| {
+                    facts.skills.values().any(|evidence| evidence.kind == kind)
+                })
+            })
+            .count()
+    }
+
+    fn selected_skill(&self) -> Option<SkillStat> {
+        self.skill_stats_for(self.analytics_kind)
+            .get(self.selected_index)
+            .cloned()
+    }
+
     pub fn selected_skill_jobs(&self) -> Vec<&JobRecord> {
-        let Some(skill) = self.skill_stats().get(self.selected_index).cloned() else {
+        let Some(skill) = self.selected_skill() else {
             return Vec::new();
         };
         self.analytics_jobs()
@@ -536,7 +1159,7 @@ impl App {
     }
 
     pub fn selected_skill_evidence(&self) -> Vec<(&JobRecord, &SkillEvidence)> {
-        let Some(skill) = self.skill_stats().get(self.selected_index).cloned() else {
+        let Some(skill) = self.selected_skill() else {
             return Vec::new();
         };
         self.analytics_jobs()
@@ -551,7 +1174,7 @@ impl App {
     }
 
     pub fn related_skill_stats(&self) -> Vec<RelatedSkillStat> {
-        let Some(selected) = self.skill_stats().get(self.selected_index).cloned() else {
+        let Some(selected) = self.selected_skill() else {
             return Vec::new();
         };
         let jobs = self.analytics_jobs().collect::<Vec<_>>();
@@ -561,20 +1184,19 @@ impl App {
             .count();
         let minimum = self.config.analytics.minimum_cooccurrence;
         let mut related = self
-            .config
-            .analytics
-            .skills
-            .keys()
-            .filter(|name| *name != &selected.name)
+            .all_skill_stats()
+            .into_iter()
+            .map(|skill| skill.name)
+            .filter(|name| name != &selected.name)
             .filter_map(|name| {
                 let other_count = jobs
                     .iter()
-                    .filter(|job| self.job_has_skill(job, name))
+                    .filter(|job| self.job_has_skill(job, &name))
                     .count();
                 let job_count = jobs
                     .iter()
                     .filter(|job| {
-                        self.job_has_skill(job, &selected.name) && self.job_has_skill(job, name)
+                        self.job_has_skill(job, &selected.name) && self.job_has_skill(job, &name)
                     })
                     .count();
                 let union_count = selected_count + other_count - job_count;
@@ -644,14 +1266,31 @@ impl App {
     }
 
     pub fn analytics_coverage(&self) -> AnalyticsCoverage {
-        let jobs = self.analytics_jobs().collect::<Vec<_>>();
+        let jobs = self
+            .analytics_jobs()
+            .filter(|job| {
+                self.view != View::Analytics
+                    || self.job_facts.get(&job.key).is_some_and(|facts| {
+                        insights::matches_filters(job, facts, &self.analytics_filters)
+                    })
+            })
+            .collect::<Vec<_>>();
+        let relevant_source = |source: &&SourceReadModel| {
+            source.enabled
+                && self
+                    .analytics_filters
+                    .company
+                    .as_deref()
+                    .is_none_or(|company| source.company_id == company)
+        };
         let mut coverage = AnalyticsCoverage {
             total: jobs.len(),
-            enabled_sources: self.sources.iter().filter(|source| source.enabled).count(),
+            enabled_sources: self.sources.iter().filter(relevant_source).count(),
             healthy_sources: self
                 .sources
                 .iter()
-                .filter(|source| source.enabled && source.health == SourceHealth::Healthy)
+                .filter(relevant_source)
+                .filter(|source| source.health == SourceHealth::Healthy)
                 .count(),
             ..AnalyticsCoverage::default()
         };
@@ -868,49 +1507,20 @@ impl App {
                 }
             }
             View::Analytics => {
-                if width < 80 && !self.narrow_details_visible {
-                    return item_at(
-                        column,
-                        row,
-                        content,
-                        2,
-                        self.item_count(),
-                        self.selected_index,
-                    )
-                    .map(MouseTarget::Item);
-                }
-                let (list, details) = if width < 80 {
-                    (None, content)
+                let surface = if width >= 120 {
+                    Rect::new(22, 0, width.saturating_sub(22), content.height)
                 } else {
-                    let (list, details) = self.job_panes(content).expect("analytics panes");
-                    (Some(list), details)
+                    content
                 };
-                if let Some(list) = list
-                    && let Some(index) =
-                        item_at(column, row, list, 2, self.item_count(), self.selected_index)
-                {
-                    return Some(MouseTarget::Item(index));
-                }
-                let sections = Layout::vertical([
-                    Constraint::Length(8.min(details.height.saturating_sub(2))),
-                    Constraint::Length(8.min(details.height.saturating_sub(10))),
-                    Constraint::Fill(1),
-                ])
-                .split(details);
-                item_at(
-                    column,
-                    row,
-                    sections[2],
-                    2,
-                    self.selected_skill_evidence().len(),
-                    self.evidence_index,
-                )
-                .map(MouseTarget::Evidence)
-                .or_else(|| {
-                    details
-                        .contains((column, row).into())
-                        .then_some(MouseTarget::Details)
-                })
+                self.analytics_surface_target(column, row, surface)
+            }
+            View::Library => {
+                let surface = if width >= 120 {
+                    Rect::new(22, 0, width.saturating_sub(22), content.height)
+                } else {
+                    content
+                };
+                self.library_surface_target(column, row, surface)
             }
             _ if width >= 120 => {
                 let (list, details) = self.job_panes(content).expect("wide job panes");
@@ -959,12 +1569,39 @@ impl App {
                 self.focus = Focus::Navigation;
                 self.navigation_index = index;
             }
+            Some(MouseTarget::AnalyticsTab(index)) => {
+                self.focus = Focus::Content;
+                self.analytics_tab = ANALYTICS_TABS[index.min(ANALYTICS_TABS.len() - 1)];
+                self.reset_analytics_selection();
+            }
+            Some(MouseTarget::MarketSection(index)) => {
+                self.focus = Focus::Content;
+                self.market_section = MARKET_SECTIONS[index.min(MARKET_SECTIONS.len() - 1)];
+                self.reset_analytics_selection();
+            }
+            Some(MouseTarget::LibraryTab(index)) => {
+                self.focus = Focus::Content;
+                self.library_tab = LIBRARY_TABS[index.min(LIBRARY_TABS.len() - 1)];
+                self.selected_index = 0;
+            }
             Some(MouseTarget::Item(index)) => {
                 self.focus = Focus::Content;
                 if self.selected_index != index {
                     self.selected_index = index;
                     self.reset_detail_scroll();
                 }
+            }
+            Some(MouseTarget::HardSkill(index)) => {
+                self.select_analytics_kind(SkillKind::Hard);
+                self.selected_index = index;
+                self.hard_skill_index = index;
+                self.reset_detail_scroll();
+            }
+            Some(MouseTarget::SoftSkill(index)) => {
+                self.select_analytics_kind(SkillKind::Soft);
+                self.selected_index = index;
+                self.soft_skill_index = index;
+                self.reset_detail_scroll();
             }
             Some(MouseTarget::Evidence(index)) => {
                 self.focus = Focus::Content;
@@ -982,6 +1619,11 @@ impl App {
     fn activate_mouse_target(&mut self, target: Option<MouseTarget>) -> AppCommand {
         match target {
             Some(MouseTarget::Navigation(_)) => self.activate_navigation(),
+            Some(
+                MouseTarget::AnalyticsTab(_)
+                | MouseTarget::MarketSection(_)
+                | MouseTarget::LibraryTab(_),
+            ) => AppCommand::None,
             Some(MouseTarget::Setting(_)) if self.input_mode == InputMode::Normal => {
                 self.start_setting_edit();
                 AppCommand::None
@@ -1007,11 +1649,36 @@ impl App {
                     (self.navigation_index + 1).min(VIEWS.len() - 1)
                 };
             }
+            Some(
+                MouseTarget::AnalyticsTab(_)
+                | MouseTarget::MarketSection(_)
+                | MouseTarget::LibraryTab(_),
+            ) => {}
             Some(MouseTarget::Item(_)) => {
+                if !self.accept_list_scroll(direction) {
+                    return;
+                }
                 self.focus = Focus::Content;
                 self.move_selection(direction);
             }
+            Some(MouseTarget::HardSkill(_)) => {
+                if !self.accept_list_scroll(direction) {
+                    return;
+                }
+                self.select_analytics_kind(SkillKind::Hard);
+                self.move_selection(direction);
+            }
+            Some(MouseTarget::SoftSkill(_)) => {
+                if !self.accept_list_scroll(direction) {
+                    return;
+                }
+                self.select_analytics_kind(SkillKind::Soft);
+                self.move_selection(direction);
+            }
             Some(MouseTarget::Evidence(_)) => {
+                if !self.accept_list_scroll(direction) {
+                    return;
+                }
                 self.focus = Focus::Content;
                 self.move_evidence_selection(direction);
             }
@@ -1020,7 +1687,10 @@ impl App {
                 self.scroll_details(direction * 3);
             }
             Some(MouseTarget::Divider) => {}
-            Some(MouseTarget::Setting(_)) => self.move_selection(direction),
+            Some(MouseTarget::Setting(_)) if self.accept_list_scroll(direction) => {
+                self.move_selection(direction)
+            }
+            Some(MouseTarget::Setting(_)) => {}
             Some(MouseTarget::Help) | None => {}
         }
     }
@@ -1073,12 +1743,178 @@ impl App {
         } else {
             self.selected_index.saturating_add(1).min(last)
         };
+        if self.view == View::Analytics {
+            match self.analytics_kind {
+                SkillKind::Hard => self.hard_skill_index = self.selected_index,
+                SkillKind::Soft => self.soft_skill_index = self.selected_index,
+            }
+        }
         self.evidence_index = 0;
         self.reset_detail_scroll();
     }
 
+    fn select_analytics_kind(&mut self, kind: SkillKind) {
+        if self.analytics_kind == kind {
+            return;
+        }
+        match self.analytics_kind {
+            SkillKind::Hard => self.hard_skill_index = self.selected_index,
+            SkillKind::Soft => self.soft_skill_index = self.selected_index,
+        }
+        self.analytics_kind = kind;
+        self.selected_index = self.analytics_skill_index(kind);
+        self.evidence_index = 0;
+        self.reset_detail_scroll();
+    }
+
+    fn reset_analytics_selection(&mut self) {
+        self.selected_index = 0;
+        self.evidence_index = 0;
+        self.reset_detail_scroll();
+    }
+
+    fn save_analytics_state_command(&self) -> AppCommand {
+        AppCommand::SaveAnalyticsState(self.analytics_filters.clone(), self.library.clone())
+    }
+
+    fn selected_analytics_skill_name(&self) -> Option<String> {
+        let report = self.analytics_report();
+        let rows = match self.analytics_kind {
+            SkillKind::Hard => &report.hard_skills,
+            SkillKind::Soft => &report.soft_skills,
+        };
+        rows.get(self.selected_index)
+            .map(|skill| skill.metric.name.clone())
+    }
+
+    fn toggle_selected_analytics_item(&mut self) {
+        let report = self.analytics_report();
+        match self.analytics_tab {
+            AnalyticsTab::Overview => {
+                if let Some(skill) = report
+                    .recommendations
+                    .get(self.selected_index)
+                    .map(|item| item.skill.clone())
+                {
+                    toggle_map_key(&mut self.library.skills, skill, None);
+                }
+            }
+            AnalyticsTab::Skills => {
+                if let Some(skill) = self.selected_analytics_skill_name() {
+                    toggle_map_key(&mut self.library.skills, skill, None);
+                }
+            }
+            AnalyticsTab::Stacks => {
+                if let Some(stack) = report
+                    .stacks
+                    .get(self.selected_index)
+                    .map(|item| item.key.0.clone())
+                    && !self.library.stacks.remove(&stack)
+                {
+                    self.library.stacks.insert(stack);
+                }
+            }
+            AnalyticsTab::Market => match self.market_section {
+                MarketSection::Roles => {
+                    if let Some(role) = report
+                        .roles
+                        .get(self.selected_index)
+                        .map(|item| item.name.clone())
+                    {
+                        toggle_map_key(&mut self.library.roles, role, false);
+                    }
+                }
+                MarketSection::Companies => {
+                    if let Some(company) = report
+                        .companies
+                        .get(self.selected_index)
+                        .map(|item| item.name.clone())
+                        && !self.library.companies.remove(&company)
+                    {
+                        self.library.companies.insert(company);
+                    }
+                }
+                MarketSection::Seniority | MarketSection::Experience | MarketSection::Work => {}
+            },
+        }
+    }
+
+    fn cycle_selected_skill_status(&mut self) {
+        if let Some(skill) = self.selected_analytics_skill_name() {
+            cycle_skill_status(&mut self.library.skills, skill);
+        }
+    }
+
+    fn cycle_selected_library_skill_status(&mut self) {
+        let index = self
+            .selected_index
+            .saturating_sub(self.pending_skill_suggestions().len());
+        if let Some(skill) = self.library.skills.keys().nth(index).cloned() {
+            cycle_skill_status(&mut self.library.skills, skill);
+        }
+    }
+
+    fn selected_pending_suggestion(&self) -> Option<&SkillSuggestion> {
+        self.pending_skill_suggestions()
+            .get(self.selected_index)
+            .copied()
+    }
+
+    fn remove_selected_library_item(&mut self) {
+        match self.library_tab {
+            LibraryTab::Jobs => {
+                if let Some(key) = self.library.jobs.iter().nth(self.selected_index).cloned() {
+                    self.library.jobs.remove(&key);
+                }
+            }
+            LibraryTab::Skills => {
+                let index = self
+                    .selected_index
+                    .saturating_sub(self.pending_skill_suggestions().len());
+                if self.selected_index >= self.pending_skill_suggestions().len()
+                    && let Some(name) = self.library.skills.keys().nth(index).cloned()
+                {
+                    self.library.skills.remove(&name);
+                }
+            }
+            LibraryTab::Stacks => {
+                if let Some(stack) = self.library.stacks.iter().nth(self.selected_index).cloned() {
+                    self.library.stacks.remove(&stack);
+                }
+            }
+            LibraryTab::Roles => {
+                if let Some(role) = self.library.roles.keys().nth(self.selected_index).cloned() {
+                    self.library.roles.remove(&role);
+                }
+            }
+            LibraryTab::Companies => {
+                if let Some(company) = self
+                    .library
+                    .companies
+                    .iter()
+                    .nth(self.selected_index)
+                    .cloned()
+                {
+                    self.library.companies.remove(&company);
+                }
+            }
+        }
+        self.selected_index = self.selected_index.min(self.item_count().saturating_sub(1));
+    }
+
+    fn accept_list_scroll(&mut self, direction: isize) -> bool {
+        let now = Instant::now();
+        if self.last_list_scroll.is_some_and(|(previous, at)| {
+            previous == direction && now.duration_since(at) < StdDuration::from_millis(50)
+        }) {
+            return false;
+        }
+        self.last_list_scroll = Some((direction, now));
+        true
+    }
+
     fn move_evidence_selection(&mut self, direction: isize) {
-        let last = self.selected_skill_evidence().len().saturating_sub(1);
+        let last = self.analytics_evidence_jobs().len().saturating_sub(1);
         self.evidence_index = if direction < 0 {
             self.evidence_index.saturating_sub(1)
         } else {
@@ -1106,7 +1942,33 @@ impl App {
         match self.view {
             View::Scans => self.scans.len(),
             View::Sources => self.sources.len(),
-            View::Analytics => self.skill_stats().len(),
+            View::Analytics => {
+                let report = self.analytics_report();
+                match self.analytics_tab {
+                    AnalyticsTab::Overview => report.recommendations.len(),
+                    AnalyticsTab::Skills => match self.analytics_kind {
+                        SkillKind::Hard => report.hard_skills.len(),
+                        SkillKind::Soft => report.soft_skills.len(),
+                    },
+                    AnalyticsTab::Stacks => report.stacks.len(),
+                    AnalyticsTab::Market => match self.market_section {
+                        MarketSection::Roles => report.roles.len(),
+                        MarketSection::Seniority => report.seniority.len(),
+                        MarketSection::Experience => report.experience.len(),
+                        MarketSection::Work => report.work.len() + report.education.len(),
+                        MarketSection::Companies => report.companies.len(),
+                    },
+                }
+            }
+            View::Library => match self.library_tab {
+                LibraryTab::Jobs => self.library.jobs.len(),
+                LibraryTab::Skills => {
+                    self.pending_skill_suggestions().len() + self.library.skills.len()
+                }
+                LibraryTab::Stacks => self.library.stacks.len(),
+                LibraryTab::Roles => self.library.roles.len(),
+                LibraryTab::Companies => self.library.companies.len(),
+            },
             View::Settings => SETTINGS.len(),
             _ => self.visible_jobs().count(),
         }
@@ -1221,9 +2083,9 @@ impl App {
     }
 
     fn open_selected_evidence(&self) -> AppCommand {
-        self.selected_skill_evidence()
+        self.analytics_evidence_jobs()
             .get(self.evidence_index)
-            .map_or(AppCommand::None, |(job, _)| {
+            .map_or(AppCommand::None, |job| {
                 AppCommand::OpenUrl(job.classified.observed.job_url.clone())
             })
     }
@@ -1231,9 +2093,9 @@ impl App {
     fn copy_selected(&self) -> AppCommand {
         if self.view == View::Analytics {
             return self
-                .selected_skill_evidence()
+                .analytics_evidence_jobs()
                 .get(self.evidence_index)
-                .map_or(AppCommand::None, |(job, _)| {
+                .map_or(AppCommand::None, |job| {
                     AppCommand::CopyUrl(job.classified.observed.job_url.clone())
                 });
         }
@@ -1244,6 +2106,9 @@ impl App {
 
     fn reset_view_state(&mut self) {
         self.selected_index = 0;
+        self.analytics_kind = SkillKind::Hard;
+        self.hard_skill_index = 0;
+        self.soft_skill_index = 0;
         self.evidence_index = 0;
         self.reset_detail_scroll();
         self.narrow_details_visible = false;
@@ -1308,6 +2173,163 @@ impl App {
         })
     }
 
+    fn analytics_surface_target(&self, column: u16, row: u16, area: Rect) -> Option<MouseTarget> {
+        if row == area.y {
+            return tab_at_widths(column, area.x, &[13, 11, 11, 11]).map(MouseTarget::AnalyticsTab);
+        }
+        let main = Rect::new(
+            area.x,
+            area.y.saturating_add(2),
+            area.width,
+            area.height.saturating_sub(2),
+        );
+        if area.width < 90 && self.narrow_details_visible {
+            return item_at(
+                column,
+                row,
+                main,
+                2,
+                self.analytics_evidence_jobs().len(),
+                self.evidence_index,
+            )
+            .map(MouseTarget::Evidence);
+        }
+        let (surface, evidence) = if area.width >= 90 {
+            let panes =
+                Layout::horizontal([Constraint::Percentage(64), Constraint::Fill(1)]).split(main);
+            (panes[0], Some(panes[1]))
+        } else {
+            (main, None)
+        };
+        if let Some(evidence) = evidence
+            && evidence.contains((column, row).into())
+        {
+            return item_at(
+                column,
+                row,
+                evidence,
+                2,
+                self.analytics_evidence_jobs().len(),
+                self.evidence_index,
+            )
+            .map(MouseTarget::Evidence)
+            .or(Some(MouseTarget::Details));
+        }
+        match self.analytics_tab {
+            AnalyticsTab::Overview => {
+                let sections = Layout::vertical([Constraint::Percentage(48), Constraint::Fill(1)])
+                    .split(surface);
+                table_item_at(
+                    column,
+                    row,
+                    sections[1],
+                    self.item_count(),
+                    self.selected_index,
+                )
+                .map(MouseTarget::Item)
+            }
+            AnalyticsTab::Skills => {
+                let sections = Layout::vertical([Constraint::Percentage(68), Constraint::Fill(1)])
+                    .split(surface);
+                let panes = Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)])
+                    .split(sections[0]);
+                let report = self.analytics_report();
+                table_item_at(
+                    column,
+                    row,
+                    panes[0],
+                    report.hard_skills.len(),
+                    self.hard_skill_index,
+                )
+                .map(MouseTarget::HardSkill)
+                .or_else(|| {
+                    table_item_at(
+                        column,
+                        row,
+                        panes[1],
+                        report.soft_skills.len(),
+                        self.soft_skill_index,
+                    )
+                    .map(MouseTarget::SoftSkill)
+                })
+            }
+            AnalyticsTab::Stacks => {
+                let sections = Layout::vertical([Constraint::Percentage(68), Constraint::Fill(1)])
+                    .split(surface);
+                table_item_at(
+                    column,
+                    row,
+                    sections[0],
+                    self.item_count(),
+                    self.selected_index,
+                )
+                .map(MouseTarget::Item)
+            }
+            AnalyticsTab::Market => {
+                let sections =
+                    Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).split(surface);
+                if sections[0].contains((column, row).into()) {
+                    return tab_at_widths(column, sections[0].x, &[7, 11, 12, 6, 11])
+                        .map(MouseTarget::MarketSection);
+                }
+                let panes = Layout::horizontal([Constraint::Percentage(62), Constraint::Fill(1)])
+                    .split(sections[1]);
+                table_item_at(
+                    column,
+                    row,
+                    panes[0],
+                    self.item_count(),
+                    self.selected_index,
+                )
+                .map(MouseTarget::Item)
+            }
+        }
+    }
+
+    fn library_surface_target(&self, column: u16, row: u16, area: Rect) -> Option<MouseTarget> {
+        if row == area.y {
+            return tab_at_widths(column, area.x, &[9, 11, 11, 10, 14])
+                .map(MouseTarget::LibraryTab);
+        }
+        let list = Rect::new(
+            area.x,
+            area.y.saturating_add(1),
+            area.width,
+            area.height.saturating_sub(1),
+        );
+        if self.library_tab == LibraryTab::Jobs {
+            item_at(column, row, list, 2, self.item_count(), self.selected_index)
+        } else {
+            table_item_at(column, row, list, self.item_count(), self.selected_index)
+        }
+        .map(MouseTarget::Item)
+    }
+
+    fn cycle_analytics_company(&mut self) {
+        let values = self
+            .jobs
+            .iter()
+            .map(|job| job.key.company_id.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        self.analytics_filters.company =
+            cycle_owned(self.analytics_filters.company.take(), &values);
+        self.reset_analytics_selection();
+    }
+
+    fn cycle_analytics_role(&mut self) {
+        let values = self
+            .job_facts
+            .values()
+            .map(|facts| facts.role_family.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        self.analytics_filters.role = cycle_owned(self.analytics_filters.role.take(), &values);
+        self.reset_analytics_selection();
+    }
+
     fn job_has_skill(&self, job: &JobRecord, skill: &str) -> bool {
         self.job_facts
             .get(&job.key)
@@ -1315,7 +2337,22 @@ impl App {
     }
 }
 
-const VIEWS: [View; 8] = [
+fn cycle_option<T: Copy + PartialEq>(current: Option<T>, values: &[T]) -> Option<T> {
+    current
+        .and_then(|value| values.iter().position(|item| *item == value))
+        .and_then(|index| values.get(index + 1).copied())
+        .or_else(|| current.is_none().then(|| values.first().copied()).flatten())
+}
+
+fn cycle_owned(current: Option<String>, values: &[String]) -> Option<String> {
+    current
+        .as_ref()
+        .and_then(|value| values.iter().position(|item| item == value))
+        .and_then(|index| values.get(index + 1).cloned())
+        .or_else(|| current.is_none().then(|| values.first().cloned()).flatten())
+}
+
+const VIEWS: [View; 9] = [
     View::Active,
     View::New,
     View::Applied,
@@ -1323,7 +2360,31 @@ const VIEWS: [View; 8] = [
     View::Scans,
     View::Sources,
     View::Analytics,
+    View::Library,
     View::Settings,
+];
+
+const ANALYTICS_TABS: [AnalyticsTab; 4] = [
+    AnalyticsTab::Overview,
+    AnalyticsTab::Skills,
+    AnalyticsTab::Stacks,
+    AnalyticsTab::Market,
+];
+
+const MARKET_SECTIONS: [MarketSection; 5] = [
+    MarketSection::Roles,
+    MarketSection::Seniority,
+    MarketSection::Experience,
+    MarketSection::Work,
+    MarketSection::Companies,
+];
+
+const LIBRARY_TABS: [LibraryTab; 5] = [
+    LibraryTab::Jobs,
+    LibraryTab::Skills,
+    LibraryTab::Stacks,
+    LibraryTab::Roles,
+    LibraryTab::Companies,
 ];
 
 const SETTINGS: [Setting; 4] = [
@@ -1364,6 +2425,44 @@ fn view_index(view: View) -> usize {
         .unwrap_or(0)
 }
 
+fn analytics_tab_index(tab: AnalyticsTab) -> usize {
+    ANALYTICS_TABS
+        .iter()
+        .position(|candidate| *candidate == tab)
+        .unwrap_or(0)
+}
+
+fn market_section_index(section: MarketSection) -> usize {
+    MARKET_SECTIONS
+        .iter()
+        .position(|candidate| *candidate == section)
+        .unwrap_or(0)
+}
+
+fn library_tab_index(tab: LibraryTab) -> usize {
+    LIBRARY_TABS
+        .iter()
+        .position(|candidate| *candidate == tab)
+        .unwrap_or(0)
+}
+
+fn toggle_map_key<T>(map: &mut std::collections::BTreeMap<String, T>, key: String, value: T) {
+    if map.remove(&key).is_none() {
+        map.insert(key, value);
+    }
+}
+
+fn cycle_skill_status(
+    skills: &mut std::collections::BTreeMap<String, Option<SkillStatus>>,
+    skill: String,
+) {
+    let next = match skills.get(&skill).copied().flatten() {
+        None => Some(SkillStatus::Known),
+        Some(status) => status.next(),
+    };
+    skills.insert(skill, next);
+}
+
 fn split_setting(value: &str, separator: char) -> Vec<String> {
     value
         .split(separator)
@@ -1373,15 +2472,24 @@ fn split_setting(value: &str, separator: char) -> Vec<String> {
         .collect()
 }
 
-fn extract_job_facts(jobs: &[JobRecord], config: &Config) -> HashMap<JobKey, JobFacts> {
+fn extract_job_facts(jobs: &[JobRecord]) -> HashMap<JobKey, JobFacts> {
     jobs.iter()
-        .map(|job| {
-            (
-                job.key.clone(),
-                analytics::extract(job, &config.analytics.skills),
-            )
-        })
+        .map(|job| (job.key.clone(), analytics::extract(job)))
         .collect()
+}
+
+#[cfg(any())]
+pub(super) fn analytics_skill_panes(area: Rect) -> [Rect; 2] {
+    let left_width = area.width / 2;
+    [
+        Rect::new(area.x, area.y, left_width, area.height),
+        Rect::new(
+            area.x.saturating_add(left_width),
+            area.y,
+            area.width.saturating_sub(left_width),
+            area.height,
+        ),
+    ]
 }
 
 fn item_at(
@@ -1400,6 +2508,18 @@ fn item_at(
     let first_visible = selected_index.saturating_sub(visible_count.saturating_sub(1));
     let index = first_visible + usize::from((row - inner.y) / item_height);
     (index < item_count).then_some(index)
+}
+
+fn tab_at_widths(column: u16, origin: u16, widths: &[u16]) -> Option<usize> {
+    if column < origin {
+        return None;
+    }
+    let offset = column - origin;
+    let mut end = 0;
+    widths.iter().position(|width| {
+        end += width;
+        offset < end
+    })
 }
 
 fn table_item_at(

@@ -4,10 +4,12 @@ use chrono::{DateTime, TimeZone, Utc};
 use job_watch::{
     config::{AnalyticsConfig, CompanyConfig, SourceConfig},
     domain::{ClassifiedJob, Eligibility, JobKey, ObservedJob, ScanFailure, SourceErrorKind},
+    insights::{AnalyticsFilters, LibraryState, SkillStatus},
     storage::{JobQuery, ScanOutcome, SourceHealth, Store},
 };
 use rusqlite::Connection;
 use serde_json::json;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn at(hour: u32) -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 8, 11, hour, 0, 0).unwrap()
@@ -242,7 +244,7 @@ fn snapshots_ignore_raw_payload_churn_and_capture_changed_descriptions() {
 }
 
 #[test]
-fn analytics_facts_are_cached_by_content_and_matcher_version() {
+fn analytics_facts_are_cached_by_content_and_extractor_version() {
     let path = tempfile::NamedTempFile::new().unwrap();
     let company = mollie_config();
     let mut observed = job("1");
@@ -256,29 +258,16 @@ fn analytics_facts_are_cached_by_content_and_matcher_version() {
         .unwrap();
     let jobs = store.list_jobs(JobQuery::active()).unwrap();
 
-    let first = AnalyticsConfig {
-        skills: std::collections::BTreeMap::from([("Python".into(), vec!["python".into()])]),
-        ..AnalyticsConfig::default()
-    };
+    let first = AnalyticsConfig::default();
     let first_facts = store.analytics_facts(&jobs, &first).unwrap();
     assert!(first_facts[&jobs[0].key].skills.contains_key("Python"));
     store.analytics_facts(&jobs, &first).unwrap();
-
-    let mut renamed = first.clone();
-    renamed.skills =
-        std::collections::BTreeMap::from([("Python language".into(), vec!["python".into()])]);
-    let renamed_facts = store.analytics_facts(&jobs, &renamed).unwrap();
-    assert!(
-        renamed_facts[&jobs[0].key]
-            .skills
-            .contains_key("Python language")
-    );
 
     let cache_rows: i64 = Connection::open(path.path())
         .unwrap()
         .query_row("SELECT COUNT(*) FROM job_analytics", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(cache_rows, 2);
+    assert_eq!(cache_rows, 1);
 }
 
 #[test]
@@ -430,4 +419,29 @@ fn syncing_a_removed_company_disables_it_without_deleting_history_or_applied_sta
     assert_eq!(stored.len(), 1);
     assert!(stored[0].applied_at.is_some());
     assert_eq!(store.recent_scans().unwrap().len(), 1);
+}
+
+#[test]
+fn analytics_filters_and_library_survive_reopening_the_database() {
+    let path = tempfile::NamedTempFile::new().unwrap();
+    let store = Store::open(path.path()).unwrap();
+    let filters = AnalyticsFilters {
+        window_days: 90,
+        company: Some("mollie".into()),
+        role: Some("Backend".into()),
+        seniority: None,
+        work_mode: None,
+    };
+    let library = LibraryState {
+        jobs: BTreeSet::from([JobKey::new("mollie", "1")]),
+        skills: BTreeMap::from([("Rust".into(), Some(SkillStatus::Learning))]),
+        stacks: BTreeSet::from([["Rust".into(), "AWS".into()].into()]),
+        roles: BTreeMap::from([("Backend".into(), true)]),
+        companies: BTreeSet::from(["mollie".into()]),
+    };
+    store.save_analytics_state(&filters, &library).unwrap();
+    drop(store);
+
+    let store = Store::open(path.path()).unwrap();
+    assert_eq!(store.analytics_state().unwrap(), (filters, library));
 }

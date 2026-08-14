@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs,
-    path::Path,
-};
+use std::{collections::HashMap, fs, path::Path};
 
 use ratatui::style::Color;
 use regex::RegexBuilder;
@@ -406,16 +402,34 @@ fn default_new_job_max_age_days() -> u32 {
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct AnalyticsConfig {
-    #[serde(default = "default_skill_aliases")]
-    pub skills: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
+    pub provider: AnalyticsProvider,
+    #[serde(default = "default_minimum_skill_occurrence")]
+    pub minimum_skill_occurrence: usize,
+    #[serde(default = "default_maximum_skills")]
+    pub maximum_skills: usize,
+    #[serde(default = "default_ai_timeout_seconds")]
+    pub ai_timeout_seconds: u64,
     #[serde(default = "default_minimum_cooccurrence")]
     pub minimum_cooccurrence: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AnalyticsProvider {
+    #[default]
+    Local,
+    Claude,
+    Codex,
 }
 
 impl Default for AnalyticsConfig {
     fn default() -> Self {
         Self {
-            skills: default_skill_aliases(),
+            provider: AnalyticsProvider::Local,
+            minimum_skill_occurrence: default_minimum_skill_occurrence(),
+            maximum_skills: default_maximum_skills(),
+            ai_timeout_seconds: default_ai_timeout_seconds(),
             minimum_cooccurrence: default_minimum_cooccurrence(),
         }
     }
@@ -429,56 +443,51 @@ impl AnalyticsConfig {
                 "must be greater than zero",
             ));
         }
-        for (skill, aliases) in &self.skills {
-            if skill.trim().is_empty() {
+        for (field, value) in [
+            ("minimum_skill_occurrence", self.minimum_skill_occurrence),
+            ("maximum_skills", self.maximum_skills),
+        ] {
+            if value == 0 {
                 return Err(ConfigError::invalid(
-                    "analytics.skills",
-                    "skill names must not be empty",
+                    format!("analytics.{field}"),
+                    "must be greater than zero",
                 ));
             }
-            if aliases.is_empty() || aliases.iter().any(|alias| alias.trim().is_empty()) {
-                return Err(ConfigError::invalid(
-                    format!("analytics.skills.{skill}"),
-                    "must contain non-empty aliases",
-                ));
-            }
+        }
+        if self.ai_timeout_seconds == 0 {
+            return Err(ConfigError::invalid(
+                "analytics.ai_timeout_seconds",
+                "must be greater than zero",
+            ));
         }
         Ok(())
     }
 }
 
-fn default_minimum_cooccurrence() -> usize {
-    10
+impl AnalyticsProvider {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Local => "local",
+            Self::Claude => "claude",
+            Self::Codex => "codex",
+        }
+    }
 }
 
-fn default_skill_aliases() -> BTreeMap<String, Vec<String>> {
-    [
-        ("AWS", &["aws", "amazon web services"][..]),
-        ("Azure", &["azure"]),
-        ("CI/CD", &["ci/cd", "continuous integration"]),
-        ("Docker", &["docker"]),
-        ("GCP", &["gcp", "google cloud"]),
-        ("Go", &["go", "golang"]),
-        ("Java", &["java"]),
-        ("Kafka", &["kafka"]),
-        ("Kotlin", &["kotlin"]),
-        ("Kubernetes", &["kubernetes", "k8s"]),
-        (".NET", &[".net", "dotnet", "asp.net", "aspnet", "c#"]),
-        ("Python", &["python"]),
-        ("React", &["react", "reactjs", "react.js"]),
-        ("Rust", &["rust"]),
-        ("SQL", &["sql", "postgres", "postgresql"]),
-        ("Terraform", &["terraform"]),
-        ("TypeScript", &["typescript"]),
-    ]
-    .into_iter()
-    .map(|(skill, aliases)| {
-        (
-            skill.to_owned(),
-            aliases.iter().map(|alias| (*alias).to_owned()).collect(),
-        )
-    })
-    .collect()
+fn default_minimum_cooccurrence() -> usize {
+    3
+}
+
+fn default_minimum_skill_occurrence() -> usize {
+    2
+}
+
+fn default_maximum_skills() -> usize {
+    50
+}
+
+fn default_ai_timeout_seconds() -> u64 {
+    60
 }
 
 #[derive(Debug, Clone, Deserialize)]

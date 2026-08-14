@@ -11,9 +11,15 @@ use ratatui::{
     },
 };
 
-use crate::storage::{ScanOutcome, SourceHealth};
+use crate::{
+    analytics::SkillKind,
+    insights::{MetricRow, Momentum},
+    storage::{ScanOutcome, SourceHealth},
+};
 
-use super::{App, Focus, InputMode, MouseTarget, Setting, View};
+use super::{
+    AnalyticsTab, App, Focus, InputMode, LibraryTab, MarketSection, MouseTarget, Setting, View,
+};
 
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
@@ -55,6 +61,10 @@ fn render_content(frame: &mut Frame, app: &App, area: Rect) {
     }
     if app.view() == View::Analytics {
         render_analytics_view(frame, app, area);
+        return;
+    }
+    if app.view() == View::Library {
+        render_library_view(frame, app, area);
         return;
     }
     match area.width {
@@ -116,60 +126,896 @@ fn render_job_divider(frame: &mut Frame, app: &App, list: Rect) {
 }
 
 fn render_analytics_view(frame: &mut Frame, app: &App, area: Rect) {
-    if area.width < 80 {
-        if app.narrow_details_visible() {
-            render_analytics_details(frame, app, area, Borders::ALL);
-        } else {
-            render_analytics_list(frame, app, area, Borders::ALL);
-        }
+    let surface = if area.width >= 120 {
+        render_navigation(frame, app, Rect::new(area.x, area.y, 22, area.height));
+        Rect::new(
+            area.x + 22,
+            area.y,
+            area.width.saturating_sub(22),
+            area.height,
+        )
+    } else {
+        area
+    };
+    let shell = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Fill(1),
+    ])
+    .split(surface);
+    render_analytics_tabs(frame, app, shell[0]);
+    render_analytics_filters(frame, app, shell[1]);
+
+    if surface.width < 90 && app.narrow_details_visible() {
+        render_analytics_evidence(frame, app, shell[2], Borders::ALL);
         return;
     }
-    let (list, details) = app.job_panes(area).expect("analytics panes");
-    if area.width >= 120 {
-        render_navigation(frame, app, Rect::new(area.x, area.y, 22, area.height));
-        render_analytics_list(
+    if surface.width >= 90 {
+        let panes =
+            Layout::horizontal([Constraint::Percentage(64), Constraint::Fill(1)]).split(shell[2]);
+        render_analytics_tab(frame, app, panes[0]);
+        render_analytics_evidence(
             frame,
             app,
-            list,
+            panes[1],
             Borders::TOP | Borders::RIGHT | Borders::BOTTOM,
         );
     } else {
-        render_analytics_list(frame, app, list, Borders::ALL);
+        render_analytics_tab(frame, app, shell[2]);
     }
-    render_analytics_details(
-        frame,
-        app,
-        details,
-        Borders::TOP | Borders::RIGHT | Borders::BOTTOM,
-    );
-    render_job_divider(frame, app, list);
 }
 
-fn render_analytics_list(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
-    let theme = app.theme();
-    let stats = app.skill_stats();
-    let total = app.analytics_job_count();
-    let coverage = app.analytics_coverage();
-    let skill_label = if stats.len() == 1 { "skill" } else { "skills" };
-    let title = format!(
-        "Observed skills · {} {skill_label} · {total} jobs · {}/{} descriptions",
-        stats.len(),
-        coverage.descriptions,
-        coverage.total
+fn render_analytics_tabs(frame: &mut Frame, app: &App, area: Rect) {
+    let spans = [
+        AnalyticsTab::Overview,
+        AnalyticsTab::Skills,
+        AnalyticsTab::Stacks,
+        AnalyticsTab::Market,
+    ]
+    .into_iter()
+    .enumerate()
+    .flat_map(|(index, tab)| {
+        let selected = tab == app.analytics_tab();
+        [
+            Span::styled(
+                format!(" {} {} ", index + 1, tab.label()),
+                Style::new()
+                    .fg(if selected {
+                        app.theme().warning
+                    } else {
+                        app.theme().primary_text
+                    })
+                    .bg(if selected {
+                        app.theme().selected_row
+                    } else {
+                        app.theme().background
+                    })
+                    .add_modifier(if selected {
+                        Modifier::BOLD
+                    } else {
+                        Modifier::empty()
+                    }),
+            ),
+            Span::raw(" "),
+        ]
+    })
+    .collect::<Vec<_>>();
+    frame.render_widget(
+        Paragraph::new(Line::from(spans)).style(Style::new().bg(app.theme().background)),
+        area,
     );
+}
+
+fn render_analytics_filters(frame: &mut Frame, app: &App, area: Rect) {
+    let filters = app.analytics_filters();
+    let report = app.analytics_report();
+    let text = format!(
+        "{}d t/± · Company {} C · Role {} R · Level {} S · Work {} W · x clear · comparable {} firms · new {}/{} jobs",
+        filters.window_days,
+        filters
+            .company
+            .as_deref()
+            .map(|company| app.company_name(company))
+            .unwrap_or("All"),
+        filters.role.as_deref().unwrap_or("All"),
+        filters
+            .seniority
+            .map(crate::insights::seniority_name)
+            .unwrap_or("All"),
+        filters
+            .work_mode
+            .map(crate::insights::work_mode_name)
+            .unwrap_or("All"),
+        report.comparable_company_count,
+        report.period_job_count,
+        report.previous_job_count,
+    );
+    frame.render_widget(
+        Paragraph::new(text).style(
+            Style::new()
+                .fg(app.theme().muted_text)
+                .bg(app.theme().background),
+        ),
+        area,
+    );
+}
+
+fn render_analytics_tab(frame: &mut Frame, app: &App, area: Rect) {
+    match app.analytics_tab() {
+        AnalyticsTab::Overview => render_overview(frame, app, area),
+        AnalyticsTab::Skills => render_skills_trends(frame, app, area),
+        AnalyticsTab::Stacks => render_stacks_trends(frame, app, area),
+        AnalyticsTab::Market => render_market_trends(frame, app, area),
+    }
+}
+
+fn render_overview(frame: &mut Frame, app: &App, area: Rect) {
+    let report = app.analytics_report();
+    let sections = Layout::vertical([Constraint::Percentage(48), Constraint::Fill(1)]).split(area);
+    let charts =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(sections[0]);
+    let hard = report
+        .hard_skills
+        .iter()
+        .map(|skill| &skill.metric)
+        .collect::<Vec<_>>();
+    let roles = report.roles.iter().collect::<Vec<_>>();
+    render_metric_chart(frame, app, charts[0], "Hard-skill demand", &hard);
+    render_metric_chart(frame, app, charts[1], "Role demand", &roles);
+
+    let rows = report.recommendations.iter().map(|item| {
+        Row::new(vec![
+            Cell::from(if item.saved { "★" } else { " " }),
+            Cell::from(item.skill.clone()),
+            Cell::from(item.kind.as_str()),
+            Cell::from(item.demand_count.to_string()),
+            Cell::from(item.target_role_count.to_string()),
+            Cell::from(item.adjacent_known_count.to_string()),
+            Cell::from(item.momentum.as_str()),
+            Cell::from(item.confidence.as_str()),
+            Cell::from(item.reason.clone()),
+        ])
+    });
+    let title = format!(
+        "Career opportunities · {} recommendations · {} active jobs · history since {}",
+        report.recommendations.len(),
+        report.active_job_count,
+        report
+            .earliest_observation
+            .map(|date| date.format("%Y-%m-%d").to_string())
+            .unwrap_or_else(|| "unknown".into())
+    );
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(2),
+            Constraint::Fill(2),
+            Constraint::Length(6),
+            Constraint::Length(7),
+            Constraint::Length(6),
+            Constraint::Length(7),
+            Constraint::Length(12),
+            Constraint::Length(5),
+            Constraint::Fill(3),
+        ],
+    )
+    .header(table_header([
+        "",
+        "Learn next",
+        "Type",
+        "Demand",
+        "Target",
+        "Beside",
+        "Momentum",
+        "Conf",
+        "Why",
+    ]))
+    .block(panel(
+        &title,
+        app.theme().focused_border,
+        app.theme().background,
+        Borders::ALL,
+    ))
+    .row_highlight_style(Style::new().bg(app.theme().selected_row))
+    .highlight_symbol("› ");
+    let mut state = TableState::default().with_selected(app.selected_index());
+    frame.render_stateful_widget(table, sections[1], &mut state);
+    render_scrollbar(
+        frame,
+        app,
+        sections[1],
+        report.recommendations.len(),
+        state.offset(),
+        usize::from(sections[1].height.saturating_sub(3)).max(1),
+    );
+}
+
+fn render_skills_trends(frame: &mut Frame, app: &App, area: Rect) {
+    let report = app.analytics_report();
+    let sections = Layout::vertical([Constraint::Percentage(68), Constraint::Fill(1)]).split(area);
+    let tables =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(sections[0]);
+    render_skill_table(
+        frame,
+        app,
+        tables[0],
+        "Hard skills",
+        &report.hard_skills,
+        SkillKind::Hard,
+    );
+    render_skill_table(
+        frame,
+        app,
+        tables[1],
+        "Soft skills",
+        &report.soft_skills,
+        SkillKind::Soft,
+    );
+    let metrics = match app.analytics_skill_kind() {
+        SkillKind::Hard => report
+            .hard_skills
+            .iter()
+            .map(|skill| &skill.metric)
+            .collect::<Vec<_>>(),
+        SkillKind::Soft => report
+            .soft_skills
+            .iter()
+            .map(|skill| &skill.metric)
+            .collect::<Vec<_>>(),
+    };
+    render_metric_chart(frame, app, sections[1], "Demand chart", &metrics);
+}
+
+fn render_skill_table(
+    frame: &mut Frame,
+    app: &App,
+    area: Rect,
+    title: &str,
+    skills: &[crate::insights::SkillTrend],
+    kind: SkillKind,
+) {
+    let rows = skills.iter().map(|skill| {
+        Row::new(vec![
+            Cell::from(if skill.saved { "★" } else { " " }),
+            Cell::from(skill.metric.name.clone()),
+            Cell::from(format_demand(&skill.metric)),
+            Cell::from(format!("{:+}", skill.metric.delta_count)),
+            Cell::from(format_delta(&skill.metric)),
+            Cell::from(skill.metric.momentum.as_str()),
+            Cell::from(
+                skill
+                    .status
+                    .map_or("—", crate::insights::SkillStatus::as_str),
+            ),
+        ])
+    });
+    let selected = app.analytics_skill_kind() == kind;
+    let panel_title = format!("{title} · {}", skills.len());
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(2),
+            Constraint::Fill(2),
+            Constraint::Length(11),
+            Constraint::Length(7),
+            Constraint::Length(8),
+            Constraint::Length(12),
+            Constraint::Length(10),
+        ],
+    )
+    .header(table_header([
+        "", "Skill", "Demand", "Δ jobs", "Δ share", "Momentum", "Status",
+    ]))
+    .block(panel(
+        &panel_title,
+        if selected {
+            app.theme().focused_border
+        } else {
+            app.theme().unfocused_border
+        },
+        app.theme().background,
+        Borders::ALL,
+    ))
+    .row_highlight_style(Style::new().bg(app.theme().selected_row))
+    .highlight_symbol("› ");
+    let mut state = TableState::default();
+    if selected && !skills.is_empty() {
+        state.select(Some(app.selected_index()));
+    }
+    frame.render_stateful_widget(table, area, &mut state);
+    render_scrollbar(
+        frame,
+        app,
+        area,
+        skills.len(),
+        state.offset(),
+        usize::from(area.height.saturating_sub(3)).max(1),
+    );
+}
+
+fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
+    let report = app.analytics_report();
+    let sections = Layout::vertical([Constraint::Percentage(68), Constraint::Fill(1)]).split(area);
+    let rows = report.stacks.iter().map(|stack| {
+        Row::new(vec![
+            Cell::from(if stack.saved { "★" } else { " " }),
+            Cell::from(stack.key.label()),
+            Cell::from(format_demand(&stack.metric)),
+            Cell::from(format!("{:+}", stack.metric.delta_count)),
+            Cell::from(format_delta(&stack.metric)),
+            Cell::from(stack.metric.momentum.as_str()),
+            Cell::from(stack.metric.confidence.as_str()),
+        ])
+    });
+    let title = format!(
+        "Common stacks · {} · minimum {} jobs",
+        report.stacks.len(),
+        app.config().analytics.minimum_cooccurrence
+    );
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(2),
+            Constraint::Fill(2),
+            Constraint::Length(11),
+            Constraint::Length(7),
+            Constraint::Length(8),
+            Constraint::Length(12),
+            Constraint::Length(5),
+        ],
+    )
+    .header(table_header([
+        "", "Stack", "Demand", "Δ jobs", "Δ share", "Momentum", "Conf",
+    ]))
+    .block(panel(
+        &title,
+        app.theme().focused_border,
+        app.theme().background,
+        Borders::ALL,
+    ))
+    .row_highlight_style(Style::new().bg(app.theme().selected_row))
+    .highlight_symbol("› ");
+    let mut state = TableState::default().with_selected(app.selected_index());
+    frame.render_stateful_widget(table, sections[0], &mut state);
+    let metrics = report
+        .stacks
+        .iter()
+        .map(|stack| &stack.metric)
+        .collect::<Vec<_>>();
+    render_metric_chart(frame, app, sections[1], "Stack demand", &metrics);
+}
+
+fn render_market_trends(frame: &mut Frame, app: &App, area: Rect) {
+    let sections = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).split(area);
+    let labels = [
+        MarketSection::Roles,
+        MarketSection::Seniority,
+        MarketSection::Experience,
+        MarketSection::Work,
+        MarketSection::Companies,
+    ]
+    .into_iter()
+    .map(|section| {
+        Span::styled(
+            format!(" {} ", section.label()),
+            Style::new()
+                .fg(if section == app.market_section() {
+                    app.theme().warning
+                } else {
+                    app.theme().primary_text
+                })
+                .bg(if section == app.market_section() {
+                    app.theme().selected_row
+                } else {
+                    app.theme().background
+                }),
+        )
+    })
+    .collect::<Vec<_>>();
+    frame.render_widget(Paragraph::new(Line::from(labels)), sections[0]);
+    let panes =
+        Layout::horizontal([Constraint::Percentage(62), Constraint::Fill(1)]).split(sections[1]);
+    let rows = app.market_rows();
+    render_metric_table(frame, app, panes[0], app.market_section().label(), &rows);
+    let refs = rows.iter().collect::<Vec<_>>();
+    render_metric_chart(frame, app, panes[1], "Market shape", &refs);
+}
+
+fn render_metric_table(frame: &mut Frame, app: &App, area: Rect, title: &str, rows: &[MetricRow]) {
+    let table_rows = rows.iter().map(|metric| {
+        Row::new(vec![
+            Cell::from(format!(
+                "{}{}",
+                if market_metric_saved(app, metric) {
+                    "★ "
+                } else {
+                    ""
+                },
+                metric_display_name(app, metric)
+            )),
+            Cell::from(format_demand(metric)),
+            Cell::from(format!("{:+}", metric.delta_count)),
+            Cell::from(format_delta(metric)),
+            Cell::from(metric.momentum.as_str()),
+            Cell::from(metric.confidence.as_str()),
+        ])
+    });
+    let panel_title = format!("{title} · {}", rows.len());
+    let table = Table::new(
+        table_rows,
+        [
+            Constraint::Fill(2),
+            Constraint::Length(11),
+            Constraint::Length(7),
+            Constraint::Length(8),
+            Constraint::Length(12),
+            Constraint::Length(5),
+        ],
+    )
+    .header(table_header([
+        "Name", "Demand", "Δ jobs", "Δ share", "Momentum", "Conf",
+    ]))
+    .block(panel(
+        &panel_title,
+        app.theme().focused_border,
+        app.theme().background,
+        Borders::ALL,
+    ))
+    .row_highlight_style(Style::new().bg(app.theme().selected_row))
+    .highlight_symbol("› ");
+    let mut state = TableState::default().with_selected(app.selected_index());
+    frame.render_stateful_widget(table, area, &mut state);
+    render_scrollbar(
+        frame,
+        app,
+        area,
+        rows.len(),
+        state.offset(),
+        usize::from(area.height.saturating_sub(3)).max(1),
+    );
+}
+
+fn render_metric_chart(frame: &mut Frame, app: &App, area: Rect, title: &str, rows: &[&MetricRow]) {
+    let bars = rows
+        .iter()
+        .take(8.min(usize::from(area.height.saturating_sub(2) / 2).max(1)))
+        .map(|metric| {
+            Bar::with_label(
+                metric_display_name(app, metric),
+                metric.current_count as u64,
+            )
+            .text_value(String::new())
+            .style(Style::new().fg(momentum_color(app, metric.momentum)))
+        })
+        .collect::<Vec<_>>();
+    if bars.is_empty() {
+        frame.render_widget(
+            Paragraph::new("No data for this filter.").block(panel(
+                title,
+                app.theme().unfocused_border,
+                app.theme().background,
+                Borders::ALL,
+            )),
+            area,
+        );
+        return;
+    }
+    let max = rows.iter().map(|row| row.current_count).max().unwrap_or(1);
+    let mut chart = BarChart::horizontal(bars)
+        .block(panel(
+            title,
+            app.theme().unfocused_border,
+            app.theme().background,
+            Borders::ALL,
+        ))
+        .bar_width(1)
+        .bar_gap(1)
+        .max(max.max(1) as u64)
+        .label_style(Style::new().fg(app.theme().primary_text));
+    if !app.config().ui.unicode_icons {
+        chart = chart.bar_set(ascii_bar_set());
+    }
+    frame.render_widget(chart, area);
+}
+
+fn render_analytics_evidence(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
+    let jobs = app.analytics_evidence_jobs();
+    let coverage = app.analytics_coverage();
+    let items = jobs.iter().map(|job| {
+        let status = if job.source_open { "OPEN" } else { "CLOSED" };
+        let evidence = app.analytics_evidence_text(job);
+        ListItem::new(vec![
+            Line::styled(
+                format!(
+                    "• {} · {}",
+                    app.company_name(&job.key.company_id),
+                    job.classified.observed.title
+                ),
+                Style::new().fg(app.theme().primary_text),
+            ),
+            Line::styled(
+                format!("  {status} — {}", truncate(&evidence, 120)),
+                Style::new().fg(app.theme().muted_text),
+            ),
+        ])
+    });
+    let title = format!(
+        "Evidence · {} matching jobs · descriptions {}/{} · sources {}/{} healthy",
+        jobs.len(),
+        coverage.descriptions,
+        coverage.total,
+        coverage.healthy_sources,
+        coverage.enabled_sources,
+    );
+    let list = List::new(items)
+        .block(panel(
+            &title,
+            app.theme().unfocused_border,
+            app.theme().background,
+            borders,
+        ))
+        .highlight_style(Style::new().bg(app.theme().selected_row))
+        .highlight_symbol("› ");
+    let mut state = ListState::default();
+    if !jobs.is_empty() {
+        state.select(Some(app.evidence_index().min(jobs.len() - 1)));
+    }
+    frame.render_stateful_widget(list, area, &mut state);
+    render_scrollbar(
+        frame,
+        app,
+        area,
+        jobs.len(),
+        state.offset(),
+        usize::from(area.height.saturating_sub(2) / 2).max(1),
+    );
+}
+
+fn render_library_view(frame: &mut Frame, app: &App, area: Rect) {
+    let surface = if area.width >= 120 {
+        render_navigation(frame, app, Rect::new(area.x, area.y, 22, area.height));
+        Rect::new(
+            area.x + 22,
+            area.y,
+            area.width.saturating_sub(22),
+            area.height,
+        )
+    } else {
+        area
+    };
+    let sections = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).split(surface);
+    let tabs = [
+        LibraryTab::Jobs,
+        LibraryTab::Skills,
+        LibraryTab::Stacks,
+        LibraryTab::Roles,
+        LibraryTab::Companies,
+    ]
+    .into_iter()
+    .enumerate()
+    .flat_map(|(index, tab)| {
+        let selected = tab == app.library_tab();
+        [
+            Span::styled(
+                format!(" {} {} ", index + 1, tab.label()),
+                Style::new()
+                    .fg(if selected {
+                        app.theme().warning
+                    } else {
+                        app.theme().primary_text
+                    })
+                    .bg(if selected {
+                        app.theme().selected_row
+                    } else {
+                        app.theme().background
+                    }),
+            ),
+            Span::raw(" "),
+        ]
+    })
+    .collect::<Vec<_>>();
+    frame.render_widget(Paragraph::new(Line::from(tabs)), sections[0]);
+    match app.library_tab() {
+        LibraryTab::Jobs => render_library_jobs(frame, app, sections[1]),
+        LibraryTab::Skills => {
+            let suggestions = app.pending_skill_suggestions();
+            let values = app.library_skills();
+            let rows = suggestions
+                .iter()
+                .map(|item| {
+                    Row::new(vec![
+                        Cell::from("?"),
+                        Cell::from(item.name.clone()),
+                        Cell::from(item.kind.as_str()),
+                        Cell::from("review: a approve / d reject"),
+                        Cell::from(item.evidence.first().cloned().unwrap_or_default()),
+                    ])
+                })
+                .chain(values.iter().map(|(name, status)| {
+                    Row::new(vec![
+                        Cell::from("★"),
+                        Cell::from((*name).to_owned()),
+                        Cell::from("saved"),
+                        Cell::from(status.map_or("—", crate::insights::SkillStatus::as_str)),
+                        Cell::from(""),
+                    ])
+                }));
+            let title = format!(
+                "Skills · AI suggestions require review · {}",
+                suggestions.len() + values.len()
+            );
+            render_library_table(
+                frame,
+                app,
+                sections[1],
+                &title,
+                rows,
+                [
+                    Constraint::Length(2),
+                    Constraint::Length(24),
+                    Constraint::Length(7),
+                    Constraint::Length(28),
+                    Constraint::Fill(1),
+                ],
+                ["", "Skill", "Type", "Status", "Evidence"],
+            );
+        }
+        LibraryTab::Stacks => {
+            let values = app.library_stacks();
+            let rows = values
+                .iter()
+                .map(|stack| Row::new(vec![Cell::from("★"), Cell::from(stack.label())]));
+            let title = format!("Saved stacks · {}", values.len());
+            render_library_table(
+                frame,
+                app,
+                sections[1],
+                &title,
+                rows,
+                [Constraint::Length(2), Constraint::Fill(1)],
+                ["", "Stack"],
+            );
+        }
+        LibraryTab::Roles => {
+            let values = app.library_roles();
+            let rows = values.iter().map(|(role, target)| {
+                Row::new(vec![
+                    Cell::from("★"),
+                    Cell::from((*role).to_owned()),
+                    Cell::from(if *target { "Target" } else { "Saved" }),
+                ])
+            });
+            let title = format!("Saved roles · {}", values.len());
+            render_library_table(
+                frame,
+                app,
+                sections[1],
+                &title,
+                rows,
+                [
+                    Constraint::Length(2),
+                    Constraint::Fill(1),
+                    Constraint::Length(10),
+                ],
+                ["", "Role", "Purpose"],
+            );
+        }
+        LibraryTab::Companies => {
+            let values = app.library_companies();
+            let rows = values.iter().map(|company| {
+                Row::new(vec![
+                    Cell::from("★"),
+                    Cell::from(app.company_name(company).to_owned()),
+                ])
+            });
+            let title = format!("Saved companies · {}", values.len());
+            render_library_table(
+                frame,
+                app,
+                sections[1],
+                &title,
+                rows,
+                [Constraint::Length(2), Constraint::Fill(1)],
+                ["", "Company"],
+            );
+        }
+    }
+}
+
+fn render_library_jobs(frame: &mut Frame, app: &App, area: Rect) {
+    let jobs = app.library_jobs();
+    let items = jobs.iter().map(|job| {
+        let status = if job.source_open {
+            if job.reopened_at.is_some() {
+                "REOPENED"
+            } else {
+                "OPEN"
+            }
+        } else {
+            "CLOSED"
+        };
+        ListItem::new(vec![
+            Line::styled(
+                format!("★ {status} · {}", app.company_name(&job.key.company_id)),
+                Style::new().fg(app.theme().new),
+            ),
+            Line::styled(
+                format!("  {}", job.classified.observed.title),
+                Style::new().fg(app.theme().primary_text),
+            ),
+        ])
+    });
+    let title = format!("Saved jobs · {}", jobs.len());
+    let list = List::new(items)
+        .block(panel(
+            &title,
+            app.theme().focused_border,
+            app.theme().background,
+            Borders::ALL,
+        ))
+        .highlight_style(Style::new().bg(app.theme().selected_row))
+        .highlight_symbol("› ");
+    let mut state = ListState::default();
+    if !jobs.is_empty() {
+        state.select(Some(app.selected_index()));
+    }
+    frame.render_stateful_widget(list, area, &mut state);
+    render_scrollbar(
+        frame,
+        app,
+        area,
+        jobs.len(),
+        state.offset(),
+        usize::from(area.height.saturating_sub(2) / 2).max(1),
+    );
+}
+
+fn render_library_table<'a, const W: usize, const H: usize>(
+    frame: &mut Frame,
+    app: &App,
+    area: Rect,
+    panel_title: &str,
+    rows: impl Iterator<Item = Row<'a>>,
+    widths: [Constraint; W],
+    headers: [&str; H],
+) {
+    let rows = rows.collect::<Vec<_>>();
+    let count = rows.len();
+    let table = Table::new(rows, widths)
+        .header(table_header(headers))
+        .block(panel(
+            panel_title,
+            app.theme().focused_border,
+            app.theme().background,
+            Borders::ALL,
+        ))
+        .row_highlight_style(Style::new().bg(app.theme().selected_row))
+        .highlight_symbol("› ");
+    let mut state = TableState::default();
+    if count > 0 {
+        state.select(Some(app.selected_index()));
+    }
+    frame.render_stateful_widget(table, area, &mut state);
+    render_scrollbar(
+        frame,
+        app,
+        area,
+        count,
+        state.offset(),
+        usize::from(area.height.saturating_sub(3)).max(1),
+    );
+}
+
+fn table_header<const N: usize>(labels: [&str; N]) -> Row<'static> {
+    Row::new(
+        labels
+            .into_iter()
+            .map(|label| Cell::from(label.to_owned()))
+            .collect::<Vec<_>>(),
+    )
+    .style(Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+}
+
+fn format_demand(metric: &MetricRow) -> String {
+    format!(
+        "{} · {}%",
+        metric.current_count,
+        metric.current_share_per_mille / 10
+    )
+}
+
+fn format_delta(metric: &MetricRow) -> String {
+    format!("{:+.1}pp", metric.delta_share_per_mille as f64 / 10.0)
+}
+
+fn momentum_color(app: &App, momentum: Momentum) -> Color {
+    match momentum {
+        Momentum::New | Momentum::Rising => app.theme().new,
+        Momentum::Stable => app.theme().open,
+        Momentum::Falling => app.theme().error,
+        Momentum::LowConfidence => app.theme().muted_text,
+    }
+}
+
+fn metric_display_name(app: &App, metric: &MetricRow) -> String {
+    if app.analytics_tab() == AnalyticsTab::Market
+        && app.market_section() == MarketSection::Companies
+    {
+        app.company_name(&metric.name).to_owned()
+    } else {
+        metric.name.clone()
+    }
+}
+
+fn market_metric_saved(app: &App, metric: &MetricRow) -> bool {
+    app.analytics_tab() == AnalyticsTab::Market
+        && match app.market_section() {
+            MarketSection::Roles => app.library().roles.contains_key(&metric.name),
+            MarketSection::Companies => app.library().companies.contains(&metric.name),
+            MarketSection::Seniority | MarketSection::Experience | MarketSection::Work => false,
+        }
+}
+
+fn truncate(value: &str, maximum: usize) -> String {
+    let mut characters = value.chars();
+    let text = characters.by_ref().take(maximum).collect::<String>();
+    if characters.next().is_some() {
+        format!("{text}…")
+    } else {
+        text
+    }
+}
+
+#[cfg(any())]
+fn render_analytics_list(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
+    let [hard, soft] = analytics_skill_panes(area);
+    render_skill_pane(frame, app, hard, borders, SkillKind::Hard);
+    render_skill_pane(
+        frame,
+        app,
+        soft,
+        Borders::TOP | Borders::RIGHT | Borders::BOTTOM,
+        SkillKind::Soft,
+    );
+}
+
+#[cfg(any())]
+fn render_skill_pane(frame: &mut Frame, app: &App, area: Rect, borders: Borders, kind: SkillKind) {
+    let theme = app.theme();
+    let stats = app.skill_stats_for(kind);
+    let total = app.analytics_job_count();
+    let matched_jobs = app.analytics_skill_job_count(kind);
+    let coverage = app.analytics_coverage();
+    let heading = match kind {
+        SkillKind::Hard => "Hard skills",
+        SkillKind::Soft => "Soft skills",
+    };
+    let title = if area.width >= 32 {
+        format!("{heading} · {} · jobs {matched_jobs}/{total}", stats.len())
+    } else {
+        let heading = match kind {
+            SkillKind::Hard => "Hard",
+            SkillKind::Soft => "Soft",
+        };
+        format!("{heading} · {} · {matched_jobs}/{total} jobs", stats.len())
+    };
     let block = panel(
         &title,
-        if app.focus() == Focus::Content {
+        if app.focus() == Focus::Content && app.analytics_skill_kind() == kind {
             theme.focused_border
         } else {
             theme.unfocused_border
         },
         theme.background,
         borders,
-    );
+    )
+    .title_bottom(format!(
+        "descriptions {}/{}",
+        coverage.descriptions, coverage.total
+    ));
     if stats.is_empty() {
         frame.render_widget(
-            Paragraph::new("No configured skills found in observed job descriptions.")
+            Paragraph::new("No banked skills found in observed job descriptions.")
                 .block(block)
                 .style(Style::new().bg(theme.background)),
             area,
@@ -178,9 +1024,8 @@ fn render_analytics_list(frame: &mut Frame, app: &App, area: Rect, borders: Bord
     }
 
     let visible_count = usize::from(area.height.saturating_sub(2) / 2).max(1);
-    let first = app
-        .selected_index()
-        .saturating_sub(visible_count.saturating_sub(1));
+    let selected_index = app.analytics_skill_index(kind);
+    let first = selected_index.saturating_sub(visible_count.saturating_sub(1));
     let bars = stats
         .iter()
         .enumerate()
@@ -188,32 +1033,42 @@ fn render_analytics_list(frame: &mut Frame, app: &App, area: Rect, borders: Bord
         .take(visible_count)
         .map(|(index, stat)| {
             let percent = stat.job_count * 100 / total.max(1);
-            let selected = index == app.selected_index();
+            let selected = index == selected_index && app.analytics_skill_kind() == kind;
+            let target = match kind {
+                SkillKind::Hard => MouseTarget::HardSkill(index),
+                SkillKind::Soft => MouseTarget::SoftSkill(index),
+            };
             let style = if selected {
                 Style::new().fg(theme.warning).bg(theme.selected_row)
             } else {
-                Style::new()
-                    .fg(theme.new)
-                    .patch(mouse_style(app, MouseTarget::Item(index)))
+                Style::new().fg(theme.new).patch(mouse_style(app, target))
             };
-            Bar::with_label(stat.name.clone(), stat.job_count as u64)
-                .text_value(format!("{} jobs · {percent}%", stat.job_count))
-                .style(style)
-                .value_style(
-                    Style::new()
-                        .fg(theme.primary_text)
-                        .add_modifier(if selected {
-                            Modifier::BOLD
-                        } else {
-                            Modifier::empty()
-                        }),
-                )
+            Bar::with_label(
+                format!("{}  {} jobs · {percent}%", stat.name, stat.job_count),
+                stat.job_count as u64,
+            )
+            .text_value(String::new())
+            .style(style)
+            .value_style(
+                Style::new()
+                    .fg(theme.primary_text)
+                    .add_modifier(if selected {
+                        Modifier::BOLD
+                    } else {
+                        Modifier::empty()
+                    }),
+            )
         })
         .collect::<Vec<_>>();
     let inner = area.inner(Margin::new(1, 1));
     for (offset, index) in (first..first + bars.len()).enumerate() {
-        let target = MouseTarget::Item(index);
-        let background = if app.pressed(target) || index == app.selected_index() {
+        let target = match kind {
+            SkillKind::Hard => MouseTarget::HardSkill(index),
+            SkillKind::Soft => MouseTarget::SoftSkill(index),
+        };
+        let background = if app.pressed(target)
+            || (index == selected_index && app.analytics_skill_kind() == kind)
+        {
             Some(theme.selected_row)
         } else if app.hovered(target) {
             Some(theme.hovered_row)
@@ -246,10 +1101,11 @@ fn render_analytics_list(frame: &mut Frame, app: &App, area: Rect, borders: Bord
     render_scrollbar(frame, app, area, stats.len(), first, visible_count);
 }
 
+#[cfg(any())]
 fn render_analytics_details(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
     let theme = app.theme();
     let total = app.analytics_job_count();
-    let stats = app.skill_stats();
+    let stats = app.skill_stats_for(app.analytics_skill_kind());
     let Some(skill) = stats.get(app.selected_index()) else {
         frame.render_widget(
             Paragraph::new("No skill selected.").block(panel(
@@ -273,6 +1129,7 @@ fn render_analytics_details(frame: &mut Frame, app: &App, area: Rect, borders: B
     render_skill_evidence(frame, app, sections[2]);
 }
 
+#[cfg(any())]
 fn render_analytics_summary(
     frame: &mut Frame,
     app: &App,
@@ -367,6 +1224,7 @@ fn render_analytics_summary(
     );
 }
 
+#[cfg(any())]
 fn render_related_skills(frame: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme();
     let related = app.related_skill_stats();
@@ -394,13 +1252,17 @@ fn render_related_skills(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .take(usize::from(area.height.saturating_sub(2) / 2).max(1))
         .map(|skill| {
-            Bar::with_label(skill.name.clone(), skill.jaccard_per_mille as u64)
-                .text_value(format!(
-                    "{:.1}% · {} jobs",
+            Bar::with_label(
+                format!(
+                    "{}  {:.1}% · {} jobs",
+                    skill.name,
                     skill.jaccard_per_mille as f64 / 10.0,
                     skill.job_count
-                ))
-                .style(Style::new().fg(theme.open))
+                ),
+                skill.jaccard_per_mille as u64,
+            )
+            .text_value(String::new())
+            .style(Style::new().fg(theme.open))
         })
         .collect::<Vec<_>>();
     let mut chart = BarChart::horizontal(bars)
@@ -416,6 +1278,7 @@ fn render_related_skills(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(chart, area);
 }
 
+#[cfg(any())]
 fn render_skill_evidence(frame: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme();
     let evidence = app.selected_skill_evidence();
@@ -736,7 +1599,8 @@ fn render_navigation(frame: &mut Frame, app: &App, area: Rect) {
         nav_item(app, 4, icons.scanning, "Scans", theme.primary_text),
         nav_item(app, 5, icons.source_failure, "Sources", theme.warning),
         nav_item(app, 6, "%", "Analytics", theme.new),
-        nav_item(app, 7, "=", "Settings", theme.primary_text),
+        nav_item(app, 7, "*", "Library", theme.warning),
+        nav_item(app, 8, "=", "Settings", theme.primary_text),
     ];
     let list = List::new(items)
         .block(panel(
@@ -828,7 +1692,7 @@ fn render_job_list(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
         View::New => "New jobs",
         View::Applied => "Applied jobs",
         View::History => "Job history",
-        View::Scans | View::Sources | View::Analytics | View::Settings => {
+        View::Scans | View::Sources | View::Analytics | View::Library | View::Settings => {
             unreachable!("job list has fixed views")
         }
     };
@@ -1454,9 +2318,23 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         ]
     } else if app.view() == View::Analytics {
         let mut actions = vec![
-            "↑/↓ skills".to_owned(),
+            "[/] section".to_owned(),
+            "↑/↓ rows".to_owned(),
             "J/K matches".to_owned(),
-            "Enter open".to_owned(),
+            "t/± window".to_owned(),
+            "C/R/S/W filter · x clear".to_owned(),
+            "* save · m status".to_owned(),
+            "Tab navigation".to_owned(),
+        ];
+        if area.width >= 80 {
+            actions.push(format!("{} quit", keys.quit));
+        }
+        actions
+    } else if app.view() == View::Library {
+        let mut actions = vec![
+            "[/] section".to_owned(),
+            "↑/↓ rows".to_owned(),
+            "* remove · m status/target".to_owned(),
             "Tab navigation".to_owned(),
         ];
         if area.width >= 80 {
@@ -1550,8 +2428,9 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
          J/K scroll details\n\
          Mouse: hover; click tabs/rows; drag job divider; wheel select or scroll details\n\
          Click Settings to edit; click Help to close\n\n\
-         Analytics: ↑/↓ skills; J/K matches; Enter/open key opens match\n\
-         Analytics uses cached active job descriptions\n\n\
+         Analytics: [/] or 1-4 sections; arrows rows/type; J/K evidence; Enter/open\n\
+         Filters: t/± time; C/R/S/W factors; x clear; * save; m skill status\n\
+         Library: [/] or 1-5; * remove; a/d optional AI review; never auto-approved\n\n\
          {} scan  {} search jobs  {} filter company/New/Applied\n\
          {} applied  {} history  {} open  {} copy\n\
          Enter narrow: details; otherwise: open\n\

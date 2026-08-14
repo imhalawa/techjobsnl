@@ -1,0 +1,19 @@
+{
+  "version": "2026-08-14",
+  "roles": [
+    {"name":"ML / AI","aliases":["machine learning","ml engineer","ai engineer","artificial intelligence","data scientist"]},
+    {"name":"Data","aliases":["data engineer","analytics engineer","data platform","business intelligence","bi engineer"]},
+    {"name":"Security","aliases":["security engineer","application security","product security","cloud security","cybersecurity","offensive security"]},
+    {"name":"Site Reliability","aliases":["site reliability","sre","reliability engineer"]},
+    {"name":"DevOps","aliases":["devops","release engineer","release tooling"]},
+    {"name":"Platform","aliases":["platform engineer","cloud engineer","infrastructure engineer","developer experience"]},
+    {"name":"Full-stack","aliases":["full-stack","full stack","fullstack"]},
+    {"name":"Frontend","aliases":["frontend","front-end","front end","web engineer","ui engineer"]},
+    {"name":"Backend","aliases":["backend","back-end","back end","api engineer","server engineer"]},
+    {"name":"Mobile","aliases":["mobile engineer","mobile developer","ios engineer","ios developer","android engineer","android developer"]},
+    {"name":"Applications","aliases":["application engineer","applications engineer","application developer"]},
+    {"name":"Quality","aliases":["quality engineer","qa engineer","test engineer","automation engineer"]},
+    {"name":"Architecture","aliases":["software architect","solution architect","solutions architect","enterprise architect"]},
+    {"name":"Software Engineering","aliases":["software engineer","software developer","developer","engineer"]}
+  ]
+}

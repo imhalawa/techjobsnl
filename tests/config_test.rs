@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use job_watch::config::{
-    AnalyticsConfig, CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig,
-    SourceConfig, ThemeOverrides, UiConfig,
+    AnalyticsConfig, AnalyticsProvider, CompanyConfig, Config, FiltersConfig, KeybindingsConfig,
+    ScanConfig, SourceConfig, ThemeOverrides, UiConfig,
 };
 
 fn valid_config() -> Config {
@@ -83,6 +83,12 @@ countries = ["NL"]
 new_job_max_age_days = 7
 include_title_patterns = []
 exclude_title_patterns = ["manager"]
+[analytics]
+provider = "claude"
+minimum_skill_occurrence = 3
+maximum_skills = 25
+ai_timeout_seconds = 45
+minimum_cooccurrence = 2
 [ui]
 theme = "clean-dark"
 unicode_icons = true
@@ -114,7 +120,10 @@ board = "mollie"
         config.companies[0].source,
         SourceConfig::Ashby { .. }
     ));
-    assert!(config.analytics.skills.contains_key("Kubernetes"));
+    assert_eq!(config.analytics.provider, AnalyticsProvider::Claude);
+    assert_eq!(config.analytics.minimum_skill_occurrence, 3);
+    assert_eq!(config.analytics.maximum_skills, 25);
+    assert_eq!(config.analytics.ai_timeout_seconds, 45);
 }
 
 #[test]
@@ -262,13 +271,18 @@ fn rejects_empty_countries_and_invalid_title_patterns() {
 }
 
 #[test]
-fn rejects_empty_analytics_aliases() {
+fn rejects_zero_analytics_discovery_limits() {
     let mut config = valid_config();
-    config.analytics.skills.insert("Rust".into(), vec![]);
+    config.analytics.minimum_skill_occurrence = 0;
 
     let error = config.validate().unwrap_err().to_string();
-    assert!(error.contains("analytics.skills.Rust"));
-    assert!(error.contains("non-empty aliases"));
+    assert!(error.contains("analytics.minimum_skill_occurrence"));
+    assert!(error.contains("greater than zero"));
+
+    let mut config = valid_config();
+    config.analytics.ai_timeout_seconds = 0;
+    let error = config.validate().unwrap_err().to_string();
+    assert!(error.contains("analytics.ai_timeout_seconds"));
 }
 
 #[test]
