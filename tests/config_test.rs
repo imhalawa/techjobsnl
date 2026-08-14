@@ -379,6 +379,11 @@ fn parses_and_validates_every_source_strategy() {
             "google",
         ),
         (
+            "strategy = \"successfactors-api\"\nbase_url = \"https://jobs.worldline.com\"",
+            true,
+            "worldline",
+        ),
+        (
             "strategy = \"successfactors\"\nlisting_url = \"https://jobs.flatexdegiro.com/search/?q=&locationsearch=NL\"\nemployer = \"flatexDEGIRO AG\"",
             true,
             "flatexdegiro",
@@ -519,6 +524,9 @@ fn rejects_non_https_source_urls() {
         },
         SourceConfig::Google {
             search_url: "http://www.google.com/about/careers/applications/jobs/results/".into(),
+        },
+        SourceConfig::SuccessfactorsApi {
+            base_url: "http://jobs.worldline.com".into(),
         },
     ];
 

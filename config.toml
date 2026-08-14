@@ -673,3 +673,13 @@ enabled = true
 [companies.source]
 strategy = "google"
 search_url = "https://www.google.com/about/careers/applications/jobs/results/?company=Google&location=Netherlands&sort_by=date"
+
+[[companies]]
+id = "worldline"
+name = "Worldline"
+industry = "Fintech, Payments, Financial services, Payment technology"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "successfactors-api"
+base_url = "https://jobs.worldline.com"

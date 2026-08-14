@@ -226,6 +226,9 @@ pub enum SourceConfig {
     Google {
         search_url: String,
     },
+    SuccessfactorsApi {
+        base_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -277,6 +280,7 @@ impl SourceConfig {
             Self::Deel { .. } => "Deel Jobs",
             Self::Successfactors { .. } => "SAP SuccessFactors HTML",
             Self::Google { .. } => "Google Careers HTML",
+            Self::SuccessfactorsApi { .. } => "SAP SuccessFactors API",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -323,6 +327,7 @@ impl SourceConfig {
             Self::Deel { board_url } => board_url,
             Self::Successfactors { listing_url, .. } => listing_url,
             Self::Google { search_url } => search_url,
+            Self::SuccessfactorsApi { base_url } => base_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -563,6 +568,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("search_url"),
                     "must be the exact official Google Netherlands search URL",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::SuccessfactorsApi { base_url } => {
+            validate_https_url(base_url, path("base_url"))?;
+            if company.id != "worldline" || base_url != "https://jobs.worldline.com" {
+                return Err(ConfigError::invalid(
+                    path("base_url"),
+                    "must match Worldline's official SuccessFactors host",
                 ));
             }
             Ok(())
