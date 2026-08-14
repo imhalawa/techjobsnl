@@ -1053,7 +1053,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 63);
+        assert_eq!(migrated.companies.len(), 64);
         assert!(
             migrated
                 .companies
