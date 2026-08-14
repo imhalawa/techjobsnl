@@ -1,5 +1,11 @@
 # Source and sponsor evidence
 
+## Wolters Kluwer
+
+- Official source: <https://wk.wd3.myworkdayjobs.com/External>. The Workday API exposes an explicit Netherlands facet, a first-page total, paginated stable paths, and complete detail records.
+- Wolters Kluwer's official company profile reports 21,100 employees worldwide: <https://www.wolterskluwer.com/en/about-us>.
+- Workday exposes the hiring organisation for each vacancy. Confirm that entity before relying on sponsor status.
+
 ## Info Support
 
 - Official source: <https://werkenbij.infosupport.com/en/jobs.json>. The Teamtailor JSON feed exposes every public job, stable identifiers, structured locations, descriptions, and publication dates in one response.

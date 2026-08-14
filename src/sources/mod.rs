@@ -15,6 +15,7 @@ pub mod personio;
 pub mod rabobank;
 pub mod recruitee;
 pub mod workable;
+pub mod workday;
 pub mod yuki;
 
 use std::time::Duration;

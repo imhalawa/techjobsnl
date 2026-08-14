@@ -25,7 +25,7 @@ use job_watch::{
     scanner::ScanService,
     sources::{
         JobSource, albert_heijn, ashby, bol, coolblue, ebay, eneco, getnoticed, greenhouse, ing,
-        jibe, lever, personio, rabobank, recruitee, workable, yuki,
+        jibe, lever, personio, rabobank, recruitee, workable, workday, yuki,
     },
     storage::{JobQuery, ScanReadModel, SourceReadModel, Store},
     ui::{App, AppCommand, View, render},
@@ -554,6 +554,21 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     workable::WorkableSource::new(&company.id, account, client.clone())
                         .with_country_filter(country_filter.as_deref()),
                 )),
+                SourceConfig::Workday {
+                    base_url,
+                    tenant,
+                    site,
+                    country,
+                    country_code,
+                } => Ok(Arc::new(workday::WorkdaySource::new(
+                    &company.id,
+                    base_url,
+                    tenant,
+                    site,
+                    country,
+                    country_code,
+                    client.clone(),
+                ))),
                 SourceConfig::Yuki { feed_url } => Ok(Arc::new(yuki::YukiSource::new(
                     &company.id,
                     feed_url,
@@ -960,7 +975,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 44);
+        assert_eq!(migrated.companies.len(), 45);
         assert!(
             migrated
                 .companies
@@ -1301,7 +1316,8 @@ mod tests {
                 "ohpen",
                 "finom",
                 "keylane",
-                "info-support"
+                "info-support",
+                "wolters-kluwer"
             ]
         );
 
