@@ -792,6 +792,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "topicus")
             .collect::<Vec<_>>();
+        let centric = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "centric")
+            .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
         assert!(adyen[0].enabled);
@@ -914,6 +919,18 @@ mod tests {
             } if base_url == "https://www.werkenbijtopicus.nl"
         ));
 
+        assert_eq!(centric.len(), 1);
+        assert!(centric[0].enabled);
+        assert_eq!(
+            centric[0].industry,
+            "IT services, Software, Cloud, Consulting"
+        );
+        assert!(matches!(
+            &centric[0].source,
+            SourceConfig::Recruitee { base_url }
+                if base_url == "https://centric.recruitee.com"
+        ));
+
         let enabled_ids = config
             .companies
             .iter()
@@ -939,6 +956,7 @@ mod tests {
                 "databricks",
                 "coolblue",
                 "topicus",
+                "centric",
                 "reddit"
             ]
         );

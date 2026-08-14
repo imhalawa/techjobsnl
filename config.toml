@@ -224,6 +224,16 @@ strategy = "getnoticed"
 base_url = "https://www.werkenbijtopicus.nl"
 
 [[companies]]
+id = "centric"
+name = "Centric"
+industry = "IT services, Software, Cloud, Consulting"
+scale = "Large European technology company"
+enabled = true
+[companies.source]
+strategy = "recruitee"
+base_url = "https://centric.recruitee.com"
+
+[[companies]]
 id = "reddit"
 name = "Reddit"
 industry = "Social media, Advertising, Community platform"

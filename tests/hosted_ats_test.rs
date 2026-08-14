@@ -232,6 +232,16 @@ fn parses_complete_recruitee_offers() {
 }
 
 #[test]
+fn recruitee_accepts_null_optional_requirements() {
+    let mut offers = recruitee_fixture();
+    offers["offers"][0]["requirements"] = serde_json::Value::Null;
+
+    let jobs = parse_recruitee_response("funda", &offers.to_string()).unwrap();
+
+    assert_eq!(jobs[0].description, "Build the housing platform.");
+}
+
+#[test]
 fn recruitee_rejects_missing_required_data_and_duplicate_ids() {
     for mutation in [
         "offers",
@@ -254,7 +264,7 @@ fn recruitee_rejects_missing_required_data_and_duplicate_ids() {
             "apply_url" => offers["offers"][0]["careers_apply_url"] = "".into(),
             "description" => {
                 offers["offers"][0]["description"] = "<p> </p>".into();
-                offers["offers"][0]["requirements"] = "<p> </p>".into();
+                offers["offers"][0]["requirements"] = serde_json::Value::Null;
             }
             "locations" => offers["offers"][0]["locations"] = serde_json::json!([]),
             "duplicate" => offers["offers"][1]["id"] = offers["offers"][0]["id"].clone(),
@@ -329,6 +339,21 @@ async fn recruitee_live_returns_complete_unique_jobs() {
     let source = RecruiteeSource::new("funda", "https://jobs.funda.nl", client);
     let jobs = complete_jobs(source.scan().await.unwrap());
     assert_live_jobs("Funda", &jobs);
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn recruitee_live_returns_complete_unique_centric_jobs() {
+    let client = live_client();
+    let source = RecruiteeSource::new("centric", "https://centric.recruitee.com", client);
+    let jobs = complete_jobs(source.scan().await.unwrap());
+    assert_live_jobs("Centric", &jobs);
+    assert!(jobs.iter().all(|job| job.countries == ["NL"]));
+    assert!(
+        jobs.iter()
+            .all(|job| job.job_url.starts_with("https://centric.recruitee.com/"))
+    );
+    println!("Centric: {} jobs", jobs.len());
 }
 
 fn greenhouse_fixture() -> serde_json::Value {

@@ -99,7 +99,7 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
     let mut config = Config::load(format!("{}/config.toml", env!("CARGO_MANIFEST_DIR"))).unwrap();
     assert_eq!(config.database_path, ".data/job-watch.sqlite3");
     assert_eq!(config.scan.concurrency, 4);
-    assert_eq!(config.companies.len(), 17);
+    assert_eq!(config.companies.len(), 18);
     assert_eq!(config.companies[0].name, "Mollie");
     assert_eq!(config.companies[1].name, "Booking.com");
     assert_eq!(config.companies[2].name, "eBay");
@@ -116,7 +116,8 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
     assert_eq!(config.companies[13].name, "Databricks");
     assert_eq!(config.companies[14].name, "Coolblue");
     assert_eq!(config.companies[15].name, "Topicus");
-    assert_eq!(config.companies[16].name, "Reddit");
+    assert_eq!(config.companies[16].name, "Centric");
+    assert_eq!(config.companies[17].name, "Reddit");
 
     let mollie = config.companies[0].clone();
     config.companies.truncate(1);

@@ -120,7 +120,8 @@ fn observed_job(
 
     let description = html_markdown(&format!(
         "{}<br><br>{}",
-        offer.description, offer.requirements
+        offer.description,
+        offer.requirements.as_deref().unwrap_or_default()
     ));
     if description.is_empty() {
         return Err(SourceError::schema(format!(
@@ -185,7 +186,7 @@ struct RecruiteeOffer {
     #[serde(default)]
     employment_type_code: String,
     description: String,
-    requirements: String,
+    requirements: Option<String>,
     careers_url: String,
     careers_apply_url: String,
     published_at: String,
