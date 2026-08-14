@@ -614,6 +614,16 @@ strategy = "postnl"
 api_url = "https://vacatures-website.postnl.nl/vacatures-widget/api/"
 
 [[companies]]
+id = "pggm"
+name = "PGGM"
+industry = "Pensions, Asset management, Financial services, Technology"
+scale = "1,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "pggm"
+listing_url = "https://www.werkenbijpggm.nl/vacatures"
+
+[[companies]]
 id = "tomtom"
 name = "TomTom"
 industry = "Location technology, Digital maps, Navigation, Automotive software"

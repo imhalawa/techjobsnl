@@ -22,6 +22,7 @@ pub mod lever;
 pub mod microsoft;
 pub mod ns;
 pub mod personio;
+pub mod pggm;
 pub mod postnl;
 pub mod rabobank;
 pub mod recruitee;

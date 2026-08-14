@@ -210,6 +210,9 @@ pub enum SourceConfig {
     Postnl {
         api_url: String,
     },
+    Pggm {
+        listing_url: String,
+    },
     Amazon {
         search_url: String,
     },
@@ -278,6 +281,7 @@ impl SourceConfig {
             Self::Chipsoft { .. } => "ChipSoft HTML",
             Self::Anwb { .. } => "ANWB JSON + JSON-LD",
             Self::Postnl { .. } => "PostNL paged API",
+            Self::Pggm { .. } => "PGGM paged HTML",
             Self::Amazon { .. } => "Amazon Jobs API",
             Self::Uber { .. } => "Uber Oracle HCM API",
             Self::Microsoft { .. } => "Microsoft Careers API",
@@ -326,6 +330,7 @@ impl SourceConfig {
             | Self::PagedHtml { listing_url, .. } => listing_url,
             Self::Anwb { feed_url } => feed_url,
             Self::Postnl { api_url } => api_url,
+            Self::Pggm { listing_url } => listing_url,
             Self::Amazon { search_url } => search_url,
             Self::Uber { api_url } => api_url,
             Self::Microsoft { search_url } => search_url,
@@ -500,6 +505,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("api_url"),
                     "must be the official PostNL vacancy API",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Pggm { listing_url } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            if listing_url != "https://www.werkenbijpggm.nl/vacatures" {
+                return Err(ConfigError::invalid(
+                    path("listing_url"),
+                    "must be the official PGGM vacancy URL",
                 ));
             }
             Ok(())

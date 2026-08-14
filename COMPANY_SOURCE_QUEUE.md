@@ -57,7 +57,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 46. [x] **Microsoft** — shipped · official Eightfold API with exact pagination, complete detail validation, and explicit Netherlands filtering.
 47. [ ] **Meta** — blocked/needs research · public/login-gated interface did not safely expose a current Netherlands vacancy.
 48. [x] **PostNL** — shipped · official paginated vacancy API with complete detail validation.
-49. [ ] **PGGM** — blocked/needs research · official custom source has current .NET roles; no reusable complete feed proved.
+49. [x] **PGGM** — shipped · official paginated board with complete detail validation.
 50. [x] **NS** — shipped · NS custom/Hamilton feed.
 51. [x] **Achmea** — shipped · Hamilton feed using the verified NS adapter profile.
 52. [ ] **a.s.r.** — blocked/needs research · live roles use an unsupported custom Vue/API source.
