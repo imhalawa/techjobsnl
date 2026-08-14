@@ -67,6 +67,4 @@ The live smoke tests check Mollie's, Airwallex's, DataSnipper's, Adyen's, Databr
 
 ## Company onboarding
 
-Albert Heijn Tech is tracked but disabled. Its native official filtered source was complete on 2026-08-13 with 10 Tech/Data Science jobs, but each vacancy names only `Albert Heijn` as hiring organization. Re-enable it only when an official vacancy, recruiter, or employment document names the legal entity and its KvK number matches a current IND-recognised sponsor.
-
 The remaining allowlist is not enabled. Each company requires source-contract fixtures and live verification before it can be added safely. Re-check `SOURCES.md` before changing enabled policy.

@@ -107,10 +107,10 @@ listing_url = "https://www.werkenbijeneco.nl/vacatures?f=1270"
 [[companies]]
 id = "ahold"
 name = "Albert Heijn Tech"
-enabled = false
+enabled = true
 [companies.source]
-strategy = "unsupported"
-reason = "legal employer not established"
+strategy = "albert-heijn"
+base_url = "https://werk.ah.nl"
 
 [[companies]]
 id = "ing"

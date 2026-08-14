@@ -352,6 +352,9 @@ fn rejects_empty_source_fields() {
         SourceConfig::Eneco {
             listing_url: " ".into(),
         },
+        SourceConfig::AlbertHeijn {
+            base_url: " ".into(),
+        },
         SourceConfig::Ing {
             listing_url: "".into(),
         },
@@ -406,6 +409,9 @@ fn rejects_non_https_source_urls() {
         },
         SourceConfig::Eneco {
             listing_url: "http://www.werkenbijeneco.nl/vacatures?f=1270".into(),
+        },
+        SourceConfig::AlbertHeijn {
+            base_url: "http://werk.ah.nl".into(),
         },
         SourceConfig::Ing {
             listing_url: "http://careers.ing.com/en/search-jobs".into(),

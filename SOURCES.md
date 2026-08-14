@@ -89,6 +89,7 @@
 ## Albert Heijn Tech
 
 - Sponsor candidates: the current IND public register for work lists `Albert Heijn B.V.` with KvK `35012085` and `Albert Heijn Support B.V.` with KvK `34305784`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.
-- Official source: the native official filtered source returned a technically complete set of 10 Tech/Data Science jobs on 2026-08-13. Every vacancy's `hiringOrganization` was only `Albert Heijn`.
+- Official source: <https://werk.ah.nl/api/vacancy/> filtered to Hoofdkantoor and IT/Data-science, plus each public vacancy detail's `JobPosting` JSON-LD. The adapter uses the endpoint's required `X-Requested-With` request header, validates all pagination metadata and filters, rejects duplicate IDs, and requires matching official detail data.
+- Live discovery: 11 complete Tech/Data-science jobs on 2026-08-14. IDs were unique and every job had the required title, description, date, and Netherlands location. The count is volatile and is not hardcoded in the smoke test.
 - Privacy evidence: the recruitment privacy notice spans four entities. It does not establish which legal entity employs a vacancy candidate.
-- Policy: Albert Heijn Tech remains configured as disabled and unsupported because the legal employer cannot be matched to an IND sponsor. Re-enable it only when an official vacancy, recruiter, or employment document names the legal entity and its KvK number matches a current IND-recognised sponsor.
+- Hiring entity: each vacancy identifies only `Albert Heijn`. The exact employment-contract entity remains unproven; confirm it before relying on sponsor status.

@@ -149,6 +149,9 @@ pub enum SourceConfig {
     Eneco {
         listing_url: String,
     },
+    AlbertHeijn {
+        base_url: String,
+    },
     Ing {
         listing_url: String,
     },
@@ -193,6 +196,7 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
             validate_country(country, path("country"))
         }
         SourceConfig::Eneco { listing_url } => validate_https_url(listing_url, path("listing_url")),
+        SourceConfig::AlbertHeijn { base_url } => validate_https_url(base_url, path("base_url")),
         SourceConfig::Getnoticed {
             base_url,
             country_filter,

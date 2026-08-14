@@ -17,7 +17,8 @@ use job_watch::{
     filter::EligibilityFilter,
     scanner::ScanService,
     sources::{
-        JobSource, ashby, bol, ebay, eneco, getnoticed, greenhouse, ing, jibe, rabobank, recruitee,
+        JobSource, albert_heijn, ashby, bol, ebay, eneco, getnoticed, greenhouse, ing, jibe,
+        rabobank, recruitee,
     },
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
@@ -296,6 +297,9 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     listing_url,
                     client.clone(),
                 ))),
+                SourceConfig::AlbertHeijn { base_url } => Ok(Arc::new(
+                    albert_heijn::AlbertHeijnSource::new(&company.id, base_url, client.clone()),
+                )),
                 SourceConfig::Ing { listing_url } => Ok(Arc::new(ing::IngSource::new(
                     &company.id,
                     listing_url,
@@ -666,10 +670,10 @@ mod tests {
 
         assert_eq!(ahold.len(), 1);
         assert_eq!(ahold[0].name, "Albert Heijn Tech");
-        assert!(!ahold[0].enabled);
+        assert!(ahold[0].enabled);
         assert!(matches!(
             &ahold[0].source,
-            SourceConfig::Unsupported { reason } if reason == "legal employer not established"
+            SourceConfig::AlbertHeijn { base_url } if base_url == "https://werk.ah.nl"
         ));
 
         assert_eq!(datasnipper.len(), 1);
@@ -717,6 +721,7 @@ mod tests {
                 "bol",
                 "rabobank",
                 "eneco",
+                "ahold",
                 "ing",
                 "abn-amro",
                 "datasnipper",
