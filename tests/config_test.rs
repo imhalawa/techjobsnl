@@ -435,6 +435,9 @@ fn rejects_empty_source_fields() {
         SourceConfig::Coolblue {
             listing_url: " ".into(),
         },
+        SourceConfig::Pggm {
+            listing_url: " ".into(),
+        },
         SourceConfig::Buckaroo {
             listing_url: " ".into(),
         },
@@ -504,6 +507,9 @@ fn rejects_non_https_source_urls() {
         },
         SourceConfig::Pay {
             listing_url: "http://www.pay.nl/werk".into(),
+        },
+        SourceConfig::Pggm {
+            listing_url: "http://www.werkenbijpggm.nl/vacatures".into(),
         },
         SourceConfig::Buckaroo {
             listing_url: "http://www.buckaroo.nl/over-buckaroo/vacatures".into(),

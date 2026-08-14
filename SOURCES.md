@@ -8,6 +8,15 @@
 - The current board and most vacancy text are in Dutch. Language, work-authorisation, relocation, and visa sponsorship conditions vary by vacancy; confirm them before applying.
 - The board identifies the Brand New Day brand, not the legal contract entity for each vacancy. Confirm that entity before relying on recognised-sponsor status.
 
+## PGGM
+
+- Official source: <https://www.werkenbijpggm.nl/vacatures>. PGGM's first-party server-rendered board declares its last page and fixed six-row pages. The adapter validates every declared page plus an empty sentinel page, unique Salesforce vacancy IDs, matching titles, full descriptions, and official job and application URLs before accepting a complete scan. Individual pages do not expose a structured location; the adapter records `Netherlands` because PGGM's official 2025 annual report states that all employees work in the Netherlands.
+- Live discovery: the board published 28 Netherlands vacancies on 2026-08-14. The count is volatile and is not hardcoded in the smoke test. The first-party detail pages do not publish posting dates, so the adapter leaves `published_at` empty rather than inventing a date.
+- PGGM's 2025 annual report records 1,987 internal employees, all working in the Netherlands: <https://pggm.nl/media/2xbnbek1/jaarverslag-pggm-cooperatie-u-a-2025.pdf>. The configured `1,000+` band follows the app's EU large-company classification.
+- PGGM describes itself as a non-profit cooperative pension-administration organisation and provides pension administration, asset management, and policy advice: <https://www.pggm.nl/>. The configured industries cover that board and its technology roles.
+- The board is mainly Dutch and includes some English roles. Language, relocation, work-authorisation, and visa sponsorship conditions vary by vacancy; confirm them on each role.
+- The board identifies the PGGM brand, not the legal contract entity for every vacancy. Confirm that entity before relying on recognised-sponsor status.
+
 ## Worldline
 
 - Official source: <https://jobs.worldline.com/search/?q=&locationsearch=Netherlands&locale=en_US>. Its first-party SAP SuccessFactors endpoint at <https://jobs.worldline.com/services/recruiting/v1/jobs> declares the exact Netherlands total and exposes fixed 25-row pagination. The adapter obtains the required CSRF token from the official search page, validates every unique ID and explicit Netherlands location, then matches each canonical detail URL, title, date, full description, and official application path before accepting a complete scan.

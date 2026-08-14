@@ -26,7 +26,7 @@ use job_watch::{
     sources::{
         JobSource, afas, albert_heijn, amazon, anwb, ashby, bol, buckaroo, chipsoft, coolblue,
         deel, ebay, eneco, exact, getnoticed, google, greenhouse, ing, jibe, lever, microsoft, ns,
-        pay, personio, postnl, rabobank, recruitee, successfactors, successfactors_api, uber,
+        pay, personio, pggm, postnl, rabobank, recruitee, successfactors, successfactors_api, uber,
         workable, workday, yuki,
     },
     storage::{JobQuery, ScanReadModel, SourceReadModel, Store},
@@ -637,6 +637,11 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     api_url,
                     client.clone(),
                 ))),
+                SourceConfig::Pggm { listing_url } => Ok(Arc::new(pggm::PggmSource::new(
+                    &company.id,
+                    listing_url,
+                    client.clone(),
+                ))),
                 SourceConfig::Amazon { search_url } => Ok(Arc::new(amazon::AmazonSource::new(
                     &company.id,
                     search_url,
@@ -1058,7 +1063,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 66);
+        assert_eq!(migrated.companies.len(), 67);
         assert!(
             migrated
                 .companies
@@ -1410,6 +1415,7 @@ mod tests {
                 "chipsoft",
                 "anwb",
                 "postnl",
+                "pggm",
                 "tomtom",
                 "amazon",
                 "uber",
