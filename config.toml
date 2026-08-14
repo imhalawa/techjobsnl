@@ -622,3 +622,13 @@ enabled = true
 [companies.source]
 strategy = "amazon"
 search_url = "https://www.amazon.jobs/en/search.json?normalized_country_code%5B%5D=NLD&offset=0&result_limit=100"
+
+[[companies]]
+id = "klarna"
+name = "Klarna"
+industry = "Fintech, Digital banking, Payments, E-commerce"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "deel"
+board_url = "https://jobs.deel.com/klarna"

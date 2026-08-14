@@ -6,6 +6,7 @@ pub mod ashby;
 pub mod bol;
 pub mod chipsoft;
 pub mod coolblue;
+pub mod deel;
 pub mod ebay;
 pub mod eneco;
 pub mod exact;

@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Klarna
+
+- Official source: <https://jobs.deel.com/klarna>. The server-rendered board publishes a complete ordered ItemList. The adapter validates every unique official URL, fetches every listed JobPosting detail, matches its Deel ATS ID and canonical URL, and keeps only explicit Amsterdam vacancies.
+- Klarna's official press kit reports 3,400 employees: <https://www.klarna.com/international/press/>. The configured `2,000+` band follows the app's EU large-company classification.
+- Klarna describes itself as a digital bank and flexible-payments provider: <https://investors.klarna.com/overview/>. The configured industries cover its payments, banking, shopping, and merchant-commerce products.
+- The current Amsterdam vacancy is in English. The board does not prove visa sponsorship or the legal contract entity; confirm both before relying on recognised-sponsor status.
+
 ## Amazon / AWS
 
 - Official source: <https://www.amazon.jobs/en/search?country=NLD>. Its JSON API at <https://www.amazon.jobs/en/search.json?normalized_country_code%5B%5D=NLD&offset=0&result_limit=100> declares the exact Netherlands total. The adapter follows every result page and validates unique feed IDs, public job IDs, official paths, Netherlands locations, dates, full descriptions, and Amazon-owned application URLs.

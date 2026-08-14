@@ -210,6 +210,9 @@ pub enum SourceConfig {
     Amazon {
         search_url: String,
     },
+    Deel {
+        board_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -256,6 +259,7 @@ impl SourceConfig {
             Self::Anwb { .. } => "ANWB JSON + JSON-LD",
             Self::Postnl { .. } => "PostNL paged API",
             Self::Amazon { .. } => "Amazon Jobs API",
+            Self::Deel { .. } => "Deel Jobs",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -297,6 +301,7 @@ impl SourceConfig {
             Self::Anwb { feed_url } => feed_url,
             Self::Postnl { api_url } => api_url,
             Self::Amazon { search_url } => search_url,
+            Self::Deel { board_url } => board_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -466,6 +471,26 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("search_url"),
                     "must be the exact official Amazon Netherlands search API",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Deel { board_url } => {
+            validate_https_url(board_url, path("board_url"))?;
+            let url = Url::parse(board_url).expect("validated URL must parse");
+            let segments = url
+                .path_segments()
+                .map(Iterator::collect::<Vec<_>>)
+                .unwrap_or_default();
+            if url.host_str() != Some("jobs.deel.com")
+                || segments.len() != 1
+                || segments[0].is_empty()
+                || url.query().is_some()
+                || url.fragment().is_some()
+            {
+                return Err(ConfigError::invalid(
+                    path("board_url"),
+                    "must be an official Deel company board URL",
                 ));
             }
             Ok(())
