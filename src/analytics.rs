@@ -19,7 +19,8 @@ use crate::{
     domain::{JobKey, JobRecord},
 };
 
-const EXTRACTOR_VERSION: &str = "taxonomy-v2";
+// Cached JSON changed when SkillEvidence gained `kind`; changing this invalidates old rows.
+const EXTRACTOR_VERSION: &str = "taxonomy-v3";
 const SKILL_BANK_JSON: &str = include_str!("../assets/software-skills.json");
 const ROLE_BANK_JSON: &str = include_str!("../assets/role-families.json");
 const MAX_CLI_OUTPUT_BYTES: u64 = 1_000_000;
