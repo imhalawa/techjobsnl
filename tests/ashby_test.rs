@@ -14,6 +14,23 @@ use job_watch::{
 };
 
 #[test]
+fn parses_and_filters_sanitized_datasnipper_board() {
+    let jobs = parse_ashby_response(
+        "datasnipper",
+        include_str!("fixtures/ashby/datasnipper.json"),
+    )
+    .unwrap();
+    let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
+    let filter = EligibilityFilter::new(&config.filters).unwrap();
+
+    assert_eq!(jobs.len(), 1);
+    assert_eq!(jobs[0].title, "Site Reliability Engineer");
+    assert_eq!(jobs[0].locations, ["Amsterdam"]);
+    assert_eq!(jobs[0].countries, ["NL"]);
+    assert!(filter.classify(&jobs[0], &HashMap::new()).unwrap().eligible);
+}
+
+#[test]
 fn parses_and_filters_sanitized_airwallex_board() {
     let jobs =
         parse_ashby_response("airwallex", include_str!("fixtures/ashby/airwallex.json")).unwrap();
@@ -212,6 +229,46 @@ async fn scans_live_airwallex_board_as_a_complete_unique_result() {
         assert!(job.raw_payload.is_object());
     }
     println!("Airwallex: {} complete jobs", observations.len());
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn scans_live_datasnipper_board_as_a_complete_unique_result() {
+    let client = build_client(
+        "job-watch/0.1 (+DataSnipper live test)",
+        Duration::from_secs(20),
+    )
+    .unwrap();
+    let source = AshbySource::new("datasnipper", "datasnipper", client);
+
+    let SourceScan::Complete { observations } = source.scan().await.unwrap() else {
+        panic!("Ashby scans must be complete");
+    };
+    assert!(!observations.is_empty());
+
+    let mut source_ids = HashSet::new();
+    for job in &observations {
+        assert!(source_ids.insert(&job.source_id));
+        assert!(!job.title.trim().is_empty());
+        assert!(!job.locations.is_empty());
+        assert!(!job.countries.is_empty());
+        assert!(!job.job_url.trim().is_empty());
+        assert!(!job.apply_url.trim().is_empty());
+        assert!(!job.description.trim().is_empty());
+    }
+    assert!(
+        observations
+            .iter()
+            .any(|job| job.countries.contains(&"NL".into()))
+    );
+    let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
+    let filter = EligibilityFilter::new(&config.filters).unwrap();
+    assert!(observations.iter().any(|job| {
+        filter
+            .classify(job, &HashMap::new())
+            .is_ok_and(|result| result.eligible)
+    }));
+    println!("DataSnipper: {} complete jobs", observations.len());
 }
 
 fn fixture_board() -> serde_json::Value {

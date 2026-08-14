@@ -127,3 +127,11 @@ enabled = true
 strategy = "getnoticed"
 base_url = "https://www.werkenbijabnamro.nl"
 country_filter = "Nederland"
+
+[[companies]]
+id = "datasnipper"
+name = "DataSnipper"
+enabled = true
+[companies.source]
+strategy = "ashby"
+board = "datasnipper"

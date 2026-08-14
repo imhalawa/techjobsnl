@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## DataSnipper
+
+- Sponsor: the IND public register for work dated 2026-08-03 lists `DataSnipper B.V.` with KvK `69343861`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. DataSnipper's official terms identify the Amsterdam entity with the same legal name and KvK number: <https://www.datasnipper.com/pdf-proxy.pdf?url=https%3A%2F%2Feu-assets.contentstack.com%2Fv3%2Fassets%2Fbltc08aa646f32b9827%2Fblt2109238ccab969a1%2F696a12bc34206b2e8465af0d%2FDataSnipper_Terms_and_Conditions_-_Version_2025-07-01.pdf>.
+- Hiring entity: the careers board identifies DataSnipper and Amsterdam vacancies, but does not prove that every eventual contract is with `DataSnipper B.V.`. Confirm the employment entity before relying on sponsor status.
+- Official source: <https://api.ashbyhq.com/posting-api/job-board/datasnipper>. The existing Ashby adapter consumes this complete single-endpoint board and normalises its `The Netherlands` country label.
+- Live discovery: 32 complete jobs on 2026-08-14, including Netherlands vacancies. IDs were unique and every job had the parser-required fields. The count is volatile and is not hardcoded in the smoke test.
+
 ## ABN AMRO
 
 - Sponsor: the current IND public register for work, updated 2026-08-03, lists `ABN AMRO Bank N.V.` with KvK `34334259`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. ABN AMRO's own disclaimer identifies `ABN AMRO Bank N.V.` with the same Chamber of Commerce number: <https://www.abnamro.com/research/en/home/information/disclaimer>.

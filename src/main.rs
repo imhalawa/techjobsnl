@@ -574,6 +574,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "ahold")
             .collect::<Vec<_>>();
+        let datasnipper = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "datasnipper")
+            .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
         assert!(adyen[0].enabled);
@@ -639,6 +644,13 @@ mod tests {
             SourceConfig::Unsupported { reason } if reason == "legal employer not established"
         ));
 
+        assert_eq!(datasnipper.len(), 1);
+        assert!(datasnipper[0].enabled);
+        assert!(matches!(
+            &datasnipper[0].source,
+            SourceConfig::Ashby { board } if board == "datasnipper"
+        ));
+
         let enabled_ids = config
             .companies
             .iter()
@@ -656,7 +668,8 @@ mod tests {
                 "funda",
                 "bol",
                 "ing",
-                "abn-amro"
+                "abn-amro",
+                "datasnipper"
             ]
         );
 

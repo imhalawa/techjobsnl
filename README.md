@@ -1,6 +1,6 @@
 # Job Watch
 
-Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. It enables Mollie's and Airwallex's Ashby boards, Adyen's Greenhouse board, Booking.com's Jibe API, Funda's Recruitee board, bol.com's official careers API, ING's and ABN AMRO's official Netherlands careers sources, and eBay's official Netherlands careers pages.
+Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. It enables Mollie's, Airwallex's, and DataSnipper's Ashby boards, Adyen's Greenhouse board, Booking.com's Jibe API, Funda's Recruitee board, bol.com's official careers API, ING's and ABN AMRO's official Netherlands careers sources, and eBay's official Netherlands careers pages.
 
 ## Run
 

@@ -217,7 +217,7 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
 
 fn normalise_country(country: &str) -> String {
     match country {
-        "Netherlands" => "NL".to_owned(),
+        "Netherlands" | "The Netherlands" => "NL".to_owned(),
         country => country.to_owned(),
     }
 }

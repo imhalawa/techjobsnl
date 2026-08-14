@@ -1,0 +1,27 @@
+{
+  "jobs": [
+    {
+      "id": "datasnipper-sre-1",
+      "title": "Site Reliability Engineer",
+      "department": "Engineering",
+      "team": "Platform",
+      "employmentType": "FullTime",
+      "location": "Amsterdam",
+      "secondaryLocations": [],
+      "publishedAt": "2026-08-14T09:00:00Z",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "address": {
+        "postalAddress": {
+          "addressCountry": "The Netherlands",
+          "addressLocality": "Amsterdam"
+        }
+      },
+      "jobUrl": "https://jobs.example.test/datasnipper/datasnipper-sre-1",
+      "applyUrl": "https://jobs.example.test/datasnipper/datasnipper-sre-1/application",
+      "descriptionPlain": "Keep the platform reliable."
+    }
+  ],
+  "apiVersion": "1"
+}
