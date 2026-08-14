@@ -1,5 +1,11 @@
 # Source and sponsor evidence
 
+## Vanderlande
+
+- Official source: <https://vanderlande.wd3.myworkdayjobs.com/careers>. The Workday API exposes an explicit Netherlands facet, a first-page total, paginated stable paths, and complete detail records.
+- Vanderlande's official facts page reports more than 9,000 employees: <https://www.vanderlande.com/about-vanderlande/facts-and-figures/>.
+- Workday exposes vacancy details but not a separately validated contract entity for every role. Confirm that entity before relying on sponsor status.
+
 ## Wolters Kluwer
 
 - Official source: <https://wk.wd3.myworkdayjobs.com/External>. The Workday API exposes an explicit Netherlands facet, a first-page total, paginated stable paths, and complete detail records.
