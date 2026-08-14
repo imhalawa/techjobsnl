@@ -22,7 +22,7 @@ use job_watch::{
     scanner::ScanService,
     sources::{
         JobSource, albert_heijn, ashby, bol, coolblue, ebay, eneco, getnoticed, greenhouse, ing,
-        jibe, rabobank, recruitee,
+        jibe, rabobank, recruitee, yuki,
     },
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
@@ -367,6 +367,11 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                 SourceConfig::Recruitee { base_url } => Ok(Arc::new(
                     recruitee::RecruiteeSource::new(&company.id, base_url, client.clone()),
                 )),
+                SourceConfig::Yuki { feed_url } => Ok(Arc::new(yuki::YukiSource::new(
+                    &company.id,
+                    feed_url,
+                    client.clone(),
+                ))),
                 SourceConfig::Bol { base_url } => Ok(Arc::new(bol::BolSource::new(
                     &company.id,
                     base_url,
@@ -802,6 +807,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "cmcom")
             .collect::<Vec<_>>();
+        let yuki = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "yuki")
+            .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
         assert!(adyen[0].enabled);
@@ -948,6 +958,15 @@ mod tests {
                 if base_url == "https://cmcom.recruitee.com"
         ));
 
+        assert_eq!(yuki.len(), 1);
+        assert!(yuki[0].enabled);
+        assert_eq!(yuki[0].industry, "Accounting software, Fintech, B2B SaaS");
+        assert!(matches!(
+            &yuki[0].source,
+            SourceConfig::Yuki { feed_url }
+                if feed_url == "https://jobs.yukisoftware.com/jobs.json"
+        ));
+
         let enabled_ids = config
             .companies
             .iter()
@@ -975,6 +994,7 @@ mod tests {
                 "topicus",
                 "centric",
                 "cmcom",
+                "yuki",
                 "reddit"
             ]
         );

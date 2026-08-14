@@ -152,6 +152,9 @@ pub enum SourceConfig {
     Recruitee {
         base_url: String,
     },
+    Yuki {
+        feed_url: String,
+    },
     Bol {
         base_url: String,
     },
@@ -193,6 +196,7 @@ impl SourceConfig {
             Self::Jibe { .. } => "Jibe",
             Self::Ebay { .. } => "eBay",
             Self::Recruitee { .. } => "Recruitee",
+            Self::Yuki { .. } => "Teamtailor JSON Feed",
             Self::Bol { .. } => "bol.com",
             Self::Coolblue { .. } => "Coolblue HTML",
             Self::Rabobank { .. } => "Rabobank API",
@@ -215,6 +219,9 @@ impl SourceConfig {
             | Self::AlbertHeijn { base_url }
             | Self::Getnoticed { base_url, .. } => base_url,
             Self::Ebay { listing_url }
+            | Self::Yuki {
+                feed_url: listing_url,
+            }
             | Self::Coolblue { listing_url }
             | Self::Eneco { listing_url }
             | Self::Ing { listing_url }
@@ -244,6 +251,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
         }
         SourceConfig::Recruitee { base_url } | SourceConfig::Bol { base_url } => {
             validate_https_url(base_url, path("base_url"))?;
+            Ok(())
+        }
+        SourceConfig::Yuki { feed_url } => {
+            validate_https_url(feed_url, path("feed_url"))?;
+            if company.id != "yuki" || feed_url != "https://jobs.yukisoftware.com/jobs.json" {
+                return Err(ConfigError::invalid(
+                    path("feed_url"),
+                    "must be Yuki's exact official JSON feed",
+                ));
+            }
             Ok(())
         }
         SourceConfig::Coolblue { listing_url } => {

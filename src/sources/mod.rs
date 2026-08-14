@@ -12,6 +12,7 @@ pub mod jibe;
 pub mod json_ld;
 pub mod rabobank;
 pub mod recruitee;
+pub mod yuki;
 
 use std::time::Duration;
 

@@ -244,6 +244,16 @@ strategy = "recruitee"
 base_url = "https://cmcom.recruitee.com"
 
 [[companies]]
+id = "yuki"
+name = "Yuki"
+industry = "Accounting software, Fintech, B2B SaaS"
+scale = "European scale-up, 200+ employees"
+enabled = true
+[companies.source]
+strategy = "yuki"
+feed_url = "https://jobs.yukisoftware.com/jobs.json"
+
+[[companies]]
 id = "reddit"
 name = "Reddit"
 industry = "Social media, Advertising, Community platform"
