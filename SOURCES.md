@@ -1,5 +1,11 @@
 # Source and sponsor evidence
 
+## Info Support
+
+- Official source: <https://werkenbij.infosupport.com/en/jobs.json>. The Teamtailor JSON feed exposes every public job, stable identifiers, structured locations, descriptions, and publication dates in one response.
+- Current job descriptions report approximately 500 Info Support employees.
+- The feed identifies Info Support as the hiring organisation. Confirm the contract entity before relying on sponsor status.
+
 ## Keylane
 
 - Official source: <https://apply.workable.com/keylane/>. Its cursor-paginated Workable API exposes the complete public board and job details; the configured filter keeps only jobs explicitly located in the Netherlands.
