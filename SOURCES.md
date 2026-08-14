@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## ChipSoft
+
+- Official source: <https://www.chipsoft.com/nl-NL/werken-bij/vacatures>. The server-rendered board exposes every vacancy in one response without pagination. The adapter validates unique official links, an explicit NL location allowlist, matching detail fields, and unique official application-form IDs; Antwerp vacancies are excluded.
+- ChipSoft reports more than 1,000 professionals: <https://www.chipsoft.com/nl-nl/organisatie/over-ons/>. The configured `1,000+` band is approximate.
+- Current developer roles require Dutch, including the .NET/C# roles. ChipSoft is therefore lower priority for applicants who do not speak Dutch.
+- The board identifies the ChipSoft brand, not the legal contract entity for every role. Confirm that entity before relying on recognised-sponsor status.
+
 ## NS
 
 - Official source: <https://www.werkenbijns.nl/vacatures>. Every page publishes an exact result range and stable total; the adapter verifies all pages, unique official vacancy IDs, matching JobPosting details, official application links, and explicit Netherlands evidence before accepting the scan.
