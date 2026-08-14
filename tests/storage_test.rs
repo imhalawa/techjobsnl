@@ -17,6 +17,8 @@ fn company(id: &str, enabled: bool) -> CompanyConfig {
     CompanyConfig {
         id: id.into(),
         name: id.to_uppercase(),
+        industry: "Test".into(),
+        scale: "Test".into(),
         enabled,
         location_country_overrides: HashMap::new(),
         source: SourceConfig::Ashby { board: id.into() },

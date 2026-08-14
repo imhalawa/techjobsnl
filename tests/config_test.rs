@@ -12,6 +12,8 @@ fn valid_config() -> Config {
         companies: vec![CompanyConfig {
             id: "mollie".into(),
             name: "Mollie".into(),
+            industry: "Test".into(),
+            scale: "Test".into(),
             enabled: true,
             location_country_overrides: HashMap::new(),
             source: SourceConfig::Ashby {

@@ -118,10 +118,18 @@ impl ConfigError {
 pub struct CompanyConfig {
     pub id: String,
     pub name: String,
+    #[serde(default = "unknown_company_metadata")]
+    pub industry: String,
+    #[serde(default = "unknown_company_metadata")]
+    pub scale: String,
     pub enabled: bool,
     #[serde(default)]
     pub location_country_overrides: HashMap<String, String>,
     pub source: SourceConfig,
+}
+
+fn unknown_company_metadata() -> String {
+    "Unknown".into()
 }
 
 #[derive(Debug, Clone, Deserialize)]

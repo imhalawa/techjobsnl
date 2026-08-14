@@ -121,6 +121,8 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
     let atlas = CompanyConfig {
         id: "atlas".into(),
         name: "Atlas".into(),
+        industry: "Test".into(),
+        scale: "Test".into(),
         enabled: true,
         location_country_overrides: Default::default(),
         source: SourceConfig::Ashby {

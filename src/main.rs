@@ -942,6 +942,8 @@ mod tests {
         CompanyConfig {
             id: "acme".into(),
             name: "Acme".into(),
+            industry: "Test".into(),
+            scale: "Test".into(),
             enabled: true,
             location_country_overrides: HashMap::new(),
             source: SourceConfig::Ashby {

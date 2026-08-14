@@ -922,6 +922,8 @@ fn company(id: &str) -> CompanyConfig {
     CompanyConfig {
         id: id.into(),
         name: id.into(),
+        industry: "Test".into(),
+        scale: "Test".into(),
         enabled: true,
         location_country_overrides: HashMap::new(),
         source: SourceConfig::Ashby { board: id.into() },

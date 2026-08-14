@@ -638,6 +638,22 @@ fn render_operational_details(frame: &mut Frame, app: &App, area: Rect) {
                             theme.primary_text,
                         ),
                         metadata_line(
+                            "Industry     ",
+                            configured
+                                .map(|company| company.industry.clone())
+                                .unwrap_or_else(|| "Unknown".into()),
+                            theme.muted_text,
+                            theme.primary_text,
+                        ),
+                        metadata_line(
+                            "Scale        ",
+                            configured
+                                .map(|company| company.scale.clone())
+                                .unwrap_or_else(|| "Unknown".into()),
+                            theme.muted_text,
+                            theme.primary_text,
+                        ),
+                        metadata_line(
                             "Adapter      ",
                             adapter.into(),
                             theme.muted_text,
@@ -1249,14 +1265,36 @@ fn render_sources(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
         } else {
             "disabled"
         };
-        let adapter = app
+        let configured = app
             .config()
             .companies
             .iter()
-            .find(|company| company.id == source.company_id)
+            .find(|company| company.id == source.company_id);
+        let adapter = configured
             .map(|company| company.source.strategy_name())
             .unwrap_or("Unknown");
-        let values = if area.width >= 90 {
+        let values = if area.width >= 140 {
+            vec![
+                Cell::from(label).style(Style::new().fg(color)),
+                Cell::from(source.company_name.clone()),
+                Cell::from(
+                    configured
+                        .map(|company| company.industry.as_str())
+                        .unwrap_or("Unknown"),
+                ),
+                Cell::from(
+                    configured
+                        .map(|company| company.scale.as_str())
+                        .unwrap_or("Unknown"),
+                ),
+                Cell::from(adapter),
+                Cell::from(state),
+                Cell::from(optional_time(source.latest_attempted_at)),
+                Cell::from(optional_time(source.latest_successful_at)),
+                Cell::from(diagnostic(&source.latest_error_kind, &source.diagnostic))
+                    .style(Style::new().fg(color)),
+            ]
+        } else if area.width >= 90 {
             vec![
                 Cell::from(label).style(Style::new().fg(color)),
                 Cell::from(source.company_name.clone()),
@@ -1294,7 +1332,32 @@ fn render_sources(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
         );
         return;
     }
-    let (headers, widths) = if area.width >= 90 {
+    let (headers, widths) = if area.width >= 140 {
+        (
+            vec![
+                "Health",
+                "Company",
+                "Industry",
+                "Scale",
+                "Adapter",
+                "State",
+                "Last attempt",
+                "Last success",
+                "Diagnostic",
+            ],
+            vec![
+                Constraint::Length(10),
+                Constraint::Length(16),
+                Constraint::Length(20),
+                Constraint::Length(20),
+                Constraint::Length(12),
+                Constraint::Length(8),
+                Constraint::Length(13),
+                Constraint::Length(13),
+                Constraint::Fill(1),
+            ],
+        )
+    } else if area.width >= 90 {
         (
             vec![
                 "Health",

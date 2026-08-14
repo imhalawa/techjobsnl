@@ -67,6 +67,8 @@ fn config() -> Config {
         companies: vec![CompanyConfig {
             id: "acme".into(),
             name: "Acme".into(),
+            industry: "Test industry".into(),
+            scale: "Test scale".into(),
             enabled: true,
             location_country_overrides: HashMap::new(),
             source: SourceConfig::Ashby {
@@ -110,6 +112,8 @@ fn config_with_two_companies() -> Config {
     configured.companies.push(CompanyConfig {
         id: "beta".into(),
         name: "Beta Labs".into(),
+        industry: "Test industry".into(),
+        scale: "Test scale".into(),
         enabled: true,
         location_country_overrides: HashMap::new(),
         source: SourceConfig::Ashby {
@@ -821,6 +825,70 @@ fn reported_default_analytics_include_dotnet_without_matching_unrelated_text() {
 }
 
 #[test]
+fn reported_mouse_wheel_burst_moves_one_analytics_item() {
+    let mut configured = config();
+    configured.analytics.skills = std::collections::BTreeMap::from([
+        ("Azure".into(), vec!["azure".into()]),
+        ("Go".into(), vec!["go".into()]),
+        ("Java".into(), vec!["java".into()]),
+        ("Python".into(), vec!["python".into()]),
+    ]);
+    let jobs = [
+        "Python Go Java Azure",
+        "Python Go Java",
+        "Python Go",
+        "Python",
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(index, description)| {
+        let mut item = job(&format!("Engineer {index}"), false, false);
+        item.classified.observed.description = description.into();
+        item
+    })
+    .collect();
+    let mut app = App::new(configured, jobs);
+    open_view(&mut app, 6);
+
+    for _ in 0..3 {
+        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 24, 1), 140, 24);
+    }
+
+    assert_eq!(app.selected_index(), 1);
+}
+
+#[test]
+fn reported_short_skill_bar_does_not_duplicate_percentage_digits() {
+    let mut configured = config();
+    configured.analytics.skills = std::collections::BTreeMap::from([
+        ("Python".into(), vec!["python".into()]),
+        ("TypeScript".into(), vec!["typescript".into()]),
+    ]);
+    let jobs = (0..76)
+        .map(|index| {
+            let mut item = job(&format!("Engineer {index}"), false, false);
+            item.classified.observed.description = match index {
+                0..6 => "Python TypeScript",
+                6..41 => "Python",
+                _ => "General software engineering",
+            }
+            .into();
+            item
+        })
+        .collect();
+    let mut app = App::new(configured, jobs);
+    open_view(&mut app, 6);
+
+    let buffer = rendered_buffer(&app, 160, 24);
+    let typescript = (0..buffer.area.height)
+        .map(|y| row(&buffer, y))
+        .find(|line| line.contains("TypeScript"))
+        .unwrap();
+    assert!(typescript.contains("6 jobs · 7%"), "{typescript}");
+    assert!(!typescript.contains("77%"), "{typescript}");
+}
+
+#[test]
 fn description_renders_markdown_structure_and_inline_emphasis() {
     let mut markdown_job = job("Markdown Engineer", false, false);
     markdown_job.classified.observed.description =
@@ -1261,7 +1329,7 @@ fn scans_and_sources_render_durable_semantic_states_at_all_breakpoints_and_theme
 
         open_view(&mut app, 5);
         assert_eq!(app.view(), View::Sources);
-        for width in [120, 80, 79] {
+        for width in [180, 120, 80, 79] {
             let buffer = rendered_buffer(&app, width, 24);
             let screen: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
             assert!(screen.contains("Health"));
@@ -1277,6 +1345,12 @@ fn scans_and_sources_render_durable_semantic_states_at_all_breakpoints_and_theme
                 assert!(screen.contains("Diagnostic"));
                 assert!(screen.contains("enabled"));
                 assert!(screen.contains("never"));
+            }
+            if width >= 180 {
+                assert!(screen.contains("Industry"));
+                assert!(screen.contains("Scale"));
+                assert!(screen.contains("Test industry"));
+                assert!(screen.contains("Test scale"));
             }
             let start_x = if width >= 120 { 22 } else { 0 };
             let status_x = symbol_x(&buffer, 3, start_x, "I");
