@@ -1,6 +1,6 @@
 # Configuration
 
-TechJobsNL uses one TOML configuration file. The shipped [config.toml](../config.toml) is the source for built-in defaults and the company catalog.
+TechJobsNL uses one TOML configuration file for its local job-finding workflow. The shipped [config.toml](../config.toml) is the source for built-in defaults, eligible jobs, skill analytics, and the company catalog.
 
 ## File location and updates
 
@@ -10,7 +10,7 @@ TechJobsNL uses one TOML configuration file. The shipped [config.toml](../config
 
 If the new path does not exist, TechJobsNL reuses an existing `job-watch/config.toml` so upgrades keep their configuration and database history.
 
-On first start, the app creates the file. Later starts merge newly shipped company profiles without overwriting unrelated user configuration. Invalid configuration stops startup and reports the absolute file path and failing field.
+On first start, the app creates the file. Later starts merge newly shipped company profiles while preserving each existing company's `enabled` choice and unrelated user configuration. Invalid configuration stops startup and reports the absolute file path and failing field.
 
 `database_path` is resolved relative to the directory containing the user configuration file.
 
@@ -60,6 +60,8 @@ exclude_title_patterns = ["manager", "director"]
 
 ## Analytics settings
 
+Analytics settings control the local facts used to explore observed market patterns and find vacancies matching a selected skill.
+
 ```toml
 [analytics]
 provider = "local"
@@ -91,7 +93,7 @@ focused_border = "cyan"
 error = "#ff5555"
 ```
 
-Built-in themes are `clean-dark` and `clean-light`. Any other theme name falls back to the dark base theme.
+The only valid built-in themes are `clean-dark` and `clean-light`.
 
 Optional override keys:
 
@@ -154,11 +156,11 @@ board = "mollie"
 | `location_country_overrides` | Optional exact source-label to country-code mapping for otherwise unresolved locations |
 | `source` | Adapter strategy and its required official-source fields |
 
-Disabling a company stops future scans but does not delete its stored history or applied state.
+Settings → Companies can change `enabled` without editing TOML. The choice is written immediately, the current job and Analytics views reload without the company, and future scans skip it. No scan starts automatically. Disabling a company does not delete its stored history or applied state, and enabling no companies is valid.
 
 ## Runtime-supported source strategies
 
-The shipped catalog currently uses all 32 strategies below. Optional fields are marked with `?`.
+The shipped catalog currently uses all **35** strategies below. Optional fields are marked with `?`.
 
 | Strategy | Required source fields |
 |---|---|
@@ -175,6 +177,8 @@ The shipped catalog currently uses all 32 strategies below. Optional fields are 
 | `teamtailor` | `feed_url`, `employer` |
 | `bol` | `base_url` |
 | `coolblue` | `listing_url` |
+| `pay` | `listing_url` |
+| `buckaroo` | `listing_url` |
 | `rabobank` | `base_url`, `country` |
 | `eneco` | `listing_url` |
 | `exact` | `listing_url` |
@@ -184,6 +188,7 @@ The shipped catalog currently uses all 32 strategies below. Optional fields are 
 | `chipsoft` | `listing_url` |
 | `anwb` | `feed_url` |
 | `postnl` | `api_url` |
+| `pggm` | `listing_url` |
 | `amazon` | `search_url` |
 | `uber` | `api_url` |
 | `microsoft` | `search_url` |

@@ -1,6 +1,26 @@
 # Architecture
 
-TechJobsNL is a single Rust binary with a shared library. It keeps source collection, filtering, storage, analytics, and terminal rendering separate so failures remain local and testable.
+TechJobsNL is a local job finder built as a single Rust binary with a shared library. Users can review jobs directly or select an extracted skill or market fact to see matching posting evidence. The code keeps source collection, filtering, storage, analytics, and terminal rendering separate so failures remain local and testable.
+
+## High-level design
+
+```mermaid
+flowchart LR
+    User[User] --> TUI[Ratatui terminal UI]
+    TUI --> App[UI state and commands]
+    App --> Scanner[Scan service]
+    App --> Analytics[Local analytics and insights]
+    App <--> Store[(SQLite)]
+    Scanner --> Sources[Source adapters]
+    Sources --> CareerSites[Official career sources]
+    Scanner --> Store
+    Analytics <--> Store
+    App --> Desktop[Browser and clipboard]
+```
+
+`src/main.rs` is the composition root [the place that connects the parts]. It builds source adapters from configuration, starts background work, applies `AppCommand` effects, reloads stored read models, and owns terminal startup and shutdown.
+
+The terminal UI does not call career sites directly. Scans go through `ScanService` and a `JobSource` adapter; job discovery and analytics read normalized local records from SQLite.
 
 ## Runtime flow
 
@@ -10,6 +30,32 @@ TechJobsNL is a single Rust binary with a shared library. It keeps source collec
 4. Pressing `r` starts `ScanService`, which runs enabled company sources with bounded concurrency.
 5. Each adapter returns Complete, Incomplete, or Failed. Storage commits each company outcome independently.
 6. The UI reloads durable read models after company outcomes and computes Analytics in background work.
+7. Changing Settings → Companies updates `config.toml` and SQLite, rebuilds the runtime scan service for later scans, and reloads visible data without starting a scan.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Ratatui UI
+    participant Main as main event loop
+    participant Scan as ScanService
+    participant Source as JobSource adapter
+    participant DB as SQLite Store
+
+    User->>UI: Press r
+    UI->>Main: StartScan command
+    Main->>Scan: Start background scan
+    loop Enabled companies with bounded concurrency
+        Scan->>Source: scan
+        Source->>Source: Validate identity, fields, and completeness
+        Source-->>Scan: Complete, Incomplete, or error
+        Scan->>DB: Persist company outcome
+        Scan-->>Main: Send progress event
+        Main-->>UI: Refresh status and stored jobs
+    end
+    Scan-->>Main: Run finished
+    Main->>DB: Reload durable views
+    Main-->>UI: Render final state
+```
 
 ## Module responsibilities
 
@@ -65,6 +111,22 @@ Local analytics is the default. The bundled JSON assets define canonical softwar
 
 Extraction records exact evidence from posting text and does not promote unknown words. Cached facts are reused while the content hash and extractor version remain unchanged.
 
+The UI reuses these facts in two places: the selected job's detail pane lists its extracted skills, and selecting a skill or market row filters the evidence list to open vacancies whose stored facts match that selection and the shared Analytics filters. Changing the selected job does not run extraction again.
+
+```mermaid
+flowchart LR
+    Jobs[(Stored eligible jobs)] --> Extract[Versioned local fact extraction]
+    Assets[Skill and role assets] --> Extract
+    Extract --> Facts[(Cached job facts)]
+    Facts --> Insights[Analytics report]
+    Filters[Time, company, role, seniority, work mode] --> Insights
+    Insights --> Selection[Selected skill or market row]
+    Selection --> Evidence[Matching open vacancies]
+    Evidence --> Open[Open official job URL]
+```
+
+The direct `/` search is separate and matches job title or company. Skill-based discovery happens in Analytics by selecting a row and opening one of its matching evidence jobs.
+
 `insights` compares current and previous windows only when comparable complete scan history exists. It reports confidence explicitly rather than presenting weak history as a reliable trend. Stack paths require shared jobs and coherent architectural roles, which avoids combining unrelated lists into false stacks.
 
 Optional Claude or Codex CLI discovery can propose emerging terms. The result must be strict JSON, every suggestion must exist in supplied posting text, attempts are cached, and a person must approve a suggestion before it affects later extraction.
@@ -73,7 +135,7 @@ Optional Claude or Codex CLI discovery can propose emerging terms. The result mu
 
 The event loop renders immediately and moves blocking database reloads, analytics calculation, optional discovery, and scans to background tasks. Analytics results include a revision so a result computed for an old filter state can be discarded.
 
-The renderer supports wide split panes, narrow detail surfaces, keyboard control, mouse selection, scrollbars, and theme overrides. `AppCommand` separates UI intent from effects such as writing SQLite, saving filters, opening a URL, or copying text.
+The renderer supports wide split panes, narrow detail surfaces, keyboard control, mouse selection, scrollbars, and theme overrides. Selectable rows share one hover/pressed style so mouse feedback stays consistent across views. `AppCommand` separates UI intent from effects such as writing SQLite, saving filters or company choices, rebuilding future scan inputs, opening a URL, or copying text.
 
 ## Verification boundaries
 
@@ -83,3 +145,5 @@ The renderer supports wide split panes, narrow detail surfaces, keyboard control
 - `make check` runs formatting, Clippy with warnings denied, Makefile checks, and all deterministic offline tests.
 
 Live tests are separate because external counts, availability, rate limits, and page contracts can change without a code change.
+
+See [Project structure](PROJECT_STRUCTURE.md) for file ownership and [Contributing](../CONTRIBUTING.md) for the change workflow.

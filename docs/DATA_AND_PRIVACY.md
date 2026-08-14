@@ -1,6 +1,6 @@
 # Data and privacy
 
-TechJobsNL is local-first: the application, configuration, analytics facts, and personal library run on your machine. Network access happens only for requested source scans and optional AI-provider discovery.
+TechJobsNL is a local-first job finder: jobs, application state, configuration, skill-matching facts, analytics, and the personal library stay on your machine. Network access happens only for requested source scans, opening an official job URL, and optional AI-provider discovery.
 
 ## What is stored
 

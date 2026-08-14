@@ -7,14 +7,17 @@ use std::{
 
 use chrono::{Duration, Utc};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::{
+    layout::{Constraint, Layout, Rect},
+    text::Line,
+};
 
 use crate::{
     analytics::{
         self, EmergingDiscoveryWork, JobFacts, Seniority, SkillEvidence, SkillKind,
         SkillSuggestion, SuggestionStatus, WorkMode,
     },
-    config::{Config, FiltersConfig},
+    config::{CompanyConfig, Config, FiltersConfig, SourceConfig},
     domain::{JobKey, JobRecord, ScanEvent, SourceScan},
     insights::{
         self, AnalyticsFilters, AnalyticsReport, AnalyticsResult, AnalyticsWork, LibraryState,
@@ -150,6 +153,7 @@ pub enum Focus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Setting {
     NewJobAge,
+    Companies,
     Countries,
     IncludedTitles,
     ExcludedTitles,
@@ -193,6 +197,7 @@ pub enum AppCommand {
     CopyUrl(String),
     ReloadJobs,
     SaveFilters(FiltersConfig),
+    SaveCompanies(Vec<(String, bool)>),
     SaveAnalyticsState(AnalyticsFilters, LibraryState),
     ReviewSkillSuggestion(String, SuggestionStatus),
     Quit,
@@ -205,6 +210,103 @@ struct ScanProgress {
     finished: usize,
     failed: usize,
     incomplete: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CompanyColumns {
+    pub name: usize,
+    pub industry: usize,
+    pub scale: usize,
+}
+
+impl CompanyColumns {
+    pub fn row_height(self, company: &CompanyConfig) -> usize {
+        if self.industry == 0 {
+            return wrap_company_text(&company.name, self.name).len().max(1);
+        }
+        wrap_company_text(&company.name, self.name)
+            .len()
+            .max(wrap_company_text(&company.industry, self.industry).len())
+            .max(wrap_company_text(&company.scale, self.scale).len())
+            .max(1)
+    }
+}
+
+pub(crate) fn company_columns(
+    companies: &[(usize, &CompanyConfig)],
+    width: usize,
+) -> CompanyColumns {
+    if width < 36 {
+        return CompanyColumns {
+            name: width.saturating_sub(4).max(1),
+            industry: 0,
+            scale: 0,
+        };
+    }
+    let maximum = |value: fn(&CompanyConfig) -> &str, cap: usize| {
+        companies
+            .iter()
+            .map(|(_, company)| Line::from(value(company)).width())
+            .max()
+            .unwrap_or(1)
+            .min(cap)
+    };
+    let mut columns = CompanyColumns {
+        name: maximum(|company| &company.name, 32),
+        industry: maximum(|company| &company.industry, 56),
+        scale: maximum(|company| &company.scale, 32),
+    };
+    let available = width.saturating_sub(8);
+    let mut overflow = columns
+        .name
+        .saturating_add(columns.industry)
+        .saturating_add(columns.scale)
+        .saturating_sub(available);
+    shrink_column(&mut columns.industry, 18, &mut overflow);
+    shrink_column(&mut columns.scale, 16, &mut overflow);
+    shrink_column(&mut columns.name, 12, &mut overflow);
+    columns
+}
+
+fn shrink_column(width: &mut usize, minimum: usize, overflow: &mut usize) {
+    let reduction = width.saturating_sub(minimum).min(*overflow);
+    *width -= reduction;
+    *overflow -= reduction;
+}
+
+pub(crate) fn wrap_company_text(value: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return Vec::new();
+    }
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for word in value.split_whitespace() {
+        let joined = if current.is_empty() {
+            word.to_owned()
+        } else {
+            format!("{current} {word}")
+        };
+        if Line::from(joined.as_str()).width() <= width {
+            current = joined;
+            continue;
+        }
+        if !current.is_empty() {
+            lines.push(std::mem::take(&mut current));
+        }
+        let mut chunk = String::new();
+        for character in word.chars() {
+            let candidate = format!("{chunk}{character}");
+            if !chunk.is_empty() && Line::from(candidate.as_str()).width() > width {
+                lines.push(std::mem::take(&mut chunk));
+            }
+            chunk.push(character);
+        }
+        current = chunk;
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines
 }
 
 pub struct App {
@@ -252,6 +354,9 @@ pub struct App {
     setting_error: Option<String>,
     editing_setting: Option<Setting>,
     advanced_settings: bool,
+    company_settings: bool,
+    company_search_query: String,
+    company_list_offset: Cell<usize>,
     job_list_width: Option<u16>,
     job_list_offset: Cell<usize>,
     divider_dragging: bool,
@@ -324,6 +429,9 @@ impl App {
             setting_error: None,
             editing_setting: None,
             advanced_settings: false,
+            company_settings: false,
+            company_search_query: String::new(),
+            company_list_offset: Cell::new(0),
             job_list_width: None,
             job_list_offset: Cell::new(0),
             divider_dragging: false,
@@ -707,6 +815,9 @@ impl App {
             return self.toggle_selected_job();
         }
         if self.input_mode == InputMode::Search {
+            if self.view == View::Settings && self.company_settings {
+                return self.handle_company_search_key(key.code);
+            }
             return self.handle_search_key(key.code);
         }
         if self.input_mode == InputMode::Setting {
@@ -751,6 +862,11 @@ impl App {
             KeyCode::Char('K') if self.view == View::Analytics => self.move_evidence_selection(-1),
             KeyCode::Char('J') => self.scroll_details(1),
             KeyCode::Char('K') => self.scroll_details(-1),
+            KeyCode::Esc if self.view == View::Settings && self.company_settings => {
+                self.company_settings = false;
+                self.company_search_query.clear();
+                self.selected_index = 1;
+            }
             KeyCode::Tab | KeyCode::BackTab | KeyCode::Esc => {
                 self.focus = Focus::Navigation;
                 self.navigation_index = view_index(self.view);
@@ -772,21 +888,29 @@ impl App {
     fn handle_analytics_key(&mut self, code: KeyCode) -> Option<AppCommand> {
         match code {
             KeyCode::Char('[') => {
-                self.analytics_tab =
-                    ANALYTICS_TABS[analytics_tab_index(self.analytics_tab).saturating_sub(1)];
+                self.analytics_tab = ACTIVE_ANALYTICS_TABS
+                    [analytics_tab_index(self.analytics_tab).saturating_sub(1)];
                 self.reset_analytics_selection();
                 Some(AppCommand::None)
             }
             KeyCode::Char(']') => {
-                self.analytics_tab = ANALYTICS_TABS
-                    [(analytics_tab_index(self.analytics_tab) + 1).min(ANALYTICS_TABS.len() - 1)];
+                self.analytics_tab =
+                    ACTIVE_ANALYTICS_TABS[(analytics_tab_index(self.analytics_tab) + 1)
+                        .min(ACTIVE_ANALYTICS_TABS.len() - 1)];
                 self.reset_analytics_selection();
                 Some(AppCommand::None)
             }
-            KeyCode::Char(value @ '1'..='4') => {
-                self.analytics_tab =
-                    ANALYTICS_TABS[(value as usize - '1' as usize).min(ANALYTICS_TABS.len() - 1)];
+            KeyCode::Char('1' | '2' | '4') => {
+                self.analytics_tab = match code {
+                    KeyCode::Char('1') => AnalyticsTab::Overview,
+                    KeyCode::Char('2') => AnalyticsTab::Skills,
+                    _ => AnalyticsTab::Market,
+                };
                 self.reset_analytics_selection();
+                Some(AppCommand::None)
+            }
+            KeyCode::Char('3') => {
+                self.set_feedback("Stacks is work in progress");
                 Some(AppCommand::None)
             }
             KeyCode::Char('t') => {
@@ -1126,6 +1250,64 @@ impl App {
         self.advanced_settings
     }
 
+    pub fn company_settings(&self) -> bool {
+        self.company_settings
+    }
+
+    pub fn company_search_query(&self) -> &str {
+        &self.company_search_query
+    }
+
+    pub fn configurable_companies(&self) -> Vec<(usize, &CompanyConfig)> {
+        let query = self.company_search_query.to_lowercase();
+        let mut companies = self
+            .config
+            .companies
+            .iter()
+            .enumerate()
+            .filter(|(_, company)| !matches!(company.source, SourceConfig::Unsupported { .. }))
+            .filter(|(_, company)| query.is_empty() || company.name.to_lowercase().contains(&query))
+            .collect::<Vec<_>>();
+        companies.sort_by_cached_key(|(_, company)| company.name.to_lowercase());
+        companies
+    }
+
+    pub(crate) fn company_list_offset(&self) -> usize {
+        self.company_list_offset.get()
+    }
+
+    pub(crate) fn set_company_list_offset(&self, offset: usize) {
+        self.company_list_offset.set(offset);
+    }
+
+    pub(crate) fn analytics_overview_chart_height(&self, area: Rect) -> u16 {
+        let Some(report) = self.analytics_report() else {
+            return 3;
+        };
+        u16::try_from(report.hard_skills.len().max(report.roles.len()).min(10) + 2)
+            .unwrap_or(12)
+            .min(area.height.saturating_sub(4))
+            .max(3)
+    }
+
+    pub fn enabled_company_count(&self) -> usize {
+        self.config
+            .companies
+            .iter()
+            .filter(|company| {
+                company.enabled && !matches!(company.source, SourceConfig::Unsupported { .. })
+            })
+            .count()
+    }
+
+    pub fn configurable_company_count(&self) -> usize {
+        self.config
+            .companies
+            .iter()
+            .filter(|company| !matches!(company.source, SourceConfig::Unsupported { .. }))
+            .count()
+    }
+
     fn settings(&self) -> &'static [Setting] {
         if self.advanced_settings {
             &ADVANCED_SETTINGS
@@ -1158,6 +1340,23 @@ impl App {
         self.config.filters = filters;
     }
 
+    pub fn apply_company_selection(&mut self, selection: &[(String, bool)]) {
+        for company in &mut self.config.companies {
+            if let Some((_, enabled)) = selection.iter().find(|(id, _)| id == &company.id) {
+                company.enabled = *enabled;
+            }
+        }
+        if self.company_filter.as_ref().is_some_and(|id| {
+            !self
+                .config
+                .companies
+                .iter()
+                .any(|c| c.id == *id && c.enabled)
+        }) {
+            self.company_filter = None;
+        }
+    }
+
     pub fn selected_index(&self) -> usize {
         self.selected_index
     }
@@ -1171,6 +1370,18 @@ impl App {
             return self.library_jobs().get(self.selected_index).copied();
         }
         self.visible_jobs().nth(self.selected_index)
+    }
+
+    pub fn selected_job_skills(&self) -> Option<Vec<&str>> {
+        let job = self.selected_job()?;
+        Some(
+            self.job_facts
+                .get(&job.key)?
+                .skills
+                .keys()
+                .map(String::as_str)
+                .collect(),
+        )
     }
 
     pub fn library_jobs(&self) -> Vec<&JobRecord> {
@@ -1640,6 +1851,46 @@ impl App {
         AppCommand::None
     }
 
+    fn handle_company_search_key(&mut self, code: KeyCode) -> AppCommand {
+        let changed = match code {
+            KeyCode::Esc => {
+                self.company_search_query.clear();
+                self.input_mode = InputMode::Normal;
+                self.set_feedback("Company search cleared");
+                true
+            }
+            KeyCode::Enter => {
+                self.input_mode = InputMode::Normal;
+                self.set_feedback("Company search applied");
+                false
+            }
+            KeyCode::Up => {
+                self.move_selection(-1);
+                false
+            }
+            KeyCode::Down => {
+                self.move_selection(1);
+                false
+            }
+            KeyCode::Backspace => {
+                self.company_search_query.pop();
+                true
+            }
+            KeyCode::Char(character) => {
+                self.company_search_query.push(character);
+                true
+            }
+            _ => false,
+        };
+        if changed {
+            self.company_list_offset.set(0);
+            self.selected_index = self
+                .selected_index
+                .min(self.configurable_companies().len().saturating_sub(1));
+        }
+        AppCommand::None
+    }
+
     fn toggle_selected_job(&mut self) -> AppCommand {
         let Some((key, title)) = self
             .selected_job()
@@ -1699,13 +1950,24 @@ impl App {
                 if self.input_mode == InputMode::Setting {
                     area.contains((column, row).into())
                         .then_some(MouseTarget::Setting(self.selected_index))
+                } else if self.company_settings {
+                    let companies = self.configurable_companies();
+                    let border_width = if width >= 120 { 1 } else { 2 };
+                    let row_width = usize::from(area.width).saturating_sub(border_width + 2);
+                    let columns = company_columns(&companies, row_width);
+                    let heights = companies
+                        .iter()
+                        .map(|(_, company)| columns.row_height(company))
+                        .collect::<Vec<_>>();
+                    variable_item_at(column, row, area, &heights, self.company_list_offset.get())
+                        .map(MouseTarget::Setting)
                 } else {
                     item_at(
                         column,
                         row,
                         area,
                         if self.advanced_settings { 2 } else { 1 },
-                        self.settings().len(),
+                        self.item_count(),
                         self.selected_index,
                     )
                     .map(MouseTarget::Setting)
@@ -1809,7 +2071,12 @@ impl App {
             }
             Some(MouseTarget::AnalyticsTab(index)) => {
                 self.focus = Focus::Content;
-                self.analytics_tab = ANALYTICS_TABS[index.min(ANALYTICS_TABS.len() - 1)];
+                let tab = ANALYTICS_TABS[index.min(ANALYTICS_TABS.len() - 1)];
+                if tab == AnalyticsTab::Stacks {
+                    self.set_feedback("Stacks is work in progress");
+                    return;
+                }
+                self.analytics_tab = tab;
                 self.reset_analytics_selection();
             }
             Some(MouseTarget::AnalyticsSkillKind(index)) => {
@@ -1931,7 +2198,7 @@ impl App {
             }
             Some(MouseTarget::Details) => {
                 self.focus = Focus::Content;
-                self.scroll_details(direction * 3);
+                self.scroll_details(direction);
             }
             Some(MouseTarget::Divider) => {}
             Some(MouseTarget::Setting(_)) if self.accept_list_scroll(direction) => {
@@ -2261,6 +2528,7 @@ impl App {
                 LibraryTab::Roles => self.library.roles.len(),
                 LibraryTab::Companies => self.library.companies.len(),
             },
+            View::Settings if self.company_settings => self.configurable_companies().len(),
             View::Settings => self.settings().len(),
             _ => self.visible_jobs().count(),
         }
@@ -2339,6 +2607,7 @@ impl App {
                     }
                     Setting::IncludePreset(_)
                     | Setting::ExcludePreset(_)
+                    | Setting::Companies
                     | Setting::IncludedTitles
                     | Setting::ExcludedTitles
                     | Setting::SimpleSettings => unreachable!(),
@@ -2359,6 +2628,23 @@ impl App {
     }
 
     fn start_setting_edit(&mut self) -> AppCommand {
+        if self.company_settings {
+            let Some((company_index, company)) = self
+                .configurable_companies()
+                .get(self.selected_index)
+                .copied()
+            else {
+                return AppCommand::None;
+            };
+            let mut selection = self
+                .config
+                .companies
+                .iter()
+                .map(|company| (company.id.clone(), company.enabled))
+                .collect::<Vec<_>>();
+            selection[company_index].1 = !company.enabled;
+            return AppCommand::SaveCompanies(selection);
+        }
         let setting = self.setting();
         match setting {
             Setting::SimpleSettings => {
@@ -2369,6 +2655,13 @@ impl App {
             Setting::IncludedTitles => {
                 self.advanced_settings = true;
                 self.selected_index = 1;
+                return AppCommand::None;
+            }
+            Setting::Companies => {
+                self.company_settings = true;
+                self.company_search_query.clear();
+                self.company_list_offset.set(0);
+                self.selected_index = 0;
                 return AppCommand::None;
             }
             Setting::ExcludedTitles => {
@@ -2410,6 +2703,7 @@ impl App {
             .join("; "),
             Setting::IncludePreset(_)
             | Setting::ExcludePreset(_)
+            | Setting::Companies
             | Setting::IncludedTitles
             | Setting::ExcludedTitles
             | Setting::SimpleSettings => unreachable!(),
@@ -2466,12 +2760,16 @@ impl App {
     fn reset_view_state(&mut self) {
         self.selected_index = 0;
         self.job_list_offset.set(0);
+        self.company_list_offset.set(0);
         self.analytics_kind = SkillKind::Hard;
         self.hard_skill_index = 0;
         self.soft_skill_index = 0;
         self.evidence_index = 0;
         self.reset_detail_scroll();
         self.narrow_details_visible = false;
+        self.advanced_settings = false;
+        self.company_settings = false;
+        self.company_search_query.clear();
     }
 
     fn cycle_filter(&mut self) {
@@ -2529,7 +2827,7 @@ impl App {
 
     fn analytics_surface_target(&self, column: u16, row: u16, area: Rect) -> Option<MouseTarget> {
         if row == area.y {
-            return tab_at_widths(column, area.x, &[13, 11, 11, 11]).map(MouseTarget::AnalyticsTab);
+            return tab_at_widths(column, area.x, &[13, 11, 17, 11]).map(MouseTarget::AnalyticsTab);
         }
         let main = Rect::new(
             area.x,
@@ -2571,8 +2869,10 @@ impl App {
         }
         match self.analytics_tab {
             AnalyticsTab::Overview => {
-                let sections = Layout::vertical([Constraint::Percentage(48), Constraint::Fill(1)])
-                    .split(surface);
+                let chart_height = self.analytics_overview_chart_height(surface);
+                let sections =
+                    Layout::vertical([Constraint::Length(chart_height), Constraint::Fill(1)])
+                        .split(surface);
                 table_item_at(
                     column,
                     row,
@@ -2583,9 +2883,10 @@ impl App {
                 .map(MouseTarget::Item)
             }
             AnalyticsTab::Skills => {
+                let chart_height = surface.height.saturating_sub(6).min(12);
                 let sections = Layout::vertical([
                     Constraint::Length(1),
-                    Constraint::Percentage(66),
+                    Constraint::Length(chart_height),
                     Constraint::Fill(1),
                 ])
                 .split(surface);
@@ -2598,7 +2899,7 @@ impl App {
                     SkillKind::Hard => (&report.hard_skills, self.hard_skill_index),
                     SkillKind::Soft => (&report.soft_skills, self.soft_skill_index),
                 };
-                table_item_at(column, row, sections[1], skills.len(), selected_index).map(|index| {
+                table_item_at(column, row, sections[2], skills.len(), selected_index).map(|index| {
                     match self.analytics_kind {
                         SkillKind::Hard => MouseTarget::HardSkill(index),
                         SkillKind::Soft => MouseTarget::SoftSkill(index),
@@ -2730,6 +3031,12 @@ const ANALYTICS_TABS: [AnalyticsTab; 4] = [
     AnalyticsTab::Market,
 ];
 
+const ACTIVE_ANALYTICS_TABS: [AnalyticsTab; 3] = [
+    AnalyticsTab::Overview,
+    AnalyticsTab::Skills,
+    AnalyticsTab::Market,
+];
+
 const MARKET_SECTIONS: [MarketSection; 5] = [
     MarketSection::Roles,
     MarketSection::Seniority,
@@ -2748,7 +3055,7 @@ const LIBRARY_TABS: [LibraryTab; 5] = [
 
 const SETTINGS: [Setting; 4] = [
     Setting::NewJobAge,
-    Setting::Countries,
+    Setting::Companies,
     Setting::IncludedTitles,
     Setting::ExcludedTitles,
 ];
@@ -2863,7 +3170,7 @@ fn view_index(view: View) -> usize {
 }
 
 fn analytics_tab_index(tab: AnalyticsTab) -> usize {
-    ANALYTICS_TABS
+    ACTIVE_ANALYTICS_TABS
         .iter()
         .position(|candidate| *candidate == tab)
         .unwrap_or(0)
@@ -2999,6 +3306,31 @@ fn item_at_offset(
     (index < item_count).then_some(index)
 }
 
+fn variable_item_at(
+    column: u16,
+    row: u16,
+    area: Rect,
+    item_heights: &[usize],
+    first_visible: usize,
+) -> Option<usize> {
+    let inner = area.inner(ratatui::layout::Margin::new(1, 1));
+    if !inner.contains((column, row).into()) {
+        return None;
+    }
+    let target_row = usize::from(row - inner.y);
+    let mut top = 0;
+    item_heights
+        .iter()
+        .enumerate()
+        .skip(first_visible)
+        .find_map(|(index, height)| {
+            let bottom = top + height;
+            let matched = (target_row < bottom).then_some(index);
+            top = bottom;
+            matched
+        })
+}
+
 fn tab_at_widths(column: u16, origin: u16, widths: &[u16]) -> Option<usize> {
     if column < origin {
         return None;
@@ -3019,7 +3351,7 @@ fn table_item_at(
     selected_index: usize,
 ) -> Option<usize> {
     let inner = area.inner(ratatui::layout::Margin::new(1, 1));
-    let first_row = inner.y.saturating_add(2);
+    let first_row = inner.y.saturating_add(1);
     if column < inner.x
         || column >= inner.right()
         || row < first_row
@@ -3028,7 +3360,7 @@ fn table_item_at(
     {
         return None;
     }
-    let visible_count = usize::from(inner.height.saturating_sub(2)).max(1);
+    let visible_count = usize::from(inner.height.saturating_sub(1)).max(1);
     let first_visible = selected_index.saturating_sub(visible_count.saturating_sub(1));
     let index = first_visible + usize::from(row - first_row);
     (index < item_count).then_some(index)

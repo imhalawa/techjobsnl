@@ -2,6 +2,8 @@
 
 Audit date: **2026-08-14**. Scope: all **79 companies** from `CANDIDATE_SOURCE_COMPATIBILITY.md`.
 
+Current result: **46 delivered and 33 blocked or pending**. Together with the 19 sources that predated this queue, the shipped catalog has 65 enabled companies. Use [SUPPORTED_COMPANIES.md](SUPPORTED_COMPANIES.md) for current product support; this file is the delivery record.
+
 One checkbox is one delivery task. A task is complete only after its source is implemented, tested, live-verified, and merged into local `main`. Blocked tasks must be rechecked against a complete first-party source; they must not be added as disabled placeholders.
 
 ## Priority 1–2: global technology, fintech, and trading

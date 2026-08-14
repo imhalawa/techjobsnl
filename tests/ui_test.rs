@@ -13,7 +13,7 @@ use job_watch::{
     },
     insights::{AnalyticsFilters, LibraryState},
     storage::{ScanOutcome, ScanReadModel, SourceHealth, SourceReadModel},
-    ui::{App, AppCommand, IconSet, InputMode, MouseTarget, Theme, View, render},
+    ui::{AnalyticsTab, App, AppCommand, IconSet, InputMode, MouseTarget, Theme, View, render},
 };
 use ratatui::{
     Terminal,
@@ -559,7 +559,7 @@ fn mouse_hover_click_focus_and_wheel_match_the_existing_ui_actions() {
     assert!(!app.pressed(MouseTarget::Item(1)));
 
     app.handle_mouse(mouse(MouseEventKind::ScrollDown, 100, 5), 140, 30);
-    assert_eq!(app.detail_scroll(), 3);
+    assert_eq!(app.detail_scroll(), 1);
 
     app.handle_mouse(
         mouse(MouseEventKind::Down(MouseButton::Left), 2, 2),
@@ -583,11 +583,11 @@ fn mouse_hover_click_focus_and_wheel_match_the_existing_ui_actions() {
     );
     assert_eq!(app.view(), View::Settings);
     app.handle_mouse(
-        mouse(MouseEventKind::Down(MouseButton::Left), 30, 2),
+        mouse(MouseEventKind::Down(MouseButton::Left), 30, 1),
         140,
         30,
     );
-    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 30, 2), 140, 30);
+    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 30, 1), 140, 30);
     assert_eq!(app.input_mode(), InputMode::Setting);
 
     app.handle_mouse(
@@ -625,7 +625,7 @@ fn clicking_a_visible_job_preserves_its_viewport_row() {
     }
 
     let before = rendered_buffer(&app, 140, 20);
-    let clicked_row = row(&before, 4);
+    let clicked_row = row(&before, 3);
     app.handle_mouse(
         mouse(MouseEventKind::Down(MouseButton::Left), 24, 3),
         140,
@@ -636,7 +636,7 @@ fn clicking_a_visible_job_preserves_its_viewport_row() {
     assert!(clicked_row.contains(selected_title));
 
     let after = rendered_buffer(&app, 140, 20);
-    assert!(row(&after, 4).contains(selected_title));
+    assert!(row(&after, 3).contains(selected_title));
 }
 
 #[test]
@@ -777,11 +777,88 @@ fn simple_settings_hide_regex_and_use_everyday_language() {
 
     let settings = normalized_interior(&rendered_buffer(&app, 120, 24));
     assert!(settings.contains("New jobs Last 7 days"));
-    assert!(settings.contains("Locations Netherlands"));
+    assert!(!settings.contains("Locations"));
     assert!(settings.contains("Job types 2 of 6 groups enabled"));
     assert!(settings.contains("Hide jobs 2 of 5 groups enabled"));
     assert!(!settings.contains("regex"));
     assert!(!settings.contains("patterns"));
+}
+
+#[test]
+fn settings_search_and_toggle_followed_companies_including_zero() {
+    let mut configured = config_with_two_companies();
+    configured.companies[1].enabled = false;
+    let mut app = App::new(configured, vec![]);
+    open_view(&mut app, 8);
+
+    let settings = rendered(&app, 120, 24);
+    assert!(settings.contains("Companies"));
+    assert!(settings.contains("1 of 2 followed"));
+    app.handle_key(special(KeyCode::Down));
+    app.handle_key(special(KeyCode::Enter));
+    let companies = rendered(&app, 120, 24);
+    assert!(companies.contains("Test industry"));
+    assert!(companies.contains("Test scale"));
+    app.handle_mouse(mouse(MouseEventKind::Moved, 24, 2), 120, 24);
+    let hovered = rendered_buffer(&app, 120, 24);
+    assert!((23..119).any(|x| {
+        hovered
+            .cell((x, 2))
+            .is_some_and(|cell| cell.bg == app.theme().hovered_row)
+    }));
+    app.handle_key(key('/'));
+    for character in "Beta".chars() {
+        app.handle_key(key(character));
+    }
+    let companies = rendered(&app, 120, 24);
+    assert!(companies.contains("[ ] Beta Labs"));
+    assert!(!companies.contains("[x] Acme"));
+    app.handle_key(special(KeyCode::Enter));
+
+    let AppCommand::SaveCompanies(selection) = app.handle_key(key(' ')) else {
+        panic!("toggling a company must save the company selection");
+    };
+    assert_eq!(
+        selection,
+        vec![("acme".into(), true), ("beta".into(), true)]
+    );
+    app.apply_company_selection(&selection);
+    assert!(rendered(&app, 120, 24).contains("2 of 2 followed"));
+
+    app.apply_company_selection(&[("acme".into(), false), ("beta".into(), false)]);
+    assert!(rendered(&app, 120, 24).contains("0 of 2 followed"));
+}
+
+#[test]
+fn company_settings_sort_wrap_and_hover_the_full_visual_row() {
+    let mut configured = config_with_two_companies();
+    configured.companies.reverse();
+    configured.companies[0].name = "Zeta Systems".into();
+    configured.companies[0].industry =
+        "Financial software, healthcare software, education software, and public-sector software"
+            .into();
+    configured.companies[0].scale = "1,000+ employees".into();
+    let mut app = App::new(configured, vec![]);
+    open_view(&mut app, 8);
+    app.handle_key(special(KeyCode::Down));
+    app.handle_key(special(KeyCode::Enter));
+
+    let buffer = rendered_buffer(&app, 120, 24);
+    let acme_y = (1..23).find(|y| row(&buffer, *y).contains("Acme")).unwrap();
+    let zeta_y = (1..23)
+        .find(|y| row(&buffer, *y).contains("Zeta Systems"))
+        .unwrap();
+    assert!(acme_y < zeta_y);
+    assert!(row(&buffer, zeta_y + 1).contains("software"));
+
+    app.handle_mouse(mouse(MouseEventKind::Moved, 30, zeta_y + 1), 120, 24);
+    assert!(app.hovered(MouseTarget::Setting(1)));
+    let hovered = rendered_buffer(&app, 120, 24);
+    assert!((23..119).any(|x| {
+        hovered
+            .cell((x, zeta_y + 1))
+            .is_some_and(|cell| cell.bg == app.theme().hovered_row)
+    }));
 }
 
 #[test]
@@ -790,9 +867,8 @@ fn advanced_title_filters_explain_scope_and_toggle_named_presets() {
     configured.filters.include_title_patterns = vec!["data engineer|analytics engineer".into()];
     let mut app = App::new(configured.clone(), vec![]);
     open_view(&mut app, 8);
-    for _ in 0..2 {
-        app.handle_key(special(KeyCode::Down));
-    }
+    app.handle_key(special(KeyCode::Down));
+    app.handle_key(special(KeyCode::Down));
     app.handle_key(special(KeyCode::Enter));
 
     let filters = normalized_interior(&rendered_buffer(&app, 120, 32));
@@ -845,6 +921,22 @@ fn analytics_counts_description_skills_and_lists_matching_cached_jobs() {
     assert!(screen.contains("Cloud Engineer"));
     assert!(screen.contains("Data Engineer"));
     assert!(!screen.contains("Legal Counsel"));
+
+    app.handle_mouse(mouse(MouseEventKind::Moved, 112, 5), 160, 24);
+    let evidence_hover = rendered_buffer(&app, 160, 24);
+    assert!((111..159).any(|x| {
+        evidence_hover
+            .cell((x, 5))
+            .is_some_and(|cell| cell.bg == app.theme().hovered_row)
+    }));
+
+    app.handle_mouse(mouse(MouseEventKind::Moved, 24, 18), 160, 24);
+    let skill_hover = rendered_buffer(&app, 160, 24);
+    assert!((23..109).any(|x| {
+        skill_hover
+            .cell((x, 18))
+            .is_some_and(|cell| cell.bg == app.theme().hovered_row)
+    }));
 
     app.handle_key(special(KeyCode::Down));
     let details = normalized_interior(&rendered_buffer(&app, 120, 24));
@@ -921,6 +1013,109 @@ fn analytics_splits_hard_and_soft_trends_with_independent_navigation() {
         24,
     );
     assert_eq!(app.analytics_skill_kind(), SkillKind::Soft);
+}
+
+#[test]
+fn stacks_is_visible_as_wip_but_cannot_be_opened() {
+    let mut app = App::new(config(), vec![job("Backend Engineer", false, false)]);
+    open_view(&mut app, 6);
+    app.handle_key(key('2'));
+
+    assert_eq!(app.analytics_tab(), AnalyticsTab::Skills);
+    assert!(rendered(&app, 120, 24).contains("3 Stacks (WIP)"));
+
+    app.handle_key(key('3'));
+    assert_eq!(app.analytics_tab(), AnalyticsTab::Skills);
+    assert!(app.has_feedback());
+
+    app.handle_key(key(']'));
+    assert_eq!(app.analytics_tab(), AnalyticsTab::Market);
+    app.handle_key(key('['));
+    assert_eq!(app.analytics_tab(), AnalyticsTab::Skills);
+
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 50, 0),
+        120,
+        24,
+    );
+    assert_eq!(app.analytics_tab(), AnalyticsTab::Skills);
+}
+
+#[test]
+fn skills_put_a_compact_top_ten_chart_above_the_trimmed_table() {
+    let mut configured = config();
+    configured.analytics.minimum_skill_occurrence = 1;
+    let mut item = job("Polyglot Engineer", false, false);
+    item.classified.observed.description =
+        "Python Java AWS Azure Go Rust TypeScript React Docker Kubernetes Terraform".into();
+    let mut app = App::new(configured, vec![item]);
+    open_view(&mut app, 6);
+    app.handle_key(key('2'));
+
+    let buffer = rendered_buffer(&app, 79, 40);
+    let chart_y = (0..buffer.area.height)
+        .find(|y| row(&buffer, *y).contains("Top 10 demand"))
+        .unwrap();
+    let table_y = (0..buffer.area.height)
+        .find(|y| row(&buffer, *y).contains("Hard skills"))
+        .unwrap();
+    assert!(chart_y < table_y);
+
+    let report = app.analytics_report().unwrap();
+    assert!(report.hard_skills.len() > 10);
+    let chart = (chart_y + 1..table_y)
+        .map(|y| row(&buffer, y))
+        .collect::<String>();
+    assert_eq!(
+        report
+            .hard_skills
+            .iter()
+            .filter(|skill| chart.contains(&skill.metric.name))
+            .count(),
+        10
+    );
+
+    let screen = rendered(&app, 79, 40);
+    for removed in ["Δ jobs", "Δ share", "Momentum", "Conf", "Status"] {
+        assert!(
+            !screen.contains(removed),
+            "unexpected column {removed}: {screen}"
+        );
+    }
+}
+
+#[test]
+fn analytics_table_click_selects_the_row_under_the_pointer() {
+    let jobs = [
+        "Software Engineer",
+        "Data Engineer",
+        "DevOps Engineer",
+        "Full-stack Engineer",
+        "Platform Engineer",
+        "ML Engineer",
+        "Backend Engineer",
+    ]
+    .into_iter()
+    .map(|title| job(title, false, false))
+    .collect();
+    let mut app = App::new(config(), jobs);
+    open_view(&mut app, 6);
+    app.handle_key(key('4'));
+
+    let backend_index = app
+        .market_rows()
+        .iter()
+        .position(|row| row.name == "Backend")
+        .unwrap();
+    let backend_y = 5 + u16::try_from(backend_index).unwrap();
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 24, backend_y),
+        140,
+        24,
+    );
+
+    assert_eq!(app.selected_index(), backend_index);
+    assert_eq!(app.market_rows()[app.selected_index()].name, "Backend");
 }
 
 #[test]
@@ -1020,9 +1215,15 @@ fn reported_listing_views_show_their_totals() {
     open_view(&mut app, 6);
     let analytics = rendered(&app, 120, 24);
     assert!(
-        analytics.contains("Career opportunities · 1 recommendations · 2 active jobs"),
+        analytics.contains("Skills to consider · 1 · 2 active jobs"),
         "{analytics}"
     );
+    for removed in ["Type", "Target", "Beside", "Why"] {
+        assert!(
+            !analytics.contains(removed),
+            "unexpected column {removed}: {analytics}"
+        );
+    }
     assert!(analytics.contains("Evidence · 1 matching jobs"));
     open_view(&mut app, 4);
     assert!(rendered(&app, 120, 24).contains("Recent scans · 1"));
@@ -1030,6 +1231,36 @@ fn reported_listing_views_show_their_totals() {
     assert!(rendered(&app, 120, 24).contains("Sources · 1"));
     open_view(&mut app, 8);
     assert!(rendered(&app, 120, 24).contains("Settings · 4"));
+}
+
+#[test]
+fn overview_hover_targets_the_named_row_under_the_pointer() {
+    let mut configured = config();
+    configured.analytics.minimum_skill_occurrence = 1;
+    let mut item = job("Python Engineer", false, false);
+    item.classified.observed.description = "Build Python and Java services on AWS.".into();
+    let mut app = App::new(configured, vec![item]);
+    open_view(&mut app, 6);
+
+    let buffer = rendered_buffer(&app, 120, 24);
+    let title_y = (2..23)
+        .find(|y| row(&buffer, *y).contains("Skills to consider"))
+        .unwrap();
+    let skill_y = title_y + 3;
+    assert!(
+        ["Python", "Java", "AWS"]
+            .iter()
+            .any(|skill| row(&buffer, skill_y).contains(skill))
+    );
+
+    app.handle_mouse(mouse(MouseEventKind::Moved, 30, skill_y), 120, 24);
+    assert!(app.hovered(MouseTarget::Item(1)));
+    let hovered = rendered_buffer(&app, 120, 24);
+    assert!((23..84).any(|x| {
+        hovered
+            .cell((x, skill_y))
+            .is_some_and(|cell| cell.bg == app.theme().hovered_row)
+    }));
 }
 
 #[test]
@@ -1114,7 +1345,7 @@ fn reported_mouse_wheel_burst_moves_one_analytics_item() {
     app.handle_key(key('2'));
 
     for _ in 0..3 {
-        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 24, 6), 140, 24);
+        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 24, 18), 140, 24);
     }
 
     assert_eq!(app.selected_index(), 1);
@@ -1254,6 +1485,47 @@ fn description_renders_markdown_structure_and_inline_emphasis() {
 }
 
 #[test]
+fn job_details_reuse_extracted_skills_from_the_selected_description() {
+    let mut skilled_job = job("Backend Engineer", false, false);
+    skilled_job.classified.observed.description =
+        "Build Python and .NET services with strong communication skills.".into();
+    let app = App::new(config(), vec![skilled_job]);
+
+    let screen = rendered(&app, 120, 34);
+
+    assert!(screen.contains("Skills"));
+    assert!(screen.contains("Python"));
+    assert!(screen.contains(".NET"));
+    assert!(screen.contains("Communication"));
+    assert!(!screen.contains("· hard"));
+    assert!(!screen.contains("· soft"));
+    assert!(screen.contains("Description"));
+}
+
+#[test]
+fn selected_job_skills_reflow_when_the_details_pane_is_resized() {
+    let mut skilled_job = job("AI Platform Engineer", false, false);
+    skilled_job.classified.observed.description = "Build Python and TypeScript services with Docker, Kubernetes, Google Cloud, Terraform, observability, artificial intelligence, large language models, retrieval-augmented generation, and site reliability engineering.".into();
+    let app = App::new(config(), vec![skilled_job]);
+
+    let wide = rendered_buffer(&app, 180, 34);
+    let narrow = rendered_buffer(&app, 80, 34);
+    let skill_row_count = |buffer: &Buffer| {
+        let skills = (0..buffer.area.height)
+            .find(|y| row(buffer, *y).contains("Skills"))
+            .unwrap();
+        let description = (skills + 1..buffer.area.height)
+            .find(|y| row(buffer, *y).contains("Description"))
+            .unwrap();
+        description.saturating_sub(skills + 1)
+    };
+
+    assert!(skill_row_count(&wide) < skill_row_count(&narrow));
+    assert!(rendered(&app, 180, 34).contains("Retrieval-augmented generation"));
+    assert!(rendered(&app, 80, 34).contains("Retrieval-augmented generation"));
+}
+
+#[test]
 fn fixed_navigation_keys_win_even_if_an_unvalidated_config_reuses_them() {
     let mut configured = config();
     configured.keybindings.scan = "j".into();
@@ -1375,7 +1647,8 @@ fn renderer_uses_the_specified_responsive_job_layouts_and_status_icons() {
             && narrow.contains("Active jobs")
             && !narrow.contains("Job details")
     );
-    assert!(wide.contains("● OPEN") && wide.contains("◆") && wide.contains("✔"));
+    assert!(!row(&rendered_buffer(&app, 140, 40), 2).contains(" open "));
+    assert!(wide.contains("◆") && wide.contains("✔"));
 }
 
 #[test]
@@ -1502,9 +1775,10 @@ fn history_renders_closed_rows_as_closed_instead_of_open() {
     let mut app = App::new(config(), vec![closed]);
     app.handle_key(key('h'));
 
-    let screen = rendered(&app, 100, 25);
-    assert!(screen.contains("CLOSED"));
-    assert!(!screen.contains("OPEN  Closed role"));
+    let buffer = rendered_buffer(&app, 100, 25);
+    let metadata = row(&buffer, 2);
+    assert!(metadata.contains("closed · 11 Aug"));
+    assert!(!metadata.contains(" open "));
 }
 
 #[test]
@@ -1563,19 +1837,38 @@ fn production_job_buffers_preserve_geometry_styles_and_truth_at_all_breakpoints_
         for width in [120, 80, 79] {
             let buffer = rendered_buffer(&app, width, 24);
             let screen: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
-            assert!(screen.contains("Acme · Backend Engineer"));
+            assert!(screen.contains("Backend Engineer"));
+            assert!(screen.contains("Acme"));
             assert!(!screen.contains("acme"));
             assert!(screen.contains("11 Aug"));
             assert!(row(&buffer, 23).trim_end().ends_with("? help"));
 
             let list_x = if width >= 120 { 22 } else { 0 };
-            let open_x = symbol_x(&buffer, 1, list_x, "●");
-            assert_eq!(buffer.cell((open_x, 1)).unwrap().fg, theme.open);
-            assert_eq!(buffer.cell((open_x, 1)).unwrap().bg, theme.selected_row);
-            let new_x = symbol_x(&buffer, 1, open_x + 1, "◆");
-            let applied_x = symbol_x(&buffer, 1, new_x + 1, "✔");
-            assert_eq!(buffer.cell((new_x, 1)).unwrap().fg, theme.new);
-            assert_eq!(buffer.cell((applied_x, 1)).unwrap().fg, theme.applied);
+            let title_x = symbol_x(&buffer, 1, list_x, "B");
+            assert_eq!(buffer.cell((title_x, 1)).unwrap().fg, theme.warning);
+            assert!(
+                buffer
+                    .cell((title_x, 1))
+                    .unwrap()
+                    .modifier
+                    .contains(Modifier::BOLD)
+            );
+            assert_eq!(buffer.cell((title_x, 1)).unwrap().bg, theme.selected_row);
+            let company_x = symbol_x(&buffer, 2, list_x, "A");
+            assert_eq!(buffer.cell((company_x, 2)).unwrap().fg, theme.new);
+            assert!(
+                !buffer
+                    .cell((company_x, 2))
+                    .unwrap()
+                    .modifier
+                    .contains(Modifier::BOLD)
+            );
+            let date_x = symbol_x(&buffer, 2, company_x + 1, "1");
+            assert_eq!(buffer.cell((date_x, 2)).unwrap().fg, theme.muted_text);
+            let new_x = symbol_x(&buffer, 2, date_x + 1, "◆");
+            let applied_x = symbol_x(&buffer, 2, new_x + 1, "✔");
+            assert_eq!(buffer.cell((new_x, 2)).unwrap().fg, theme.new);
+            assert_eq!(buffer.cell((applied_x, 2)).unwrap().fg, theme.applied);
 
             match width {
                 120 => {
@@ -1589,6 +1882,8 @@ fn production_job_buffers_preserve_geometry_styles_and_truth_at_all_breakpoints_
                     assert_ne!(buffer.cell((22, 5)).unwrap().symbol(), "│");
                     assert_eq!(buffer.cell((69, 5)).unwrap().symbol(), "│");
                     assert_ne!(buffer.cell((70, 5)).unwrap().symbol(), "│");
+                    assert_eq!(buffer.cell((70, 1)).unwrap().symbol(), " ");
+                    assert_eq!(buffer.cell((71, 1)).unwrap().symbol(), "B");
                     assert!(screen.contains("Job details"));
                     assert!(screen.contains("Engineering"));
                     assert!(screen.contains("Status"));

@@ -269,6 +269,23 @@ fn sync_default_companies(path: &Path) -> Result<()> {
         .and_then(toml::Value::as_array)
         .ok_or_else(|| io::Error::other("user config has no company catalog"))?;
     let mut companies = default_companies.clone();
+    let enabled = current_companies
+        .iter()
+        .filter_map(|company| {
+            Some((
+                company.get("id")?.as_str()?.to_owned(),
+                company.get("enabled")?.as_bool()?,
+            ))
+        })
+        .collect::<HashMap<_, _>>();
+    for company in &mut companies {
+        let Some(id) = company.get("id").and_then(toml::Value::as_str) else {
+            continue;
+        };
+        if let Some(value) = enabled.get(id) {
+            company["enabled"] = toml::Value::Boolean(*value);
+        }
+    }
     companies.extend(
         current_companies
             .iter()
@@ -296,6 +313,7 @@ enum CommandEffect {
     Continue,
     StartScan,
     FiltersChanged,
+    SourcesChanged,
     ReloadJobs,
     Quit,
 }
@@ -316,9 +334,10 @@ async fn run(
     terminal: &mut ratatui::DefaultTerminal,
     app: &mut App,
     store: Arc<Mutex<Store>>,
-    scan_service: Arc<ScanService>,
+    initial_scan_service: Arc<ScanService>,
     config_path: PathBuf,
 ) -> Result<()> {
+    let mut runtime_scan_service = initial_scan_service;
     let mut events = EventStream::new();
     let (scan_tx, mut scan_rx) = mpsc::unbounded_channel();
     let (analytics_tx, mut analytics_rx) =
@@ -418,6 +437,9 @@ async fn run(
                     let mut open_job_url = open_url;
                     let mut copy_job_url = copy_url;
                     let mut save_filters = |filters| save_filters(&config_path, &filters);
+                    let mut save_companies = |companies: Vec<(String, bool)>| {
+                        save_companies(&config_path, &companies)
+                    };
                     let effect = match execute_command(
                         command,
                         &store,
@@ -425,6 +447,7 @@ async fn run(
                         &mut open_job_url,
                         &mut copy_job_url,
                         &mut save_filters,
+                        &mut save_companies,
                     ) {
                         Ok(effect) => effect,
                         Err(error) => {
@@ -436,7 +459,7 @@ async fn run(
                         CommandEffect::StartScan => {
                             let started = start_scan(
                                 &mut active_scan,
-                                Arc::clone(&scan_service),
+                                Arc::clone(&runtime_scan_service),
                                 scan_tx.clone(),
                             );
                             app.set_feedback(if started {
@@ -446,9 +469,15 @@ async fn run(
                             });
                         }
                         CommandEffect::FiltersChanged => {
-                            scan_service.update_filter(EligibilityFilter::new(
+                            runtime_scan_service.update_filter(EligibilityFilter::new(
                                 &app.config().filters,
                             )?);
+                        }
+                        CommandEffect::SourcesChanged => {
+                            runtime_scan_service =
+                                Arc::new(scan_service(app.config(), Arc::clone(&store))?);
+                            reload_requested = true;
+                            app.set_data_loading(true);
                         }
                         CommandEffect::ReloadJobs => {
                             reload_requested = true;
@@ -809,6 +838,7 @@ fn execute_command(
     open_url: &mut impl FnMut(&str) -> Result<()>,
     copy_url: &mut impl FnMut(&str) -> Result<()>,
     save_filters: &mut impl FnMut(FiltersConfig) -> Result<()>,
+    save_companies: &mut impl FnMut(Vec<(String, bool)>) -> Result<()>,
 ) -> Result<CommandEffect> {
     match command {
         AppCommand::ToggleApplied(key) => {
@@ -840,6 +870,16 @@ fn execute_command(
             app.apply_filters(filters);
             app.set_feedback("Settings saved");
             Ok(CommandEffect::FiltersChanged)
+        }
+        AppCommand::SaveCompanies(selection) => {
+            save_companies(selection.clone())?;
+            app.apply_company_selection(&selection);
+            store
+                .lock()
+                .unwrap()
+                .sync_companies(&app.config().companies)?;
+            app.set_feedback("Companies saved");
+            Ok(CommandEffect::SourcesChanged)
         }
         AppCommand::SaveAnalyticsState(filters, library) => {
             store
@@ -888,6 +928,33 @@ fn save_filters(config_path: &Path, values: &FiltersConfig) -> Result<()> {
         "exclude_title_patterns".into(),
         toml_strings(&values.exclude_title_patterns),
     );
+    let updated = toml::to_string_pretty(&document)?;
+    toml::from_str::<Config>(&updated)?.validate()?;
+    let temporary_path = config_path.with_extension("toml.tmp");
+    fs::write(&temporary_path, updated)?;
+    fs::rename(&temporary_path, config_path)?;
+    Ok(())
+}
+
+fn save_companies(config_path: &Path, values: &[(String, bool)]) -> Result<()> {
+    let enabled = values
+        .iter()
+        .map(|(id, enabled)| (id.as_str(), *enabled))
+        .collect::<HashMap<_, _>>();
+    let contents = fs::read_to_string(config_path)?;
+    let mut document: toml::Value = toml::from_str(&contents)?;
+    let companies = document
+        .get_mut("companies")
+        .and_then(toml::Value::as_array_mut)
+        .ok_or_else(|| io::Error::other("configuration has no company catalog"))?;
+    for company in companies {
+        let Some(id) = company.get("id").and_then(toml::Value::as_str) else {
+            continue;
+        };
+        if let Some(value) = enabled.get(id) {
+            company["enabled"] = toml::Value::Boolean(*value);
+        }
+    }
     let updated = toml::to_string_pretty(&document)?;
     toml::from_str::<Config>(&updated)?.validate()?;
     let temporary_path = config_path.with_extension("toml.tmp");
@@ -1070,7 +1137,7 @@ mod tests {
         CommandEffect, Platform, abort_scan, apply_reload, browser_command, build_sources,
         config_path_for, copy_url_with, ensure_default_config, execute_command, finish_scan,
         finish_with_restore, handle_runtime_scan_event, initialize, load_jobs,
-        prefer_existing_config, save_filters, start_scan, sync_default_companies,
+        prefer_existing_config, save_companies, save_filters, start_scan, sync_default_companies,
     };
 
     #[test]
@@ -1155,10 +1222,18 @@ mod tests {
                 .any(|company| company.id == "custom-company")
         );
         assert!(
-            migrated
+            !migrated
                 .companies
                 .iter()
                 .find(|company| company.id == "mollie")
+                .unwrap()
+                .enabled
+        );
+        assert!(
+            migrated
+                .companies
+                .iter()
+                .find(|company| company.id == "booking-com")
                 .unwrap()
                 .enabled
         );
@@ -1176,6 +1251,26 @@ mod tests {
         save_filters(&path, &filters).unwrap();
 
         assert_eq!(Config::load(path).unwrap().filters, filters);
+    }
+
+    #[test]
+    fn settings_save_company_selection_to_the_existing_config() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        std::fs::write(&path, include_str!("../config.toml")).unwrap();
+        let config = Config::load(&path).unwrap();
+        let mut selection = config
+            .companies
+            .iter()
+            .map(|company| (company.id.clone(), company.enabled))
+            .collect::<Vec<_>>();
+        selection[0].1 = !selection[0].1;
+
+        save_companies(&path, &selection).unwrap();
+
+        let saved = Config::load(path).unwrap();
+        assert_eq!(saved.companies[0].enabled, selection[0].1);
+        assert_eq!(saved.filters, config.filters);
     }
 
     #[test]
@@ -1655,6 +1750,7 @@ mod tests {
         let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
         let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
         let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
+        let mut saved_companies = |_: Vec<(String, bool)>| -> super::Result<()> { Ok(()) };
 
         let effect = execute_command(
             AppCommand::ToggleApplied(JobKey::new("acme", "job-1")),
@@ -1663,6 +1759,7 @@ mod tests {
             &mut opened,
             &mut copied,
             &mut saved,
+            &mut saved_companies,
         )
         .unwrap();
 
@@ -1697,6 +1794,7 @@ mod tests {
         let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
         let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
         let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
+        let mut saved_companies = |_: Vec<(String, bool)>| -> super::Result<()> { Ok(()) };
 
         let started = Instant::now();
         let effect = execute_command(
@@ -1706,6 +1804,7 @@ mod tests {
             &mut opened,
             &mut copied,
             &mut saved,
+            &mut saved_companies,
         )
         .unwrap();
         let elapsed = started.elapsed();
@@ -1780,6 +1879,7 @@ mod tests {
         let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
         let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
         let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
+        let mut saved_companies = |_: Vec<(String, bool)>| -> super::Result<()> { Ok(()) };
         let restored = std::cell::Cell::new(false);
         let result = execute_command(
             AppCommand::ToggleApplied(JobKey::new("acme", "missing")),
@@ -1788,6 +1888,7 @@ mod tests {
             &mut opened,
             &mut copied,
             &mut saved,
+            &mut saved_companies,
         )
         .map(|_| ());
 
@@ -1996,6 +2097,7 @@ mod tests {
             Ok(())
         };
         let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
+        let mut saved_companies = |_: Vec<(String, bool)>| -> super::Result<()> { Ok(()) };
 
         let effect = execute_command(
             AppCommand::CopyUrl("https://example.test/job".into()),
@@ -2004,6 +2106,7 @@ mod tests {
             &mut opened,
             &mut copied,
             &mut saved,
+            &mut saved_companies,
         )
         .unwrap();
 
@@ -2020,6 +2123,7 @@ mod tests {
         let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
         let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
         let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
+        let mut saved_companies = |_: Vec<(String, bool)>| -> super::Result<()> { Ok(()) };
         let filters = AnalyticsFilters::default();
         let mut library = LibraryState::default();
 
@@ -2031,6 +2135,7 @@ mod tests {
             &mut opened,
             &mut copied,
             &mut saved,
+            &mut saved_companies,
         )
         .unwrap();
         library.jobs.insert(JobKey::new("acme", "job-2"));
@@ -2041,6 +2146,7 @@ mod tests {
             &mut opened,
             &mut copied,
             &mut saved,
+            &mut saved_companies,
         )
         .unwrap();
 

@@ -3,21 +3,23 @@ use ratatui::{
     Frame,
     layout::{Constraint, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
-    symbols,
     text::{Line, Span, Text},
     widgets::{
-        Bar, BarChart, Block, Borders, Cell, Clear, List, ListItem, ListState, Paragraph, Row,
-        Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Wrap,
+        Block, Borders, Cell, Clear, List, ListItem, ListState, Padding, Paragraph, Row, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, Table, TableState, Wrap,
     },
 };
 
 use crate::{
     analytics::SkillKind,
-    insights::{MetricRow, Momentum},
+    insights::MetricRow,
     storage::{ScanOutcome, SourceHealth},
 };
 
-use super::app::{EXCLUDE_TITLE_PRESETS, INCLUDE_TITLE_PRESETS, TitlePreset};
+use super::app::{
+    CompanyColumns, EXCLUDE_TITLE_PRESETS, INCLUDE_TITLE_PRESETS, TitlePreset, company_columns,
+    wrap_company_text,
+};
 use super::{
     AnalyticsTab, App, Focus, InputMode, LibraryTab, MarketSection, MouseTarget, Setting, View,
 };
@@ -176,12 +178,20 @@ fn render_analytics_tabs(frame: &mut Frame, app: &App, area: Rect) {
     .into_iter()
     .enumerate()
     .flat_map(|(index, tab)| {
+        let disabled = tab == AnalyticsTab::Stacks;
         let selected = tab == app.analytics_tab();
         [
             Span::styled(
-                format!(" {} {} ", index + 1, tab.label()),
+                format!(
+                    " {} {}{} ",
+                    index + 1,
+                    tab.label(),
+                    if disabled { " (WIP)" } else { "" }
+                ),
                 Style::new()
-                    .fg(if selected {
+                    .fg(if disabled {
+                        app.theme().muted_text
+                    } else if selected {
                         app.theme().warning
                     } else {
                         app.theme().primary_text
@@ -275,33 +285,34 @@ fn render_overview(frame: &mut Frame, app: &App, area: Rect) {
         render_analytics_loading(frame, app, area);
         return;
     };
-    let sections = Layout::vertical([Constraint::Percentage(48), Constraint::Fill(1)]).split(area);
-    let charts =
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(sections[0]);
     let hard = report
         .hard_skills
         .iter()
         .map(|skill| &skill.metric)
         .collect::<Vec<_>>();
     let roles = report.roles.iter().collect::<Vec<_>>();
+    let chart_height = app.analytics_overview_chart_height(area);
+    let sections =
+        Layout::vertical([Constraint::Length(chart_height), Constraint::Fill(1)]).split(area);
+    let charts =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(sections[0]);
     render_metric_chart(frame, app, charts[0], "Hard-skill demand", &hard);
     render_metric_chart(frame, app, charts[1], "Role demand", &roles);
 
-    let rows = report.recommendations.iter().map(|item| {
-        Row::new(vec![
-            Cell::from(if item.saved { "★" } else { " " }),
-            Cell::from(item.skill.clone()),
-            Cell::from(item.kind.as_str()),
-            Cell::from(item.demand_count.to_string()),
-            Cell::from(item.target_role_count.to_string()),
-            Cell::from(item.adjacent_known_count.to_string()),
-            Cell::from(item.momentum.as_str()),
-            Cell::from(item.confidence.as_str()),
-            Cell::from(item.reason.clone()),
-        ])
-    });
+    let rows = report
+        .recommendations
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            Row::new(vec![
+                Cell::from(if item.saved { "★" } else { " " }),
+                Cell::from(item.skill.clone()),
+                Cell::from(item.demand_count.to_string()),
+            ])
+            .style(mouse_style(app, MouseTarget::Item(index)))
+        });
     let title = format!(
-        "Career opportunities · {} recommendations · {} active jobs · history since {}",
+        "Skills to consider · {} · {} active jobs · history since {}",
         report.recommendations.len(),
         report.active_job_count,
         report
@@ -313,27 +324,11 @@ fn render_overview(frame: &mut Frame, app: &App, area: Rect) {
         rows,
         [
             Constraint::Length(2),
-            Constraint::Fill(2),
-            Constraint::Length(6),
-            Constraint::Length(7),
-            Constraint::Length(6),
-            Constraint::Length(7),
-            Constraint::Length(12),
-            Constraint::Length(5),
-            Constraint::Fill(3),
+            Constraint::Fill(1),
+            Constraint::Length(8),
         ],
     )
-    .header(table_header([
-        "",
-        "Learn next",
-        "Type",
-        "Demand",
-        "Target",
-        "Beside",
-        "Momentum",
-        "Conf",
-        "Why",
-    ]))
+    .header(table_header(["", "Skill", "Demand"]))
     .block(panel(
         &title,
         app.theme().focused_border,
@@ -359,9 +354,10 @@ fn render_skills_trends(frame: &mut Frame, app: &App, area: Rect) {
         render_analytics_loading(frame, app, area);
         return;
     };
+    let chart_height = area.height.saturating_sub(6).min(12);
     let sections = Layout::vertical([
         Constraint::Length(1),
-        Constraint::Percentage(66),
+        Constraint::Length(chart_height),
         Constraint::Fill(1),
     ])
     .split(area);
@@ -370,16 +366,20 @@ fn render_skills_trends(frame: &mut Frame, app: &App, area: Rect) {
         SkillKind::Hard => ("Hard skills", &report.hard_skills),
         SkillKind::Soft => ("Soft skills", &report.soft_skills),
     };
+    let metrics = skills
+        .iter()
+        .take(10)
+        .map(|skill| &skill.metric)
+        .collect::<Vec<_>>();
+    render_metric_chart(frame, app, sections[1], "Top 10 demand", &metrics);
     render_skill_table(
         frame,
         app,
-        sections[1],
+        sections[2],
         title,
         skills,
         app.analytics_skill_kind(),
     );
-    let metrics = skills.iter().map(|skill| &skill.metric).collect::<Vec<_>>();
-    render_metric_chart(frame, app, sections[2], "Demand chart", &metrics);
 }
 
 fn render_skill_kind_tabs(frame: &mut Frame, app: &App, area: Rect) {
@@ -429,20 +429,17 @@ fn render_skill_table(
     skills: &[crate::insights::SkillTrend],
     kind: SkillKind,
 ) {
-    let rows = skills.iter().map(|skill| {
+    let rows = skills.iter().enumerate().map(|(index, skill)| {
+        let target = match kind {
+            SkillKind::Hard => MouseTarget::HardSkill(index),
+            SkillKind::Soft => MouseTarget::SoftSkill(index),
+        };
         Row::new(vec![
             Cell::from(if skill.saved { "★" } else { " " }),
             Cell::from(skill.metric.name.clone()),
             Cell::from(format_demand(&skill.metric)),
-            Cell::from(format!("{:+}", skill.metric.delta_count)),
-            Cell::from(format_delta(&skill.metric)),
-            Cell::from(skill.metric.momentum.as_str()),
-            Cell::from(
-                skill
-                    .status
-                    .map_or("—", crate::insights::SkillStatus::as_str),
-            ),
         ])
+        .style(mouse_style(app, target))
     });
     let selected = app.analytics_skill_kind() == kind;
     let panel_title = format!("{title} · {}", skills.len());
@@ -450,17 +447,11 @@ fn render_skill_table(
         rows,
         [
             Constraint::Length(2),
-            Constraint::Fill(2),
+            Constraint::Fill(1),
             Constraint::Length(11),
-            Constraint::Length(7),
-            Constraint::Length(8),
-            Constraint::Length(12),
-            Constraint::Length(10),
         ],
     )
-    .header(table_header([
-        "", "Skill", "Demand", "Δ jobs", "Δ share", "Momentum", "Status",
-    ]))
+    .header(table_header(["", "Skill", "Demand"]))
     .block(panel(
         &panel_title,
         if selected {
@@ -494,7 +485,7 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
         return;
     };
     let sections = Layout::vertical([Constraint::Percentage(68), Constraint::Fill(1)]).split(area);
-    let rows = report.stacks.iter().map(|stack| {
+    let rows = report.stacks.iter().enumerate().map(|(index, stack)| {
         Row::new(vec![
             Cell::from(if stack.saved { "★" } else { " " }),
             Cell::from(format!(
@@ -509,10 +500,8 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
                 stack.association_bps / 100,
                 stack.association_bps % 100
             )),
-            Cell::from(format_delta(&stack.metric)),
-            Cell::from(stack.metric.momentum.as_str()),
-            Cell::from(stack.metric.confidence.as_str()),
         ])
+        .style(mouse_style(app, MouseTarget::Item(index)))
     });
     let title = format!(
         "Technology stacks · {} paths · minimum {} jobs · 3+ architectural roles",
@@ -527,14 +516,9 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(11),
             Constraint::Length(7),
             Constraint::Length(7),
-            Constraint::Length(8),
-            Constraint::Length(12),
-            Constraint::Length(5),
         ],
     )
-    .header(table_header([
-        "", "Path", "Demand", "Firms", "Link", "Δ share", "Momentum", "Conf",
-    ]))
+    .header(table_header(["", "Path", "Demand", "Firms", "Link"]))
     .block(panel(
         &title,
         app.theme().focused_border,
@@ -640,7 +624,7 @@ fn render_market_trends(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_metric_table(frame: &mut Frame, app: &App, area: Rect, title: &str, rows: &[MetricRow]) {
-    let table_rows = rows.iter().map(|metric| {
+    let table_rows = rows.iter().enumerate().map(|(index, metric)| {
         Row::new(vec![
             Cell::from(format!(
                 "{}{}",
@@ -652,35 +636,20 @@ fn render_metric_table(frame: &mut Frame, app: &App, area: Rect, title: &str, ro
                 metric_display_name(app, metric)
             )),
             Cell::from(format_demand(metric)),
-            Cell::from(format!("{:+}", metric.delta_count)),
-            Cell::from(format_delta(metric)),
-            Cell::from(metric.momentum.as_str()),
-            Cell::from(metric.confidence.as_str()),
         ])
+        .style(mouse_style(app, MouseTarget::Item(index)))
     });
     let panel_title = format!("{title} · {}", rows.len());
-    let table = Table::new(
-        table_rows,
-        [
-            Constraint::Fill(2),
-            Constraint::Length(11),
-            Constraint::Length(7),
-            Constraint::Length(8),
-            Constraint::Length(12),
-            Constraint::Length(5),
-        ],
-    )
-    .header(table_header([
-        "Name", "Demand", "Δ jobs", "Δ share", "Momentum", "Conf",
-    ]))
-    .block(panel(
-        &panel_title,
-        app.theme().focused_border,
-        app.theme().background,
-        Borders::ALL,
-    ))
-    .row_highlight_style(Style::new().bg(app.theme().selected_row))
-    .highlight_symbol("› ");
+    let table = Table::new(table_rows, [Constraint::Fill(2), Constraint::Length(11)])
+        .header(table_header(["Name", "Demand"]))
+        .block(panel(
+            &panel_title,
+            app.theme().focused_border,
+            app.theme().background,
+            Borders::ALL,
+        ))
+        .row_highlight_style(Style::new().bg(app.theme().selected_row))
+        .highlight_symbol("› ");
     let mut state = TableState::default().with_selected(app.selected_index());
     frame.render_stateful_widget(table, area, &mut state);
     render_scrollbar(
@@ -694,19 +663,11 @@ fn render_metric_table(frame: &mut Frame, app: &App, area: Rect, title: &str, ro
 }
 
 fn render_metric_chart(frame: &mut Frame, app: &App, area: Rect, title: &str, rows: &[&MetricRow]) {
-    let bars = rows
+    let rows = rows
         .iter()
-        .take(8.min(usize::from(area.height.saturating_sub(2) / 2).max(1)))
-        .map(|metric| {
-            Bar::with_label(
-                metric_display_name(app, metric),
-                metric.current_count as u64,
-            )
-            .text_value(String::new())
-            .style(Style::new().fg(momentum_color(app, metric.momentum)))
-        })
+        .take(10.min(usize::from(area.height.saturating_sub(2)).max(1)))
         .collect::<Vec<_>>();
-    if bars.is_empty() {
+    if rows.is_empty() {
         frame.render_widget(
             Paragraph::new("No data for this filter.").block(panel(
                 title,
@@ -718,28 +679,80 @@ fn render_metric_chart(frame: &mut Frame, app: &App, area: Rect, title: &str, ro
         );
         return;
     }
-    let max = rows.iter().map(|row| row.current_count).max().unwrap_or(1);
-    let mut chart = BarChart::horizontal(bars)
-        .block(panel(
+    let inner_width = usize::from(area.width.saturating_sub(2));
+    let labels = rows
+        .iter()
+        .map(|metric| metric_display_name(app, metric))
+        .collect::<Vec<_>>();
+    let label_width = labels
+        .iter()
+        .map(|label| Line::from(label.as_str()).width())
+        .max()
+        .unwrap_or(1)
+        .min(24)
+        .min(inner_width.saturating_sub(14).max(1));
+    let bar_width = inner_width.saturating_sub(label_width + 13).clamp(1, 12);
+    let max = rows
+        .iter()
+        .map(|metric| metric.current_count)
+        .max()
+        .unwrap_or(1)
+        .max(1);
+    let (filled, empty) = if app.config().ui.unicode_icons {
+        ('━', '·')
+    } else {
+        ('#', '.')
+    };
+    let lines = rows
+        .into_iter()
+        .enumerate()
+        .map(|(index, metric)| {
+            let label = truncate_to_width(&labels[index], label_width);
+            let label_padding = label_width.saturating_sub(Line::from(label.as_str()).width());
+            let filled_width = if metric.current_count == 0 {
+                0
+            } else {
+                (metric.current_count * bar_width).div_ceil(max).max(1)
+            };
+            Line::from(vec![
+                Span::styled(
+                    format!("{:>2} ", index + 1),
+                    Style::new().fg(app.theme().muted_text),
+                ),
+                Span::styled(
+                    format!("{label}{} ", " ".repeat(label_padding)),
+                    Style::new().fg(app.theme().primary_text),
+                ),
+                Span::styled(
+                    filled.to_string().repeat(filled_width),
+                    Style::new().fg(app.theme().new),
+                ),
+                Span::styled(
+                    empty.to_string().repeat(bar_width - filled_width),
+                    Style::new().fg(app.theme().muted_text),
+                ),
+                Span::styled(
+                    format!("  {}", format_demand(metric)),
+                    Style::new().fg(app.theme().warning),
+                ),
+            ])
+        })
+        .collect::<Vec<_>>();
+    frame.render_widget(
+        Paragraph::new(lines).block(panel(
             title,
             app.theme().unfocused_border,
             app.theme().background,
             Borders::ALL,
-        ))
-        .bar_width(1)
-        .bar_gap(1)
-        .max(max.max(1) as u64)
-        .label_style(Style::new().fg(app.theme().primary_text));
-    if !app.config().ui.unicode_icons {
-        chart = chart.bar_set(ascii_bar_set());
-    }
-    frame.render_widget(chart, area);
+        )),
+        area,
+    );
 }
 
 fn render_analytics_evidence(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
     let jobs = app.analytics_evidence_jobs();
     let coverage = app.analytics_coverage();
-    let items = jobs.iter().map(|job| {
+    let items = jobs.iter().enumerate().map(|(index, job)| {
         let status = if job.source_open { "OPEN" } else { "CLOSED" };
         let evidence = app.analytics_evidence_text(job);
         ListItem::new(vec![
@@ -756,6 +769,7 @@ fn render_analytics_evidence(frame: &mut Frame, app: &App, area: Rect, borders: 
                 Style::new().fg(app.theme().muted_text),
             ),
         ])
+        .style(mouse_style(app, MouseTarget::Evidence(index)))
     });
     let title = format!(
         "Evidence · {} matching jobs · descriptions {}/{} · sources {}/{} healthy",
@@ -959,27 +973,11 @@ fn render_library_view(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_library_jobs(frame: &mut Frame, app: &App, area: Rect) {
     let jobs = app.library_jobs();
-    let items = jobs.iter().map(|job| {
-        let status = if job.source_open {
-            if job.reopened_at.is_some() {
-                "REOPENED"
-            } else {
-                "OPEN"
-            }
-        } else {
-            "CLOSED"
-        };
-        ListItem::new(vec![
-            Line::styled(
-                format!("★ {status} · {}", app.company_name(&job.key.company_id)),
-                Style::new().fg(app.theme().new),
-            ),
-            Line::styled(
-                format!("  {}", job.classified.observed.title),
-                Style::new().fg(app.theme().primary_text),
-            ),
-        ])
-    });
+    let row_width = list_row_width(area, Borders::ALL);
+    let items = jobs
+        .iter()
+        .enumerate()
+        .map(|(index, job)| job_list_item(app, job, index, row_width));
     let title = format!("Saved jobs · {}", jobs.len());
     let list = List::new(items)
         .block(panel(
@@ -1015,7 +1013,10 @@ fn render_library_table<'a, const W: usize, const H: usize>(
     widths: [Constraint; W],
     headers: [&str; H],
 ) {
-    let rows = rows.collect::<Vec<_>>();
+    let rows = rows
+        .enumerate()
+        .map(|(index, row)| row.style(mouse_style(app, MouseTarget::Item(index))))
+        .collect::<Vec<_>>();
     let count = rows.len();
     let table = Table::new(rows, widths)
         .header(table_header(headers))
@@ -1058,19 +1059,6 @@ fn format_demand(metric: &MetricRow) -> String {
         metric.current_count,
         metric.current_share_per_mille / 10
     )
-}
-
-fn format_delta(metric: &MetricRow) -> String {
-    format!("{:+.1}pp", metric.delta_share_per_mille as f64 / 10.0)
-}
-
-fn momentum_color(app: &App, momentum: Momentum) -> Color {
-    match momentum {
-        Momentum::New | Momentum::Rising => app.theme().new,
-        Momentum::Stable => app.theme().open,
-        Momentum::Falling => app.theme().error,
-        Momentum::LowConfidence => app.theme().muted_text,
-    }
 }
 
 fn metric_display_name(app: &App, metric: &MetricRow) -> String {
@@ -1495,10 +1483,15 @@ fn render_scrollable_paragraph(
     area: Rect,
     paragraph: Paragraph<'_>,
     borders: Borders,
+    horizontal_padding: u16,
 ) {
     let horizontal_borders =
         u16::from(borders.contains(Borders::LEFT)) + u16::from(borders.contains(Borders::RIGHT));
-    let content_length = paragraph.line_count(area.width.saturating_sub(horizontal_borders));
+    let content_length = paragraph.line_count(
+        area.width
+            .saturating_sub(horizontal_borders)
+            .saturating_sub(horizontal_padding),
+    );
     let viewport_length = usize::from(area.height);
     app.set_detail_scroll_max(
         content_length
@@ -1508,20 +1501,6 @@ fn render_scrollable_paragraph(
     let position = usize::from(app.detail_scroll());
     frame.render_widget(paragraph.scroll((app.detail_scroll(), 0)), area);
     render_scrollbar(frame, app, area, content_length, position, viewport_length);
-}
-
-fn ascii_bar_set() -> symbols::bar::Set<'static> {
-    symbols::bar::Set {
-        full: "#",
-        seven_eighths: "#",
-        three_quarters: "#",
-        five_eighths: "#",
-        half: "#",
-        three_eighths: "#",
-        one_quarter: "#",
-        one_eighth: "#",
-        empty: " ",
-    }
 }
 
 fn render_single_job_pane(frame: &mut Frame, app: &App, area: Rect) {
@@ -1713,6 +1692,7 @@ fn render_operational_details(frame: &mut Frame, app: &App, area: Rect) {
             .style(Style::new().fg(color).bg(theme.background))
             .wrap(Wrap { trim: true }),
         Borders::ALL,
+        0,
     );
 }
 
@@ -1784,51 +1764,11 @@ fn nav_item(
 fn render_job_list(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
     let theme = app.theme();
     let jobs = app.visible_jobs().collect::<Vec<_>>();
-    let items = jobs.iter().enumerate().map(|(index, job)| {
-        let (primary_icon, primary_label, primary_color) = if job.source_open {
-            (app.icons().open, "OPEN", theme.open)
-        } else {
-            (app.icons().history, "CLOSED", theme.muted_text)
-        };
-        let mut state = vec![Span::styled(
-            format!("{primary_icon} {primary_label}"),
-            Style::new().fg(primary_color),
-        )];
-        if app.is_job_new(job) {
-            state.push(Span::styled(
-                format!("  {}", app.icons().new),
-                Style::new().fg(theme.new),
-            ));
-        }
-        if job.applied_at.is_some() {
-            state.push(Span::styled(
-                format!(" {}", app.icons().applied),
-                Style::new().fg(theme.applied),
-            ));
-        }
-        if app.is_job_saved(job) {
-            state.push(Span::styled(
-                format!(" {}", app.icons().saved),
-                Style::new().fg(theme.warning),
-            ));
-        }
-        state.push(Span::styled(
-            format!("  {}", compact_date(job.first_seen_at)),
-            Style::new().fg(theme.muted_text),
-        ));
-        ListItem::new(vec![
-            Line::from(state),
-            Line::styled(
-                format!(
-                    "  {} · {}",
-                    app.company_name(&job.key.company_id),
-                    job.classified.observed.title
-                ),
-                Style::new().fg(theme.primary_text),
-            ),
-        ])
-        .style(mouse_style(app, MouseTarget::Item(index)))
-    });
+    let row_width = list_row_width(area, borders);
+    let items = jobs
+        .iter()
+        .enumerate()
+        .map(|(index, job)| job_list_item(app, job, index, row_width));
     let title = match app.view() {
         View::Active => "Active jobs",
         View::New => "New jobs",
@@ -1868,8 +1808,110 @@ fn render_job_list(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
     );
 }
 
+fn job_list_item(
+    app: &App,
+    job: &crate::domain::JobRecord,
+    index: usize,
+    row_width: usize,
+) -> ListItem<'static> {
+    let theme = app.theme();
+    let selected = index == app.selected_index();
+    let title_style = Style::new()
+        .fg(if selected {
+            theme.warning
+        } else {
+            theme.primary_text
+        })
+        .add_modifier(if selected {
+            Modifier::BOLD
+        } else {
+            Modifier::empty()
+        });
+    let mut right = Vec::new();
+    let status = if job.reopened_at.is_some() {
+        Some("reopened")
+    } else if !job.source_open {
+        Some("closed")
+    } else {
+        None
+    };
+    if let Some(status) = status {
+        right.push(Span::styled(
+            format!("{status} · "),
+            Style::new().fg(theme.muted_text),
+        ));
+    }
+    right.push(Span::styled(
+        compact_date(job.first_seen_at),
+        Style::new().fg(theme.muted_text),
+    ));
+    if app.is_job_new(job) {
+        right.push(Span::styled(
+            format!(" {}", app.icons().new),
+            Style::new().fg(theme.new),
+        ));
+    }
+    if job.applied_at.is_some() {
+        right.push(Span::styled(
+            format!(" {}", app.icons().applied),
+            Style::new().fg(theme.applied),
+        ));
+    }
+    if app.is_job_saved(job) {
+        right.push(Span::styled(
+            format!(" {}", app.icons().saved),
+            Style::new().fg(theme.warning),
+        ));
+    }
+
+    let right_width = Line::from(right.clone()).width();
+    let maximum_company_width = row_width.saturating_sub(right_width + 3);
+    let company = truncate_to_width(app.company_name(&job.key.company_id), maximum_company_width);
+    let company_width = Line::from(company.as_str()).width();
+    let spacing = row_width
+        .saturating_sub(company_width + right_width + 2)
+        .max(1);
+    let mut metadata = vec![
+        Span::raw("  "),
+        Span::styled(company, Style::new().fg(theme.new)),
+        Span::raw(" ".repeat(spacing)),
+    ];
+    metadata.extend(right);
+
+    ListItem::new(vec![
+        Line::styled(format!("  {}", job.classified.observed.title), title_style),
+        Line::from(metadata),
+    ])
+    .style(mouse_style(app, MouseTarget::Item(index)))
+}
+
+fn list_row_width(area: Rect, borders: Borders) -> usize {
+    let border_width = usize::from(borders.contains(Borders::LEFT))
+        + usize::from(borders.contains(Borders::RIGHT));
+    usize::from(area.width).saturating_sub(border_width + 2)
+}
+
+fn truncate_to_width(value: &str, maximum: usize) -> String {
+    if Line::from(value).width() <= maximum {
+        return value.to_owned();
+    }
+    let mut truncated = value
+        .chars()
+        .take(maximum.saturating_sub(1))
+        .collect::<String>();
+    truncated.push('…');
+    truncated
+}
+
 fn render_details(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
     let theme = app.theme();
+    let horizontal_borders =
+        u16::from(borders.contains(Borders::LEFT)) + u16::from(borders.contains(Borders::RIGHT));
+    let horizontal_padding = 2;
+    let content_width = area
+        .width
+        .saturating_sub(horizontal_borders)
+        .saturating_sub(horizontal_padding);
     let text = app.selected_job().map_or_else(
         || Text::from("No jobs in this view."),
         |job| {
@@ -1953,24 +1995,84 @@ fn render_details(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
                 },
             ));
             lines.push(Line::from(""));
+            lines.push(Line::styled(
+                "Skills",
+                Style::new()
+                    .fg(theme.primary_text)
+                    .add_modifier(Modifier::BOLD),
+            ));
+            lines.extend(selected_job_skill_lines(app, theme, content_width));
+            lines.push(Line::from(""));
+            lines.push(Line::styled(
+                "Description",
+                Style::new()
+                    .fg(theme.primary_text)
+                    .add_modifier(Modifier::BOLD),
+            ));
             lines.extend(markdown_lines(&observed.description, theme));
             Text::from(lines)
         },
     );
     let details = Paragraph::new(text)
-        .block(panel(
-            "Job details",
-            if borders == Borders::ALL || app.hovered(MouseTarget::Details) {
-                theme.focused_border
-            } else {
-                theme.unfocused_border
-            },
-            theme.background,
-            borders,
-        ))
+        .block(
+            panel(
+                "Job details",
+                if borders == Borders::ALL || app.hovered(MouseTarget::Details) {
+                    theme.focused_border
+                } else {
+                    theme.unfocused_border
+                },
+                theme.background,
+                borders,
+            )
+            .padding(Padding::horizontal(1)),
+        )
         .style(Style::new().bg(theme.background))
         .wrap(Wrap { trim: true });
-    render_scrollable_paragraph(frame, app, area, details, borders);
+    render_scrollable_paragraph(frame, app, area, details, borders, horizontal_padding);
+}
+
+fn selected_job_skill_lines(
+    app: &App,
+    theme: super::Theme,
+    content_width: u16,
+) -> Vec<Line<'static>> {
+    let Some(skills) = app.selected_job_skills() else {
+        return vec![Line::styled(
+            "Skills are not available for this job.",
+            Style::new().fg(theme.muted_text),
+        )];
+    };
+    if skills.is_empty() {
+        return vec![Line::styled(
+            "No recognised skills found in this description.",
+            Style::new().fg(theme.muted_text),
+        )];
+    }
+
+    let maximum = usize::from(content_width.max(1));
+    let mut lines = Vec::new();
+    let mut spans = Vec::new();
+    let mut width: usize = 0;
+    for skill in skills {
+        let prefix = if spans.is_empty() { "• " } else { "  • " };
+        let item_width = Line::from(format!("{prefix}{skill}")).width();
+        if !spans.is_empty() && width.saturating_add(item_width) > maximum {
+            lines.push(Line::from(std::mem::take(&mut spans)));
+            width = 0;
+        }
+        let prefix = if spans.is_empty() { "• " } else { "  • " };
+        width = width.saturating_add(Line::from(format!("{prefix}{skill}")).width());
+        spans.push(Span::styled(prefix, Style::new().fg(theme.new)));
+        spans.push(Span::styled(
+            skill.to_owned(),
+            Style::new().fg(theme.primary_text),
+        ));
+    }
+    if !spans.is_empty() {
+        lines.push(Line::from(spans));
+    }
+    lines
 }
 
 fn markdown_lines(markdown: &str, theme: super::Theme) -> Vec<Line<'static>> {
@@ -2072,6 +2174,7 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
             ),
             Setting::IncludePreset(_)
             | Setting::ExcludePreset(_)
+            | Setting::Companies
             | Setting::IncludedTitles
             | Setting::ExcludedTitles
             | Setting::SimpleSettings => unreachable!(),
@@ -2103,6 +2206,82 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
                 .style(Style::new().bg(theme.background))
                 .wrap(Wrap { trim: true }),
             area,
+        );
+        return;
+    }
+
+    if app.company_settings() {
+        let companies = app.configurable_companies();
+        let border_width = usize::from(borders.contains(Borders::LEFT))
+            + usize::from(borders.contains(Borders::RIGHT));
+        let row_width = usize::from(area.width).saturating_sub(border_width + 2);
+        let columns = company_columns(&companies, row_width);
+        let heights = companies
+            .iter()
+            .map(|(_, company)| columns.row_height(company))
+            .collect::<Vec<_>>();
+        let mut items = companies
+            .iter()
+            .enumerate()
+            .map(|(row, (_, company))| company_setting_item(app, row, company, columns))
+            .collect::<Vec<_>>();
+        if items.is_empty() {
+            let message = if app.company_search_query().is_empty() {
+                "No companies available".to_owned()
+            } else {
+                format!("No companies match ‘{}’", app.company_search_query())
+            };
+            items.push(ListItem::new(Line::styled(
+                message,
+                Style::new().fg(theme.muted_text),
+            )));
+        }
+        let title = format!(
+            "Companies · {} of {} followed · / search · Space toggle",
+            app.enabled_company_count(),
+            app.configurable_company_count()
+        );
+        let mut state = ListState::default().with_offset(app.company_list_offset());
+        state.select((!items.is_empty()).then_some(app.selected_index()));
+        frame.render_stateful_widget(
+            List::new(items)
+                .block(panel(
+                    &title,
+                    if app.focus() == Focus::Content {
+                        theme.focused_border
+                    } else {
+                        theme.unfocused_border
+                    },
+                    theme.background,
+                    borders,
+                ))
+                .highlight_style(Style::new().bg(theme.selected_row))
+                .highlight_symbol("› "),
+            area,
+            &mut state,
+        );
+        app.set_company_list_offset(state.offset());
+        let viewport_height = usize::from(area.height.saturating_sub(2));
+        let mut used_height = 0usize;
+        let visible_count = heights
+            .iter()
+            .skip(state.offset())
+            .take_while(|height| {
+                let fits = used_height.saturating_add(**height) <= viewport_height;
+                if fits {
+                    used_height += **height;
+                }
+                fits
+            })
+            .count()
+            .max(1);
+        render_scrollbar(
+            frame,
+            app,
+            area,
+            companies.len(),
+            state.offset(),
+            visible_count,
         );
         return;
     }
@@ -2178,13 +2357,12 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
                 setting_item(
                     app,
                     1,
-                    "Locations",
-                    filters
-                        .countries
-                        .iter()
-                        .map(|country| country_name(country))
-                        .collect::<Vec<_>>()
-                        .join(", "),
+                    "Companies",
+                    format!(
+                        "{} of {} followed",
+                        app.enabled_company_count(),
+                        app.configurable_company_count()
+                    ),
                 ),
                 setting_item(
                     app,
@@ -2231,6 +2409,78 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
     );
 }
 
+fn company_setting_item(
+    app: &App,
+    index: usize,
+    company: &crate::config::CompanyConfig,
+    columns: CompanyColumns,
+) -> ListItem<'static> {
+    let theme = app.theme();
+    let enabled = company.enabled;
+    let name_style = Style::new()
+        .fg(if enabled {
+            theme.primary_text
+        } else {
+            theme.muted_text
+        })
+        .add_modifier(if enabled {
+            Modifier::BOLD
+        } else {
+            Modifier::empty()
+        });
+    let names = wrap_company_text(&company.name, columns.name);
+    let industries = wrap_company_text(&company.industry, columns.industry);
+    let scales = wrap_company_text(&company.scale, columns.scale);
+    let height = columns.row_height(company);
+    let lines = (0..height)
+        .map(|line| {
+            let mut spans = vec![Span::styled(
+                if line == 0 {
+                    if enabled { "[x] " } else { "[ ] " }
+                } else {
+                    "    "
+                },
+                Style::new().fg(if enabled { theme.new } else { theme.muted_text }),
+            )];
+            spans.push(Span::styled(
+                pad_to_width(
+                    names.get(line).map(String::as_str).unwrap_or(""),
+                    columns.name,
+                ),
+                name_style,
+            ));
+            if columns.industry > 0 {
+                spans.extend([
+                    Span::raw("  "),
+                    Span::styled(
+                        pad_to_width(
+                            industries.get(line).map(String::as_str).unwrap_or(""),
+                            columns.industry,
+                        ),
+                        Style::new().fg(theme.primary_text),
+                    ),
+                    Span::raw("  "),
+                    Span::styled(
+                        pad_to_width(
+                            scales.get(line).map(String::as_str).unwrap_or(""),
+                            columns.scale,
+                        ),
+                        Style::new().fg(theme.muted_text),
+                    ),
+                ]);
+            }
+            Line::from(spans)
+        })
+        .collect::<Vec<_>>();
+    ListItem::new(lines).style(mouse_style(app, MouseTarget::Setting(index)))
+}
+
+fn pad_to_width(value: &str, width: usize) -> String {
+    let value = truncate_to_width(value, width);
+    let padding = width.saturating_sub(Line::from(value.as_str()).width());
+    format!("{value}{}", " ".repeat(padding))
+}
+
 fn setting_item(app: &App, index: usize, label: &'static str, value: String) -> ListItem<'static> {
     let theme = app.theme();
     ListItem::new(Line::from(vec![
@@ -2271,28 +2521,6 @@ fn preset_item(
         ),
     ])
     .style(mouse_style(app, MouseTarget::Setting(index)))
-}
-
-fn country_name(code: &str) -> String {
-    match code.to_ascii_uppercase().as_str() {
-        "NL" => "Netherlands".to_owned(),
-        "BE" => "Belgium".to_owned(),
-        "DE" => "Germany".to_owned(),
-        "FR" => "France".to_owned(),
-        "GB" | "UK" => "United Kingdom".to_owned(),
-        "IE" => "Ireland".to_owned(),
-        "ES" => "Spain".to_owned(),
-        "PT" => "Portugal".to_owned(),
-        "IT" => "Italy".to_owned(),
-        "CH" => "Switzerland".to_owned(),
-        "AT" => "Austria".to_owned(),
-        "PL" => "Poland".to_owned(),
-        "DK" => "Denmark".to_owned(),
-        "SE" => "Sweden".to_owned(),
-        "NO" => "Norway".to_owned(),
-        "FI" => "Finland".to_owned(),
-        _ => code.to_owned(),
-    }
 }
 
 fn job_type_summary(patterns: &[String]) -> String {
@@ -2607,7 +2835,14 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     };
     let actions = if app.input_mode() == InputMode::Search {
         let limit = if area.width < 80 { 12 } else { 32 };
-        let query = app.search_query().chars().take(limit).collect::<String>();
+        let query = if app.view() == View::Settings && app.company_settings() {
+            app.company_search_query()
+        } else {
+            app.search_query()
+        }
+        .chars()
+        .take(limit)
+        .collect::<String>();
         vec![
             format!("Search: {query}"),
             "↑↓ select".to_owned(),
@@ -2658,7 +2893,13 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         }
         actions
     } else if app.view() == View::Settings {
-        let mut actions = if app.advanced_settings() {
+        let mut actions = if app.company_settings() {
+            vec![
+                "↑/↓ companies".to_owned(),
+                "Space/Enter toggle".to_owned(),
+                "/ search · Esc back".to_owned(),
+            ]
+        } else if app.advanced_settings() {
             vec![
                 "↑/↓ filters".to_owned(),
                 "Space/Enter toggle or edit".to_owned(),

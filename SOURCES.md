@@ -1,5 +1,7 @@
 # Source and sponsor evidence
 
+These official-source checks support TechJobsNL's main job-finding workflow. The shipped beta has **65 enabled verified companies and one disabled source**. Skill-based results use the descriptions collected from these sources; they cover observed postings, not every Netherlands tech vacancy. Counts and live checks below are dated snapshots, not availability guarantees.
+
 ## Brand New Day
 
 - Official source: <https://werkenbij.brandnewday.nl/vacatures>. Its first-party Getnoticed API declares the exact total, current page, page size, and page count. The adapter verifies every page, unique numeric vacancy ID, matching canonical detail, `JobPosting` publication date, full description, explicit Netherlands country, hiring brand, and official application path before accepting a complete scan. The site's <https://werkenbij.brandnewday.nl/robots.txt> allows crawling.

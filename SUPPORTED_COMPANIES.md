@@ -1,5 +1,7 @@
 # Supported companies and roadmap
 
+These companies supply the official vacancies used for direct job review and skill-based job discovery in TechJobsNL. Coverage is limited to enabled, verified sources.
+
 Release snapshot: **2026-08-14**.
 
 - **65 supported companies** are enabled and have a tested source adapter.

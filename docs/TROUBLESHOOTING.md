@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Start with the exact error and absolute path printed by TechJobsNL. Configuration and source failures are designed to include the field, company, or diagnostic that failed.
+TechJobsNL can find jobs through its direct title/company search or through matching evidence for a selected skill or market fact. Start troubleshooting with the exact error and absolute path it prints. Configuration and source failures are designed to include the field, company, or diagnostic that failed.
 
 ## The app does not start
 
@@ -49,10 +49,13 @@ Check in this order:
 2. Open Sources and inspect health and diagnostics.
 3. Clear search by pressing `/`, then `Esc`.
 4. Press `f` until the footer shows the All filter.
-5. Open Settings and check Locations, Job types, and Hide jobs.
-6. Clear included title patterns if you want every role type.
+5. Open Settings → Companies and confirm that at least one relevant company is followed.
+6. Open Settings and check Job types and Hide jobs.
+7. Clear included title patterns if you want every role type.
 
 Jobs without a resolved allowed country are not accepted. Jobs without a publication date can still be active but are not considered new.
+
+Following or unfollowing a company does not start a scan. A newly followed company has no jobs until you press `r` and its scan completes.
 
 ## A source is Failed or Incomplete
 
@@ -83,6 +86,7 @@ The error reports the clipboard fallbacks it attempted. You can still press `o` 
 
 ## Analytics is empty, refreshing, or low confidence
 
+- The skill-matching job list depends on Analytics and its extracted posting facts.
 - Analytics requires stored eligible job descriptions.
 - A fresh database needs at least one complete scan.
 - `minimum_skill_occurrence` and `minimum_cooccurrence` can hide small samples.
