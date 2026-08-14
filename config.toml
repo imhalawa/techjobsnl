@@ -652,3 +652,14 @@ enabled = true
 [companies.source]
 strategy = "deel"
 board_url = "https://jobs.deel.com/klarna"
+
+[[companies]]
+id = "flatexdegiro"
+name = "flatexDEGIRO"
+industry = "Online brokerage, Fintech, Banking, Trading"
+scale = "1,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "successfactors"
+listing_url = "https://jobs.flatexdegiro.com/search/?q=&locationsearch=NL"
+employer = "flatexDEGIRO AG"

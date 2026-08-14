@@ -219,6 +219,10 @@ pub enum SourceConfig {
     Deel {
         board_url: String,
     },
+    Successfactors {
+        listing_url: String,
+        employer: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -268,6 +272,7 @@ impl SourceConfig {
             Self::Uber { .. } => "Uber Oracle HCM API",
             Self::Microsoft { .. } => "Microsoft Careers API",
             Self::Deel { .. } => "Deel Jobs",
+            Self::Successfactors { .. } => "SAP SuccessFactors HTML",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -312,6 +317,7 @@ impl SourceConfig {
             Self::Uber { api_url } => api_url,
             Self::Microsoft { search_url } => search_url,
             Self::Deel { board_url } => board_url,
+            Self::Successfactors { listing_url, .. } => listing_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -523,6 +529,23 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("board_url"),
                     "must be an official Deel company board URL",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Successfactors {
+            listing_url,
+            employer,
+        } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            validate_non_empty(employer, path("employer"))?;
+            if company.id != "flatexdegiro"
+                || listing_url != "https://jobs.flatexdegiro.com/search/?q=&locationsearch=NL"
+                || employer != "flatexDEGIRO AG"
+            {
+                return Err(ConfigError::invalid(
+                    path("listing_url"),
+                    "must match flatexDEGIRO's exact official NL SuccessFactors board",
                 ));
             }
             Ok(())

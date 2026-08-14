@@ -374,6 +374,11 @@ fn parses_and_validates_every_source_strategy() {
             "microsoft",
         ),
         (
+            "strategy = \"successfactors\"\nlisting_url = \"https://jobs.flatexdegiro.com/search/?q=&locationsearch=NL\"\nemployer = \"flatexDEGIRO AG\"",
+            true,
+            "flatexdegiro",
+        ),
+        (
             "strategy = \"unsupported\"\nreason = \"official source blocks unattended requests\"",
             false,
             "mollie",

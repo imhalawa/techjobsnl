@@ -26,7 +26,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 18. [ ] **Revolut** — blocked (2026-08-14) · the official careers board now lists Netherlands roles, but both the board and its first-party Next.js data endpoint return Cloudflare HTTP 403 to automated clients; no complete source can be live-verified yet.
 19. [x] **Klarna** — shipped · official Deel Jobs board with complete ItemList/detail validation and explicit Amsterdam filtering.
 20. [x] **Fourthline** — shipped · Greenhouse (`fourthline`).
-21. [ ] **flatexDEGIRO** — blocked/needs research · official custom careers site has Amsterdam roles; no complete supported endpoint proved.
+21. [x] **flatexDEGIRO** — shipped · official SAP SuccessFactors NL search with declared totals and complete detail validation.
 22. [x] **Ohpen** — shipped · Personio.
 23. [ ] **Worldline** — blocked/needs research · live NL roles use unsupported SAP SuccessFactors.
 24. [ ] **Plaid** — blocked/needs research · no current NL role or supported complete source observed.
