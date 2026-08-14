@@ -354,6 +354,11 @@ fn parses_and_validates_every_source_strategy() {
             "coolblue",
         ),
         (
+            "strategy = \"pay\"\nlisting_url = \"https://www.pay.nl/werk\"",
+            true,
+            "pay",
+        ),
+        (
             "strategy = \"ing\"\nlisting_url = \"https://careers.ing.com/en/search-jobs\"",
             true,
             "mollie",
@@ -496,6 +501,9 @@ fn rejects_non_https_source_urls() {
         },
         SourceConfig::Coolblue {
             listing_url: "http://www.coolblue.nl/vacatures/zoeken".into(),
+        },
+        SourceConfig::Pay {
+            listing_url: "http://www.pay.nl/werk".into(),
         },
         SourceConfig::Buckaroo {
             listing_url: "http://www.buckaroo.nl/over-buckaroo/vacatures".into(),

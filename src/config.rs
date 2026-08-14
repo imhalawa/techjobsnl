@@ -179,6 +179,9 @@ pub enum SourceConfig {
     Coolblue {
         listing_url: String,
     },
+    Pay {
+        listing_url: String,
+    },
     Buckaroo {
         listing_url: String,
     },
@@ -268,6 +271,7 @@ impl SourceConfig {
             Self::Teamtailor { .. } => "Teamtailor JSON Feed",
             Self::Bol { .. } => "bol.com",
             Self::Coolblue { .. } => "Coolblue HTML",
+            Self::Pay { .. } => "PAY. HubSpot HTML",
             Self::Buckaroo { .. } => "Buckaroo HTML + sitemap",
             Self::Rabobank { .. } => "Rabobank API",
             Self::Eneco { .. } => "Eneco HTML",
@@ -315,6 +319,7 @@ impl SourceConfig {
                 ..
             }
             | Self::Coolblue { listing_url }
+            | Self::Pay { listing_url }
             | Self::Buckaroo { listing_url }
             | Self::Eneco { listing_url }
             | Self::Exact { listing_url }
@@ -415,6 +420,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("listing_url"),
                     "must be the official Coolblue Netherlands vacancy URL",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Pay { listing_url } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            if company.id != "pay" || listing_url != "https://www.pay.nl/werk" {
+                return Err(ConfigError::invalid(
+                    path("listing_url"),
+                    "must be PAY.'s exact official vacancy URL",
                 ));
             }
             Ok(())

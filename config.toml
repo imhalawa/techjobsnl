@@ -704,3 +704,13 @@ enabled = true
 [companies.source]
 strategy = "buckaroo"
 listing_url = "https://www.buckaroo.nl/over-buckaroo/vacatures"
+
+[[companies]]
+id = "pay"
+name = "PAY."
+industry = "Payments, Fintech, Financial services"
+scale = "50–249 · Medium-sized company"
+enabled = true
+[companies.source]
+strategy = "pay"
+listing_url = "https://www.pay.nl/werk"

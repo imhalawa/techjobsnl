@@ -140,6 +140,7 @@ cargo test --test getnoticed_test getnoticed_live_returns_complete_unique_abn_jo
 cargo test --test ebay_test ebay_live_returns_complete_unique_netherlands_jobs -- --ignored --nocapture
 cargo test --test uber_test uber_live_returns_complete_unique_netherlands_jobs -- --ignored --exact --nocapture
 cargo test --test successfactors_test flatexdegiro_live_returns_every_nl_job -- --ignored --exact --nocapture
+cargo test --test pay_test -- --ignored --nocapture
 ```
 
 The live smoke tests check every supported source, including flatexDEGIRO's current public SAP SuccessFactors board. The offline suite is the deterministic verification path.
