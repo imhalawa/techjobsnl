@@ -610,7 +610,10 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 "topicus"
                     if base_url == "https://www.werkenbijtopicus.nl"
                         && country_filter.is_none() => {}
-                "abn-amro" | "topicus" => {
+                "brand-new-day"
+                    if base_url == "https://werkenbij.brandnewday.nl"
+                        && country_filter.is_none() => {}
+                "abn-amro" | "topicus" | "brand-new-day" => {
                     return Err(ConfigError::invalid(
                         path("base_url"),
                         "must match the company's official Getnoticed careers URL and filter",
@@ -619,7 +622,7 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 _ => {
                     return Err(ConfigError::invalid(
                         path("strategy"),
-                        "getnoticed is supported only for abn-amro and topicus",
+                        "getnoticed is supported only for approved official company boards",
                     ));
                 }
             }

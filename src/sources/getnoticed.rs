@@ -40,6 +40,12 @@ fn site_profile(company_id: &str) -> Result<SiteProfile, SourceError> {
             hiring_organization: None,
             detail_prefix: &["vacature"],
         }),
+        "brand-new-day" => Ok(SiteProfile {
+            host: "werkenbij.brandnewday.nl",
+            source_name: "Brand New Day",
+            hiring_organization: Some("Brand New Day"),
+            detail_prefix: &["vacature"],
+        }),
         _ => Err(schema(company_id, "unsupported Getnoticed site")),
     }
 }
@@ -512,7 +518,12 @@ fn application_endpoint(
         return Ok(format!("hireserve:{}", ids[0]));
     }
 
-    let selector = Selector::parse("[data-endpoint]").expect("static application selector");
+    let selector = if company_id == "brand-new-day" {
+        Selector::parse(r#"[data-endpoint^="/solliciteren/"]"#)
+            .expect("static Brand New Day application selector")
+    } else {
+        Selector::parse("[data-endpoint]").expect("static application selector")
+    };
     let endpoints = document
         .select(&selector)
         .filter_map(|element| element.value().attr("data-endpoint"))
@@ -530,7 +541,12 @@ fn application_endpoint(
         )
     })?;
     require_official_origin(base, &url, "application endpoint", company_id)?;
-    if url.path() != format!("/en/solliciteren/{id}/inline") || url.query().is_some() {
+    let expected_path = if company_id == "brand-new-day" {
+        format!("/solliciteren/{id}/inline")
+    } else {
+        format!("/en/solliciteren/{id}/inline")
+    };
+    if url.path() != expected_path || url.query().is_some() {
         return Err(schema(
             company_id,
             format!("detail {id} application endpoint has a mismatched ID"),

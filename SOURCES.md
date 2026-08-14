@@ -1,5 +1,13 @@
 # Source and sponsor evidence
 
+## Brand New Day
+
+- Official source: <https://werkenbij.brandnewday.nl/vacatures>. Its first-party Getnoticed API declares the exact total, current page, page size, and page count. The adapter verifies every page, unique numeric vacancy ID, matching canonical detail, `JobPosting` publication date, full description, explicit Netherlands country, hiring brand, and official application path before accepting a complete scan. The site's <https://werkenbij.brandnewday.nl/robots.txt> allows crawling.
+- Live discovery: the API declared 11 jobs across two pages on 2026-08-14. All 11 were in Amsterdam and every detail matched. The count is volatile and is not hardcoded in the smoke test.
+- Brand New Day describes itself as an online Dutch pension bank for saving and investing and reports almost 300 colleagues: <https://werkenbij.brandnewday.nl/>. The configured `200+` band is conservative because the source does not publish an exact headcount.
+- The current board and most vacancy text are in Dutch. Language, work-authorisation, relocation, and visa sponsorship conditions vary by vacancy; confirm them before applying.
+- The board identifies the Brand New Day brand, not the legal contract entity for each vacancy. Confirm that entity before relying on recognised-sponsor status.
+
 ## Worldline
 
 - Official source: <https://jobs.worldline.com/search/?q=&locationsearch=Netherlands&locale=en_US>. Its first-party SAP SuccessFactors endpoint at <https://jobs.worldline.com/services/recruiting/v1/jobs> declares the exact Netherlands total and exposes fixed 25-row pagination. The adapter obtains the required CSRF token from the official search page, validates every unique ID and explicit Netherlands location, then matches each canonical detail URL, title, date, full description, and official application path before accepting a complete scan.

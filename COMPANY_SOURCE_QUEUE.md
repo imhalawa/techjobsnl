@@ -34,7 +34,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 26. [ ] **PAY.** — blocked/needs research · first-party HubSpot-hosted careers page has NL roles; completeness semantics need proof.
 27. [x] **MultiSafepay** — shipped · Recruitee.
 28. [ ] **Knab** — blocked/needs research · current custom careers site has NL roles; former Greenhouse board returns 404.
-29. [ ] **Brand New Day** — blocked/needs research · Amsterdam roles exist on a custom site; no stable complete feed proved.
+29. [x] **Brand New Day** — shipped · official Getnoticed API with exact pagination and complete JobPosting detail validation.
 30. [ ] **FRISS** — blocked/needs research · company says all openings are on LinkedIn; no complete first-party jobs feed.
 31. [x] **Keylane** — shipped · Workable.
 32. [ ] **Currence / iDEAL** — blocked/needs research · no current first-party vacancy board verified; ownership must be rechecked.

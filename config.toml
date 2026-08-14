@@ -704,3 +704,13 @@ enabled = true
 [companies.source]
 strategy = "buckaroo"
 listing_url = "https://www.buckaroo.nl/over-buckaroo/vacatures"
+
+[[companies]]
+id = "brand-new-day"
+name = "Brand New Day"
+industry = "Banking, Pensions, Savings, Investing, Fintech"
+scale = "200+ · Medium or large company"
+enabled = true
+[companies.source]
+strategy = "getnoticed"
+base_url = "https://werkenbij.brandnewday.nl"
