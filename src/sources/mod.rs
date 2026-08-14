@@ -58,6 +58,7 @@ impl SourceError {
 fn country_code_for_location(location: &str) -> Option<&'static str> {
     let location = location.trim();
     for (name, code) in [
+        ("The Netherlands", "NL"),
         ("Netherlands", "NL"),
         ("United Kingdom", "GB"),
         ("United States", "US"),

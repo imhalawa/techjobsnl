@@ -20,7 +20,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 12. [x] **Silverflow** — shipped · Personio.
 13. [x] **Elastic** — shipped · Greenhouse (`elastic`).
 14. [x] **Miro** — shipped · Ashby.
-15. [ ] **TomTom** — blocked/needs research · official Amsterdam custom search has engineering roles; no complete supported feed proved.
+15. [x] **TomTom** — shipped · Lever (`tomtom`); the official careers API exposes the same complete 32-role board.
 16. [x] **Checkout.com** — shipped · Ashby.
 17. [ ] **Wise** — blocked/needs research · no current NL role; main careers source is Attrax and the small Greenhouse board is not proved complete.
 18. [ ] **Revolut** — blocked/needs research · official custom careers source had no Netherlands location and no reusable feed.
