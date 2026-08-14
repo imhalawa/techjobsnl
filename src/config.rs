@@ -198,6 +198,9 @@ pub enum SourceConfig {
     Chipsoft {
         listing_url: String,
     },
+    Anwb {
+        feed_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -240,6 +243,7 @@ impl SourceConfig {
             Self::Afas { .. } => "AFAS HTML + JSON-LD",
             Self::Ns { .. } => "NS paged HTML + JSON-LD",
             Self::Chipsoft { .. } => "ChipSoft HTML",
+            Self::Anwb { .. } => "ANWB JSON + JSON-LD",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -277,6 +281,7 @@ impl SourceConfig {
             | Self::Chipsoft { listing_url }
             | Self::Ing { listing_url }
             | Self::PagedHtml { listing_url, .. } => listing_url,
+            Self::Anwb { feed_url } => feed_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -404,6 +409,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("listing_url"),
                     "must be the official ChipSoft vacancy URL",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Anwb { feed_url } => {
+            validate_https_url(feed_url, path("feed_url"))?;
+            if feed_url != "https://www.werkenbijanwb.nl/fuse/vacancies.json" {
+                return Err(ConfigError::invalid(
+                    path("feed_url"),
+                    "must be the official ANWB vacancy feed",
                 ));
             }
             Ok(())

@@ -24,7 +24,7 @@ use job_watch::{
     insights::{AnalyticsFilters, AnalyticsResult, LibraryState},
     scanner::ScanService,
     sources::{
-        JobSource, afas, albert_heijn, ashby, bol, chipsoft, coolblue, ebay, eneco, exact,
+        JobSource, afas, albert_heijn, anwb, ashby, bol, chipsoft, coolblue, ebay, eneco, exact,
         getnoticed, greenhouse, ing, jibe, lever, ns, personio, rabobank, recruitee, workable,
         workday, yuki,
     },
@@ -612,6 +612,11 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                 SourceConfig::Chipsoft { listing_url } => Ok(Arc::new(
                     chipsoft::ChipsoftSource::new(&company.id, listing_url, client.clone()),
                 )),
+                SourceConfig::Anwb { feed_url } => Ok(Arc::new(anwb::AnwbSource::new(
+                    &company.id,
+                    feed_url,
+                    client.clone(),
+                ))),
                 SourceConfig::AlbertHeijn { base_url } => Ok(Arc::new(
                     albert_heijn::AlbertHeijnSource::new(&company.id, base_url, client.clone()),
                 )),
@@ -993,7 +998,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 51);
+        assert_eq!(migrated.companies.len(), 52);
         assert!(
             migrated
                 .companies
@@ -1341,7 +1346,8 @@ mod tests {
                 "exact",
                 "afas",
                 "ns",
-                "chipsoft"
+                "chipsoft",
+                "anwb"
             ]
         );
 

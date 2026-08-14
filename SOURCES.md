@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## ANWB
+
+- Official source: <https://www.werkenbijanwb.nl/fuse/vacancies.json>. The one-response feed exposes all public vacancy IDs and official URLs; the adapter validates every feed row against its JobPosting detail, Netherlands location, publication date, hiring brand, description, and on-page application form.
+- ANWB reports more than 4,000 colleagues: <https://www.werkenbijanwb.nl/over-ons>. The configured `2,000+` band follows the app's EU large-company classification.
+- ANWB's IT page and current technical vacancies state that Dutch is required for some roles, including C1 Dutch for some positions. Check each vacancy before applying.
+- The board covers several ANWB group hiring brands, including ANWB Energie and Unigarant. Confirm the legal contract entity before relying on recognised-sponsor status.
+
 ## ChipSoft
 
 - Official source: <https://www.chipsoft.com/nl-NL/werken-bij/vacatures>. The server-rendered board exposes every vacancy in one response without pagination. The adapter validates unique official links, an explicit NL location allowlist, matching detail fields, and unique official application-form IDs; Antwerp vacancies are excluded.
