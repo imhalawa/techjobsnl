@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Uber
+
+- Official source: <https://jobs.uber.com/en/jobs/?location=Amsterdam&radius=100>. Uber's official site links to the `UberCareers` Oracle HCM tenant at <https://iaziqy.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/UberCareers/>. The adapter uses Oracle's documented candidate-experience requisition API at <https://docs.oracle.com/en/cloud/saas/human-resources/farws/op-recruitingcejobrequisitionscoordinates-get.html>, follows the declared total and pagination, requires unique numeric IDs, fetches every detail, and accepts only roles whose primary or secondary locations explicitly include country code `NL`.
+- Uber's 2025 Form 10-K reports approximately 34,000 employees globally and describes Mobility, Delivery, Freight, technology, advertising, and payments activities: <https://d18rn0p25nwr6d.cloudfront.net/CIK-0001543151/22e9f27b-deea-485f-b5b6-7ecc7462b84a.pdf>. The configured `2,000+` band follows the app's EU large-company classification.
+- The official Netherlands results and details are in English, but language, relocation, work-authorisation, and visa sponsorship conditions are role-specific. Confirm them on each vacancy; the source does not prove a company-wide sponsorship promise.
+- The board identifies the Uber brand, while contracts may use different Uber group entities. Confirm the legal employer before relying on recognised-sponsor status.
+
 ## PostNL
 
 - Official source: <https://vacatures-website.postnl.nl/vacatures-widget/api/vacanciesoverview?isProfessional=true&distance=-1&page=1>. The adapter follows every declared page, verifies the exact total and unique IDs, fetches every official detail, and accepts only professional roles with matching Netherlands-widget locations and official job/application URLs.

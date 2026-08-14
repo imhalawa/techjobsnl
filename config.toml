@@ -612,3 +612,13 @@ enabled = true
 strategy = "lever"
 api_url = "https://api.eu.lever.co/v0/postings/tomtom"
 country_filter = "NL"
+
+[[companies]]
+id = "uber"
+name = "Uber"
+industry = "Mobility, Delivery, Logistics, Payments, Technology platform"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "uber"
+api_url = "https://iaziqy.fa.ocs.oraclecloud.com/hcmRestApi/resources/latest/"
