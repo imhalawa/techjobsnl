@@ -10,13 +10,14 @@ use ratatui::layout::{Constraint, Layout, Rect};
 
 use crate::{
     analytics::{
-        self, JobFacts, Seniority, SkillEvidence, SkillKind, SkillSuggestion, SuggestionStatus,
-        WorkMode,
+        self, EmergingDiscoveryWork, JobFacts, Seniority, SkillEvidence, SkillKind,
+        SkillSuggestion, SuggestionStatus, WorkMode,
     },
     config::{Config, FiltersConfig},
     domain::{JobKey, JobRecord, ScanEvent, SourceScan},
     insights::{
-        self, AnalyticsFilters, AnalyticsReport, LibraryState, MetricRow, SkillStatus, StackKey,
+        self, AnalyticsFilters, AnalyticsReport, AnalyticsResult, AnalyticsWork, LibraryState,
+        MetricRow, SkillStatus, StackKey,
     },
     storage::{ScanReadModel, SourceHealth, SourceReadModel},
 };
@@ -215,6 +216,11 @@ pub struct App {
     library: LibraryState,
     analytics_scans: Vec<ScanReadModel>,
     skill_suggestions: Vec<SkillSuggestion>,
+    analytics_report: Option<AnalyticsReport>,
+    analytics_revision: u64,
+    analytics_report_revision: Option<u64>,
+    analytics_in_flight: bool,
+    analytics_error: Option<String>,
     evidence_index: usize,
     active_job_count: usize,
     company_filter: Option<String>,
@@ -275,6 +281,11 @@ impl App {
             library: LibraryState::default(),
             analytics_scans: Vec::new(),
             skill_suggestions: Vec::new(),
+            analytics_report: None,
+            analytics_revision: 0,
+            analytics_report_revision: None,
+            analytics_in_flight: false,
+            analytics_error: None,
             evidence_index: 0,
             active_job_count,
             company_filter: None,
@@ -306,6 +317,7 @@ impl App {
         active_job_count: usize,
         job_facts: HashMap<JobKey, JobFacts>,
     ) {
+        self.invalidate_analytics();
         self.job_facts = job_facts;
         if matches!(
             self.view,
@@ -372,6 +384,7 @@ impl App {
         library: LibraryState,
         scans: Vec<ScanReadModel>,
     ) {
+        self.invalidate_analytics();
         self.analytics_filters = filters;
         self.library = library;
         self.analytics_scans = scans;
@@ -403,51 +416,88 @@ impl App {
         self.library_tab
     }
 
-    pub fn analytics_report(&self) -> AnalyticsReport {
-        let mut report = AnalyticsReport::build(
-            &self.jobs,
-            &self.job_facts,
-            &self.analytics_scans,
-            &self.analytics_filters,
-            &self.library,
-            Utc::now(),
-            self.config.analytics.minimum_cooccurrence,
-        );
-        let minimum = self.config.analytics.minimum_skill_occurrence;
-        let maximum = self.config.analytics.maximum_skills;
-        report
-            .hard_skills
-            .retain(|item| item.metric.current_count >= minimum);
-        report
-            .soft_skills
-            .retain(|item| item.metric.current_count >= minimum);
-        report
-            .recommendations
-            .retain(|item| item.demand_count >= minimum);
-        report.hard_skills.truncate(maximum);
-        report.soft_skills.truncate(maximum);
-        report.recommendations.truncate(maximum);
-        report
+    pub fn analytics_report(&self) -> Option<&AnalyticsReport> {
+        self.analytics_report.as_ref()
+    }
+
+    pub fn analytics_refreshing(&self) -> bool {
+        self.analytics_report_revision != Some(self.analytics_revision)
+    }
+
+    pub fn analytics_error(&self) -> Option<&str> {
+        self.analytics_error.as_deref()
+    }
+
+    pub fn emerging_discovery_work(&self) -> Option<EmergingDiscoveryWork> {
+        (self.view == View::Analytics)
+            .then(|| EmergingDiscoveryWork::new(self.config.analytics.clone(), self.jobs.clone()))
+            .flatten()
+    }
+
+    pub fn start_analytics_work(&mut self) -> Option<AnalyticsWork> {
+        if self.view != View::Analytics || self.analytics_in_flight || !self.analytics_refreshing()
+        {
+            return None;
+        }
+        self.analytics_in_flight = true;
+        Some(AnalyticsWork::new(
+            self.analytics_revision,
+            self.jobs.clone(),
+            self.job_facts.clone(),
+            self.analytics_scans.clone(),
+            self.analytics_filters.clone(),
+            self.library.clone(),
+            (
+                self.config.analytics.minimum_cooccurrence,
+                self.config.analytics.minimum_skill_occurrence,
+                self.config.analytics.maximum_skills,
+            ),
+        ))
+    }
+
+    pub fn finish_analytics_work(&mut self, result: AnalyticsResult) {
+        self.analytics_in_flight = false;
+        if result.revision != self.analytics_revision {
+            return;
+        }
+        self.analytics_report = Some(result.report);
+        self.analytics_report_revision = Some(result.revision);
+        self.analytics_error = None;
+        self.selected_index = self.selected_index.min(self.item_count().saturating_sub(1));
+        self.evidence_index = self
+            .evidence_index
+            .min(self.analytics_evidence_jobs().len().saturating_sub(1));
+    }
+
+    pub fn fail_analytics_work(&mut self, error: String) {
+        self.analytics_in_flight = false;
+        self.analytics_report_revision = Some(self.analytics_revision);
+        self.analytics_error = Some(error);
     }
 
     pub fn market_rows(&self) -> Vec<MetricRow> {
-        let report = self.analytics_report();
+        let Some(report) = self.analytics_report() else {
+            return Vec::new();
+        };
         match self.market_section {
-            MarketSection::Roles => report.roles,
-            MarketSection::Seniority => report.seniority,
-            MarketSection::Experience => report.experience,
+            MarketSection::Roles => report.roles.clone(),
+            MarketSection::Seniority => report.seniority.clone(),
+            MarketSection::Experience => report.experience.clone(),
             MarketSection::Work => report
                 .work
-                .into_iter()
-                .chain(report.employment)
-                .chain(report.education)
+                .iter()
+                .chain(&report.employment)
+                .chain(&report.education)
+                .cloned()
                 .collect(),
-            MarketSection::Companies => report.companies,
+            MarketSection::Companies => report.companies.clone(),
         }
     }
 
     pub fn analytics_evidence_jobs(&self) -> Vec<&JobRecord> {
-        let report = self.analytics_report();
+        let Some(report) = self.analytics_report() else {
+            return Vec::new();
+        };
         let selected_skill = match self.analytics_tab {
             AnalyticsTab::Overview => report
                 .recommendations
@@ -525,7 +575,9 @@ impl App {
         let Some(facts) = self.job_facts.get(&job.key) else {
             return "No extracted evidence".to_owned();
         };
-        let report = self.analytics_report();
+        let Some(report) = self.analytics_report() else {
+            return "Analytics is refreshing".to_owned();
+        };
         let skill = match self.analytics_tab {
             AnalyticsTab::Overview => report
                 .recommendations
@@ -1773,12 +1825,18 @@ impl App {
         self.reset_detail_scroll();
     }
 
-    fn save_analytics_state_command(&self) -> AppCommand {
+    fn save_analytics_state_command(&mut self) -> AppCommand {
+        self.invalidate_analytics();
         AppCommand::SaveAnalyticsState(self.analytics_filters.clone(), self.library.clone())
     }
 
+    fn invalidate_analytics(&mut self) {
+        self.analytics_revision = self.analytics_revision.wrapping_add(1);
+        self.analytics_error = None;
+    }
+
     fn selected_analytics_skill_name(&self) -> Option<String> {
-        let report = self.analytics_report();
+        let report = self.analytics_report()?;
         let rows = match self.analytics_kind {
             SkillKind::Hard => &report.hard_skills,
             SkillKind::Soft => &report.soft_skills,
@@ -1788,7 +1846,9 @@ impl App {
     }
 
     fn toggle_selected_analytics_item(&mut self) {
-        let report = self.analytics_report();
+        let Some(report) = self.analytics_report() else {
+            return;
+        };
         match self.analytics_tab {
             AnalyticsTab::Overview => {
                 if let Some(skill) = report
@@ -1943,7 +2003,9 @@ impl App {
             View::Scans => self.scans.len(),
             View::Sources => self.sources.len(),
             View::Analytics => {
-                let report = self.analytics_report();
+                let Some(report) = self.analytics_report() else {
+                    return 0;
+                };
                 match self.analytics_tab {
                     AnalyticsTab::Overview => report.recommendations.len(),
                     AnalyticsTab::Skills => match self.analytics_kind {
@@ -1955,7 +2017,9 @@ impl App {
                         MarketSection::Roles => report.roles.len(),
                         MarketSection::Seniority => report.seniority.len(),
                         MarketSection::Experience => report.experience.len(),
-                        MarketSection::Work => report.work.len() + report.education.len(),
+                        MarketSection::Work => {
+                            report.work.len() + report.employment.len() + report.education.len()
+                        }
                         MarketSection::Companies => report.companies.len(),
                     },
                 }
@@ -2233,7 +2297,7 @@ impl App {
                     .split(surface);
                 let panes = Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)])
                     .split(sections[0]);
-                let report = self.analytics_report();
+                let report = self.analytics_report()?;
                 table_item_at(
                     column,
                     row,

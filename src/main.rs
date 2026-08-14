@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     env,
     error::Error,
     fs,
@@ -16,9 +17,11 @@ use crossterm::{
 };
 use futures_util::StreamExt;
 use job_watch::{
+    analytics::EmergingDiscoveryResult,
     config::{Config, FiltersConfig, SourceConfig},
     domain::ScanEvent,
     filter::EligibilityFilter,
+    insights::AnalyticsResult,
     scanner::ScanService,
     sources::{
         JobSource, albert_heijn, ashby, bol, coolblue, ebay, eneco, getnoticed, greenhouse, ing,
@@ -291,9 +294,41 @@ async fn run(
 ) -> Result<()> {
     let mut events = EventStream::new();
     let (scan_tx, mut scan_rx) = mpsc::unbounded_channel();
+    let (analytics_tx, mut analytics_rx) =
+        mpsc::unbounded_channel::<std::result::Result<AnalyticsResult, String>>();
+    let (discovery_tx, mut discovery_rx) =
+        mpsc::unbounded_channel::<std::result::Result<Option<EmergingDiscoveryResult>, String>>();
     let mut active_scan = None;
+    let mut active_discovery = false;
+    let mut attempted_discoveries = HashSet::new();
 
     loop {
+        if let Some(work) = app.start_analytics_work() {
+            let analytics_tx = analytics_tx.clone();
+            tokio::spawn(async move {
+                let result = tokio::task::spawn_blocking(move || work.compute())
+                    .await
+                    .map_err(|error| format!("analytics worker failed: {error}"));
+                let _ = analytics_tx.send(result);
+            });
+        }
+        if !active_discovery
+            && let Some(work) = app.emerging_discovery_work()
+            && attempted_discoveries.insert(work.cache_key().to_owned())
+            && !store
+                .lock()
+                .unwrap()
+                .has_analytics_discovery(work.cache_key())?
+        {
+            active_discovery = true;
+            let discovery_tx = discovery_tx.clone();
+            tokio::spawn(async move {
+                let result = tokio::task::spawn_blocking(move || work.compute())
+                    .await
+                    .map_err(|error| format!("analytics discovery worker failed: {error}"));
+                let _ = discovery_tx.send(result);
+            });
+        }
         terminal.draw(|frame| render(frame, app))?;
         tokio::select! {
             event = events.next() => {
@@ -343,6 +378,20 @@ async fn run(
             }
             Some(event) = scan_rx.recv() => {
                 handle_runtime_scan_event(event, &store, app)?;
+            }
+            Some(result) = analytics_rx.recv() => {
+                match result {
+                    Ok(result) => app.finish_analytics_work(result),
+                    Err(error) => app.fail_analytics_work(error),
+                }
+            }
+            Some(result) = discovery_rx.recv() => {
+                active_discovery = false;
+                if let Ok(Some(result)) = result {
+                    let store = store.lock().unwrap();
+                    store.save_emerging_discovery(&result)?;
+                    app.replace_skill_suggestions(store.skill_suggestions()?);
+                }
             }
             scan_result = async {
                 active_scan.as_mut().expect("guarded by select branch").await
@@ -493,11 +542,7 @@ fn reload_jobs(store: &Arc<Mutex<Store>>, app: &mut App) -> rusqlite::Result<()>
     let analytics_config = app.config().analytics.clone();
     let store = store.lock().unwrap();
     let jobs = store.list_jobs(query)?;
-    let facts = if app.view() == View::Analytics {
-        store.enriched_analytics_facts(&jobs, &analytics_config)?
-    } else {
-        store.analytics_facts(&jobs, &analytics_config)?
-    };
+    let facts = store.analytics_facts(&jobs, &analytics_config)?;
     let active_job_count = store.list_jobs(JobQuery::active())?.len();
     let scans = store.recent_scans()?;
     let sources = store.source_health()?;

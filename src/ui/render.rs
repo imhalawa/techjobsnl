@@ -208,9 +208,27 @@ fn render_analytics_tabs(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_analytics_filters(frame: &mut Frame, app: &App, area: Rect) {
     let filters = app.analytics_filters();
-    let report = app.analytics_report();
+    let Some(report) = app.analytics_report() else {
+        let status = app
+            .analytics_error()
+            .unwrap_or("Preparing analytics in background…");
+        frame.render_widget(
+            Paragraph::new(status).style(
+                Style::new()
+                    .fg(app.theme().muted_text)
+                    .bg(app.theme().background),
+            ),
+            area,
+        );
+        return;
+    };
+    let refresh = if app.analytics_refreshing() {
+        "Refreshing… · "
+    } else {
+        ""
+    };
     let text = format!(
-        "{}d t/± · Company {} C · Role {} R · Level {} S · Work {} W · x clear · comparable {} firms · new {}/{} jobs",
+        "{refresh}{}d t/± · Company {} C · Role {} R · Level {} S · Work {} W · x clear · comparable {} firms · new {}/{} jobs",
         filters.window_days,
         filters
             .company
@@ -250,7 +268,10 @@ fn render_analytics_tab(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_overview(frame: &mut Frame, app: &App, area: Rect) {
-    let report = app.analytics_report();
+    let Some(report) = app.analytics_report() else {
+        render_analytics_loading(frame, app, area);
+        return;
+    };
     let sections = Layout::vertical([Constraint::Percentage(48), Constraint::Fill(1)]).split(area);
     let charts =
         Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(sections[0]);
@@ -331,7 +352,10 @@ fn render_overview(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_skills_trends(frame: &mut Frame, app: &App, area: Rect) {
-    let report = app.analytics_report();
+    let Some(report) = app.analytics_report() else {
+        render_analytics_loading(frame, app, area);
+        return;
+    };
     let sections = Layout::vertical([Constraint::Percentage(68), Constraint::Fill(1)]).split(area);
     let tables =
         Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(sections[0]);
@@ -434,7 +458,10 @@ fn render_skill_table(
 }
 
 fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
-    let report = app.analytics_report();
+    let Some(report) = app.analytics_report() else {
+        render_analytics_loading(frame, app, area);
+        return;
+    };
     let sections = Layout::vertical([Constraint::Percentage(68), Constraint::Fill(1)]).split(area);
     let rows = report.stacks.iter().map(|stack| {
         Row::new(vec![
@@ -486,6 +513,10 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_market_trends(frame: &mut Frame, app: &App, area: Rect) {
+    if app.analytics_report().is_none() {
+        render_analytics_loading(frame, app, area);
+        return;
+    }
     let sections = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).split(area);
     let labels = [
         MarketSection::Roles,
@@ -668,6 +699,23 @@ fn render_analytics_evidence(frame: &mut Frame, app: &App, area: Rect, borders: 
         jobs.len(),
         state.offset(),
         usize::from(area.height.saturating_sub(2) / 2).max(1),
+    );
+}
+
+fn render_analytics_loading(frame: &mut Frame, app: &App, area: Rect) {
+    let text = app
+        .analytics_error()
+        .unwrap_or("Calculating trends, stacks, and evidence in the background…");
+    frame.render_widget(
+        Paragraph::new(text)
+            .block(panel(
+                "Analytics",
+                app.theme().focused_border,
+                app.theme().background,
+                Borders::ALL,
+            ))
+            .style(Style::new().fg(app.theme().muted_text)),
+        area,
     );
 }
 

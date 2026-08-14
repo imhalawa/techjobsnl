@@ -153,6 +153,9 @@ fn open_view(app: &mut App, index: usize) {
         app.handle_key(special(KeyCode::Enter)),
         AppCommand::ReloadJobs
     );
+    if let Some(work) = app.start_analytics_work() {
+        app.finish_analytics_work(work.compute());
+    }
 }
 
 fn job(title: &str, is_new: bool, applied: bool) -> JobRecord {
@@ -936,6 +939,7 @@ fn reported_short_skill_bar_does_not_duplicate_percentage_digits() {
     app.handle_key(key('2'));
     let typescript_index = app
         .analytics_report()
+        .unwrap()
         .hard_skills
         .iter()
         .position(|skill| skill.metric.name == "TypeScript")
@@ -952,6 +956,23 @@ fn reported_short_skill_bar_does_not_duplicate_percentage_digits() {
         .unwrap();
     assert!(typescript.contains("6 · 7%"), "{typescript}");
     assert!(!typescript.contains("77%"), "{typescript}");
+}
+
+#[test]
+fn analytics_worker_discards_a_result_for_an_old_filter_revision() {
+    let mut app = App::new(config(), vec![job("Engineer", false, false)]);
+    open_view(&mut app, 6);
+
+    app.handle_key(key('t'));
+    let stale = app.start_analytics_work().unwrap();
+    app.handle_key(key('t'));
+    app.finish_analytics_work(stale.compute());
+
+    assert!(app.analytics_refreshing());
+    assert!(app.analytics_report().is_some());
+    let current = app.start_analytics_work().unwrap();
+    app.finish_analytics_work(current.compute());
+    assert!(!app.analytics_refreshing());
 }
 
 #[test]

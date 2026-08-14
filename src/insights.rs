@@ -172,6 +172,78 @@ pub struct AnalyticsReport {
     pub recommendations: Vec<Recommendation>,
 }
 
+#[derive(Debug, Clone)]
+pub struct AnalyticsWork {
+    revision: u64,
+    jobs: Vec<JobRecord>,
+    facts: HashMap<JobKey, JobFacts>,
+    scans: Vec<ScanReadModel>,
+    filters: AnalyticsFilters,
+    library: LibraryState,
+    minimum_stack_support: usize,
+    minimum_skill_occurrence: usize,
+    maximum_skills: usize,
+}
+
+#[derive(Debug)]
+pub struct AnalyticsResult {
+    pub(crate) revision: u64,
+    pub(crate) report: AnalyticsReport,
+}
+
+impl AnalyticsWork {
+    pub(crate) fn new(
+        revision: u64,
+        jobs: Vec<JobRecord>,
+        facts: HashMap<JobKey, JobFacts>,
+        scans: Vec<ScanReadModel>,
+        filters: AnalyticsFilters,
+        library: LibraryState,
+        limits: (usize, usize, usize),
+    ) -> Self {
+        let (minimum_stack_support, minimum_skill_occurrence, maximum_skills) = limits;
+        Self {
+            revision,
+            jobs,
+            facts,
+            scans,
+            filters,
+            library,
+            minimum_stack_support,
+            minimum_skill_occurrence,
+            maximum_skills,
+        }
+    }
+
+    pub fn compute(self) -> AnalyticsResult {
+        let mut report = AnalyticsReport::build(
+            &self.jobs,
+            &self.facts,
+            &self.scans,
+            &self.filters,
+            &self.library,
+            Utc::now(),
+            self.minimum_stack_support,
+        );
+        report
+            .hard_skills
+            .retain(|item| item.metric.current_count >= self.minimum_skill_occurrence);
+        report
+            .soft_skills
+            .retain(|item| item.metric.current_count >= self.minimum_skill_occurrence);
+        report
+            .recommendations
+            .retain(|item| item.demand_count >= self.minimum_skill_occurrence);
+        report.hard_skills.truncate(self.maximum_skills);
+        report.soft_skills.truncate(self.maximum_skills);
+        report.recommendations.truncate(self.maximum_skills);
+        AnalyticsResult {
+            revision: self.revision,
+            report,
+        }
+    }
+}
+
 impl AnalyticsReport {
     pub fn build(
         jobs: &[JobRecord],

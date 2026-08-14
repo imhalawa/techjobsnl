@@ -10,7 +10,7 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    analytics::{self, JobFacts, SkillSuggestion, SuggestionStatus},
+    analytics::{self, EmergingDiscoveryResult, JobFacts, SkillSuggestion, SuggestionStatus},
     config::{AnalyticsConfig, CompanyConfig},
     domain::{
         ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanFailure, SourceErrorKind,
@@ -295,64 +295,53 @@ impl Store {
             };
             facts_by_job.insert(job.key.clone(), facts);
         }
-        Ok(facts_by_job)
-    }
-
-    pub fn enriched_analytics_facts(
-        &self,
-        jobs: &[JobRecord],
-        config: &AnalyticsConfig,
-    ) -> Result<HashMap<JobKey, JobFacts>> {
-        let mut facts = self.analytics_facts(jobs, config)?;
+        drop(select);
+        drop(insert);
         let approved = self
             .skill_suggestions()?
             .into_iter()
             .filter(|item| item.status == SuggestionStatus::Approved)
             .collect::<Vec<_>>();
-        analytics::apply_approved_suggestions(&mut facts, jobs, &approved);
-        if config.provider == crate::config::AnalyticsProvider::Local || jobs.is_empty() {
-            return Ok(facts);
-        }
-        let fingerprint = jobs
-            .iter()
-            .map(|job| {
-                format!(
-                    "{}/{}:{}",
-                    job.key.company_id, job.key.source_id, job.last_seen_at
-                )
-            })
-            .collect::<Vec<_>>();
-        let cache_key = analytics::discovery_cache_key(config, &fingerprint);
-        let seen = self
+        analytics::apply_approved_suggestions(&mut facts_by_job, jobs, &approved);
+        Ok(facts_by_job)
+    }
+
+    pub fn has_analytics_discovery(&self, cache_key: &str) -> Result<bool> {
+        Ok(self
             .connection
             .query_row(
                 "SELECT 1 FROM analytics_discovery WHERE cache_key = ?1",
-                [&cache_key],
+                [cache_key],
                 |_| Ok(()),
             )
             .optional()?
-            .is_some();
-        if !seen && let Some((_, suggestions)) = analytics::discover_emerging_skills(config, jobs) {
-            for suggestion in &suggestions {
-                self.connection.execute(
-                    "INSERT OR IGNORE INTO skill_suggestions (
-                            name, aliases_json, evidence_json, status, created_at
-                         ) VALUES (?1, ?2, ?3, 'pending', ?4)",
-                    params![
-                        suggestion.name,
-                        json_text(suggestion),
-                        json_text(&suggestion.evidence),
-                        Utc::now().to_rfc3339(),
-                    ],
-                )?;
-            }
+            .is_some())
+    }
+
+    pub fn save_emerging_discovery(&self, result: &EmergingDiscoveryResult) -> Result<()> {
+        for suggestion in &result.suggestions {
             self.connection.execute(
-                "INSERT INTO analytics_discovery (cache_key, provider, result_json)
-                     VALUES (?1, ?2, ?3)",
-                params![cache_key, config.provider.as_str(), json_text(&suggestions)],
+                "INSERT OR IGNORE INTO skill_suggestions (
+                        name, aliases_json, evidence_json, status, created_at
+                     ) VALUES (?1, ?2, ?3, 'pending', ?4)",
+                params![
+                    suggestion.name,
+                    json_text(suggestion),
+                    json_text(&suggestion.evidence),
+                    Utc::now().to_rfc3339(),
+                ],
             )?;
         }
-        Ok(facts)
+        self.connection.execute(
+            "INSERT OR IGNORE INTO analytics_discovery (cache_key, provider, result_json)
+                 VALUES (?1, ?2, ?3)",
+            params![
+                result.cache_key,
+                result.provider.as_str(),
+                json_text(&result.suggestions)
+            ],
+        )?;
+        Ok(())
     }
 
     pub fn skill_suggestions(&self) -> Result<Vec<SkillSuggestion>> {
