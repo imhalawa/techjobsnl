@@ -1501,6 +1501,35 @@ fn scans_and_sources_render_durable_semantic_states_at_all_breakpoints_and_theme
 }
 
 #[test]
+fn wide_source_table_uses_available_space_for_complete_metadata() {
+    let mut configured = config();
+    configured.companies[0].name = "Albert Heijn Technology".into();
+    configured.companies[0].industry = "Retail, E-commerce, Logistics".into();
+    configured.companies[0].scale = "2,000+ · Large company".into();
+    let mut app = App::new(configured, Vec::new());
+    app.replace_read_models(
+        Vec::new(),
+        vec![SourceReadModel {
+            company_id: "acme".into(),
+            company_name: "Albert Heijn Technology".into(),
+            enabled: true,
+            latest_attempted_at: None,
+            latest_successful_at: None,
+            health: SourceHealth::Healthy,
+            latest_error_kind: None,
+            diagnostic: None,
+        }],
+    );
+    open_view(&mut app, 5);
+
+    let screen = rendered(&app, 240, 24);
+
+    assert!(screen.contains("Albert Heijn Technology"), "{screen}");
+    assert!(screen.contains("Retail, E-commerce, Logistics"), "{screen}");
+    assert!(screen.contains("2,000+ · Large company"), "{screen}");
+}
+
+#[test]
 fn configured_help_opens_an_overlay_with_fixed_and_contextual_controls() {
     let mut configured = config();
     configured.keybindings.scan = "s".into();

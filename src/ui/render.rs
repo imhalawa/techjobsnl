@@ -2259,14 +2259,14 @@ fn render_sources(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
             ],
             vec![
                 Constraint::Length(10),
-                Constraint::Length(16),
-                Constraint::Length(20),
-                Constraint::Length(20),
-                Constraint::Length(12),
+                Constraint::Fill(3),
+                Constraint::Fill(5),
+                Constraint::Fill(4),
+                Constraint::Fill(3),
                 Constraint::Length(8),
                 Constraint::Length(13),
                 Constraint::Length(13),
-                Constraint::Fill(1),
+                Constraint::Fill(4),
             ],
         )
     } else if area.width >= 90 {
@@ -2282,12 +2282,12 @@ fn render_sources(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
             ],
             vec![
                 Constraint::Length(10),
-                Constraint::Length(16),
-                Constraint::Length(12),
+                Constraint::Fill(2),
+                Constraint::Fill(2),
                 Constraint::Length(8),
                 Constraint::Length(13),
                 Constraint::Length(13),
-                Constraint::Fill(1),
+                Constraint::Fill(3),
             ],
         )
     } else {
@@ -2295,9 +2295,9 @@ fn render_sources(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
             vec!["Health", "Company", "Adapter", "Last attempt"],
             vec![
                 Constraint::Length(11),
-                Constraint::Percentage(34),
-                Constraint::Percentage(26),
-                Constraint::Fill(1),
+                Constraint::Fill(3),
+                Constraint::Fill(2),
+                Constraint::Length(13),
             ],
         )
     };
