@@ -2,6 +2,7 @@ pub mod afas;
 pub mod albert_heijn;
 pub mod ashby;
 pub mod bol;
+pub mod chipsoft;
 pub mod coolblue;
 pub mod ebay;
 pub mod eneco;

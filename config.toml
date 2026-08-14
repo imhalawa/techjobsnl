@@ -561,3 +561,13 @@ enabled = true
 [companies.source]
 strategy = "ns"
 listing_url = "https://www.werkenbijns.nl/vacatures"
+
+[[companies]]
+id = "chipsoft"
+name = "ChipSoft"
+industry = "Healthcare software, Electronic health records, B2B SaaS"
+scale = "1,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "chipsoft"
+listing_url = "https://www.chipsoft.com/nl-NL/werken-bij/vacatures"
