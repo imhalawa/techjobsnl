@@ -3,15 +3,13 @@
 [![CI](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml)
 [![Release](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml)
 
-![TechJobsNL hero](docs/images/hero.png)
-
 **Find Netherlands tech jobs by the skills they mention—not only by job title.**
 
 TechJobsNL is a local terminal job finder built with Rust and Ratatui. It collects vacancies from verified official company career sources, keeps their lifecycle in SQLite, and connects every analytics result back to the job postings behind it.
 
-> **Beta v0.1.0:** the core workflow is tested, but the interface and configuration may still change. Back up your configuration and database before upgrading.
+![TechJobsNL hero](docs/images/hero.png)
 
-![TechJobsNL active jobs with selected-job details](docs/images/jobs.png)
+> **Beta v0.1.0:** the core workflow is tested, but the interface and configuration may still change. Back up your configuration and database before upgrading.
 
 ## Why TechJobsNL
 
@@ -23,14 +21,6 @@ TechJobsNL is a local terminal job finder built with Rust and Ratatui. It collec
 - **Use keyboard or mouse:** the interface supports responsive layouts, search, scrolling, clickable rows and tabs, and a draggable job/details divider.
 
 The shipped catalog contains **66 company profiles across 35 source strategies**. Coverage is not the whole Netherlands labour market; it is the verified set documented in [Supported companies](SUPPORTED_COMPANIES.md) and [Source evidence](SOURCES.md).
-
-## Explore jobs through evidence
-
-| Market overview | Hard-skill demand |
-|---|---|
-| [![Analytics overview with skill demand, role demand, recommendations, and matching jobs](docs/images/analytics-overview.png)](docs/images/analytics-overview.png) | [![Hard-skill demand with matching vacancies](docs/images/analytics-skills.png)](docs/images/analytics-skills.png) |
-
-Select a skill or market fact to inspect the vacancies behind it. Counts come from the locally observed postings and are not presented as the whole Netherlands market.
 
 ## Quick start from source
 
@@ -89,15 +79,27 @@ Uninstalling the executable does not delete configuration or job history.
 2. Review **Active** or **New**, use `/` to search by title or company, and press `o` to open the official posting.
 3. Press `a` to mark an application or `*` to save a job.
 4. Open **Analytics** to explore skills and market facts, then open the exact matching vacancies shown as evidence.
-5. Open **Settings → Companies** to search the catalog and follow or unfollow companies. Changes save immediately, hide unfollowed-company jobs, and affect later scans without starting one.
+5. Open **Settings → Companies** to search the catalog and follow or unfollow companies.
+
+![TechJobsNL active jobs with selected-job details](docs/images/jobs.png)
 
 Press `?` in the app for the controls available in the current view.
+
+### Choose companies
+
+Changes save immediately, hide unfollowed-company jobs, and affect later scans without starting one.
 
 ![Company following settings with industry and scale](docs/images/settings-companies.png)
 
 ## Analytics
 
 Analytics describes only locally stored, eligible postings. It covers hard and soft skills, roles, seniority, experience, work mode, employment, education, companies, and learn-next recommendations. Compact top-10 charts show the leading skill and role demand. **Stacks is visible but disabled while it remains work in progress.**
+
+| Market overview | Hard-skill demand |
+|---|---|
+| [![Analytics overview with skill demand, role demand, recommendations, and matching jobs](docs/images/analytics-overview.png)](docs/images/analytics-overview.png) | [![Hard-skill demand with matching vacancies](docs/images/analytics-skills.png)](docs/images/analytics-skills.png) |
+
+Select a skill or market fact to inspect the vacancies behind it. Counts come from the locally observed postings and are not presented as the whole Netherlands market.
 
 Local matching uses the versioned bank in `assets/software-skills.json`; unknown words are not promoted automatically. Optional Claude or Codex CLI discovery can suggest emerging terms, but strict validation and explicit approval are required before a suggestion affects later extraction. No AI provider is required.
 
