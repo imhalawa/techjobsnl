@@ -63,7 +63,7 @@ quit = "q"
 id = "mollie"
 name = "Mollie"
 industry = "Fintech, Payments, Financial services"
-scale = "501–1,000"
+scale = "1,000–1,999 · Large company"
 enabled = true
 [companies.source]
 strategy = "ashby"
@@ -73,7 +73,7 @@ board = "mollie"
 id = "booking-com"
 name = "Booking.com"
 industry = "Travel, Marketplace, E-commerce"
-scale = "10,001–50,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "jibe"
@@ -84,7 +84,7 @@ client = "Booking.com"
 id = "ebay"
 name = "eBay"
 industry = "E-commerce, Marketplace, Advertising"
-scale = "10,001–50,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "ebay"
@@ -94,7 +94,7 @@ listing_url = "https://jobs.ebayinc.com/us/en/jobs-in-netherlands"
 id = "airwallex"
 name = "Airwallex"
 industry = "Fintech, Payments, Banking infrastructure"
-scale = "1,001–5,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "ashby"
@@ -104,7 +104,7 @@ board = "airwallex"
 id = "adyen"
 name = "Adyen"
 industry = "Fintech, Payments, Financial infrastructure"
-scale = "1,001–5,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "greenhouse"
@@ -114,7 +114,7 @@ board = "adyen"
 id = "funda"
 name = "Funda"
 industry = "Real estate, Marketplace, Advertising"
-scale = "51–200"
+scale = "50–249 · Medium-sized company"
 enabled = true
 [companies.source]
 strategy = "recruitee"
@@ -124,7 +124,7 @@ base_url = "https://jobs.funda.nl"
 id = "bol"
 name = "bol.com"
 industry = "E-commerce, Marketplace, Retail"
-scale = "1,001–5,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "bol"
@@ -134,7 +134,7 @@ base_url = "https://careers.bol.com"
 id = "rabobank"
 name = "Rabobank"
 industry = "Banking, Financial services, Insurance"
-scale = "10,001–50,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "rabobank"
@@ -145,7 +145,7 @@ country = "NL"
 id = "eneco"
 name = "Eneco"
 industry = "Energy, Utilities, Sustainability"
-scale = "1,001–5,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "eneco"
@@ -155,7 +155,7 @@ listing_url = "https://www.werkenbijeneco.nl/vacatures?f=1270"
 id = "ahold"
 name = "Albert Heijn Tech"
 industry = "Retail, E-commerce, Logistics"
-scale = "50,001+"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "albert-heijn"
@@ -165,7 +165,7 @@ base_url = "https://werk.ah.nl"
 id = "ing"
 name = "ING"
 industry = "Banking, Financial services, Fintech"
-scale = "50,001+"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "ing"
@@ -175,7 +175,7 @@ listing_url = "https://careers.ing.com/en/location/netherlands-jobs/2618/2750405
 id = "abn-amro"
 name = "ABN AMRO"
 industry = "Banking, Financial services, Wealth management"
-scale = "10,001–50,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "getnoticed"
@@ -186,7 +186,7 @@ country_filter = "Nederland"
 id = "datasnipper"
 name = "DataSnipper"
 industry = "Audit, Accounting, B2B SaaS"
-scale = "201–500"
+scale = "200+ · Medium or large company"
 enabled = true
 [companies.source]
 strategy = "ashby"
@@ -196,7 +196,7 @@ board = "datasnipper"
 id = "databricks"
 name = "Databricks"
 industry = "Data, AI, Cloud infrastructure"
-scale = "5,001–10,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "greenhouse"
@@ -207,7 +207,7 @@ country_filter = "NL"
 id = "coolblue"
 name = "Coolblue"
 industry = "E-commerce, Retail, Logistics, Energy"
-scale = "5,001–10,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "coolblue"
@@ -217,7 +217,7 @@ listing_url = "https://www.coolblue.nl/en/vacancies/search"
 id = "topicus"
 name = "Topicus"
 industry = "Financial software, Healthcare software, Education software, Public-sector software"
-scale = "1,001–5,000"
+scale = "1,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "getnoticed"
@@ -227,7 +227,7 @@ base_url = "https://www.werkenbijtopicus.nl"
 id = "centric"
 name = "Centric"
 industry = "IT services, Software, Cloud, Consulting"
-scale = "1,001–5,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "recruitee"
@@ -237,7 +237,7 @@ base_url = "https://centric.recruitee.com"
 id = "cmcom"
 name = "CM.com"
 industry = "Communications platform, Payments, Customer engagement, SaaS"
-scale = "501–1,000"
+scale = "500–999 · Large company"
 enabled = true
 [companies.source]
 strategy = "recruitee"
@@ -247,7 +247,7 @@ base_url = "https://cmcom.recruitee.com"
 id = "yuki"
 name = "Yuki"
 industry = "Accounting software, Fintech, B2B SaaS"
-scale = "201–500"
+scale = "50–249 · Medium-sized company"
 enabled = true
 [companies.source]
 strategy = "yuki"
@@ -257,7 +257,7 @@ feed_url = "https://jobs.yukisoftware.com/jobs.json"
 id = "reddit"
 name = "Reddit"
 industry = "Social media, Advertising, Community platform"
-scale = "1,001–5,000"
+scale = "2,000+ · Large company"
 enabled = true
 [companies.source]
 strategy = "greenhouse"

@@ -2,6 +2,8 @@
 
 Verified on 14 August 2026. Ranges use global employee headcount unless the source reports FTEs. Only company pages, parent-company disclosures, annual reports, and regulatory filings are used.
 
+The application displays Dutch CBS headcount classes: `2–9 · Micro company`, `10–49 · Small company`, `50–249 · Medium-sized company`, and detailed large-company bands `250–499`, `500–999`, `1,000–1,999`, and `2,000+`. DataSnipper and Topicus use lower-bound labels because their first-party sources do not disclose enough information for one exact detailed band.
+
 | Company | Recommended scale | Evidence and scope |
 |---|---:|---|
 | Mollie | 501–1,000 | Mollie describes its global team as **1,000 strong**. This sits exactly at the bucket ceiling. [Mollie: About us](https://www.mollie.com/about) |
