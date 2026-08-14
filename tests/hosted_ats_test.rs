@@ -356,6 +356,21 @@ async fn recruitee_live_returns_complete_unique_centric_jobs() {
     println!("Centric: {} jobs", jobs.len());
 }
 
+#[tokio::test]
+#[ignore = "live external source"]
+async fn recruitee_live_returns_complete_unique_cmcom_jobs() {
+    let client = live_client();
+    let source = RecruiteeSource::new("cmcom", "https://cmcom.recruitee.com", client);
+    let jobs = complete_jobs(source.scan().await.unwrap());
+    assert_live_jobs("CM.com", &jobs);
+    assert!(jobs.iter().any(|job| job.countries.contains(&"NL".into())));
+    assert!(
+        jobs.iter()
+            .all(|job| job.job_url.starts_with("https://jobs.cm.com/"))
+    );
+    println!("CM.com: {} jobs", jobs.len());
+}
+
 fn greenhouse_fixture() -> serde_json::Value {
     serde_json::from_str(include_str!("fixtures/greenhouse/adyen.json")).unwrap()
 }

@@ -234,6 +234,16 @@ strategy = "recruitee"
 base_url = "https://centric.recruitee.com"
 
 [[companies]]
+id = "cmcom"
+name = "CM.com"
+industry = "Communications platform, Payments, Customer engagement, SaaS"
+scale = "Large listed technology company, 600+ FTE"
+enabled = true
+[companies.source]
+strategy = "recruitee"
+base_url = "https://cmcom.recruitee.com"
+
+[[companies]]
 id = "reddit"
 name = "Reddit"
 industry = "Social media, Advertising, Community platform"

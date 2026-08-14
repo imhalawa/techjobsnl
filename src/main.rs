@@ -797,6 +797,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "centric")
             .collect::<Vec<_>>();
+        let cmcom = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "cmcom")
+            .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
         assert!(adyen[0].enabled);
@@ -931,6 +936,18 @@ mod tests {
                 if base_url == "https://centric.recruitee.com"
         ));
 
+        assert_eq!(cmcom.len(), 1);
+        assert!(cmcom[0].enabled);
+        assert_eq!(
+            cmcom[0].industry,
+            "Communications platform, Payments, Customer engagement, SaaS"
+        );
+        assert!(matches!(
+            &cmcom[0].source,
+            SourceConfig::Recruitee { base_url }
+                if base_url == "https://cmcom.recruitee.com"
+        ));
+
         let enabled_ids = config
             .companies
             .iter()
@@ -957,6 +974,7 @@ mod tests {
                 "coolblue",
                 "topicus",
                 "centric",
+                "cmcom",
                 "reddit"
             ]
         );
