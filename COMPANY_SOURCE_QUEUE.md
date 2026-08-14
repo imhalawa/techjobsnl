@@ -28,7 +28,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 20. [x] **Fourthline** — shipped · Greenhouse (`fourthline`).
 21. [ ] **flatexDEGIRO** — blocked/needs research · official custom careers site has Amsterdam roles; no complete supported endpoint proved.
 22. [x] **Ohpen** — shipped · Personio.
-23. [ ] **Worldline** — blocked/needs research · live NL roles use unsupported SAP SuccessFactors.
+23. [x] **Worldline** — shipped · official SAP SuccessFactors API with exact Netherlands pagination and complete detail validation.
 24. [ ] **Plaid** — blocked/needs research · no current NL role or supported complete source observed.
 25. [ ] **Buckaroo** — blocked/needs research · first-party NL vacancy page exists; completeness and stable feed are unproved.
 26. [ ] **PAY.** — blocked/needs research · first-party HubSpot-hosted careers page has NL roles; completeness semantics need proof.

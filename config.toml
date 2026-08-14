@@ -652,3 +652,13 @@ enabled = true
 [companies.source]
 strategy = "deel"
 board_url = "https://jobs.deel.com/klarna"
+
+[[companies]]
+id = "worldline"
+name = "Worldline"
+industry = "Fintech, Payments, Financial services, Payment technology"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "successfactors"
+base_url = "https://jobs.worldline.com"

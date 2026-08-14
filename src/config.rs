@@ -219,6 +219,9 @@ pub enum SourceConfig {
     Deel {
         board_url: String,
     },
+    Successfactors {
+        base_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -268,6 +271,7 @@ impl SourceConfig {
             Self::Uber { .. } => "Uber Oracle HCM API",
             Self::Microsoft { .. } => "Microsoft Careers API",
             Self::Deel { .. } => "Deel Jobs",
+            Self::Successfactors { .. } => "SAP SuccessFactors",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -312,6 +316,7 @@ impl SourceConfig {
             Self::Uber { api_url } => api_url,
             Self::Microsoft { search_url } => search_url,
             Self::Deel { board_url } => board_url,
+            Self::Successfactors { base_url } => base_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -364,6 +369,7 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
             validate_non_empty(country, path("country"))?;
             validate_country(country_code, path("country_code"))
         }
+        SourceConfig::Successfactors { base_url } => validate_https_url(base_url, path("base_url")),
         SourceConfig::Jibe { base_url, client } => {
             validate_https_url(base_url, path("base_url"))?;
             validate_non_empty(client, path("client"))

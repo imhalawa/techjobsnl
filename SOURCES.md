@@ -1,5 +1,13 @@
 # Source and sponsor evidence
 
+## Worldline
+
+- Official source: <https://jobs.worldline.com/search/?q=&locationsearch=Netherlands&locale=en_US>. Its first-party SAP SuccessFactors endpoint at <https://jobs.worldline.com/services/recruiting/v1/jobs> declares the exact Netherlands total and exposes fixed 25-row pagination. The adapter obtains the required CSRF token from the official search page, validates every unique ID and explicit Netherlands location, then matches each canonical detail URL, title, date, full description, and official application path before accepting a complete scan.
+- Live discovery: the endpoint declared 6 Netherlands vacancies on 2026-08-14. All 6 details matched. The count is volatile and is not hardcoded in the smoke test.
+- Worldline describes itself as a European payment-services leader focused on payments and reports 14,500+ professionals: <https://worldline.com/en/home/top-navigation/about-worldline/who-we-are>. The configured `2,000+` band follows the app's EU large-company classification.
+- The current Netherlands feed is in English, but language, work-authorisation, relocation, and visa sponsorship conditions vary by vacancy. The board does not prove sponsorship; confirm it on the specific role.
+- Worldline's office directory lists several Netherlands group entities: <https://worldline.com/en/home/main-navigation/git/office-locations>. The vacancy board identifies the Worldline brand, not the legal contract entity; confirm that entity before relying on recognised-sponsor status.
+
 ## Klarna
 
 - Official source: <https://jobs.deel.com/klarna>. The server-rendered board publishes a complete ordered ItemList. The adapter validates every unique official URL, fetches every listed JobPosting detail, matches its Deel ATS ID and canonical URL, and keeps only explicit Amsterdam vacancies.
