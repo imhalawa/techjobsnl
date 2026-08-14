@@ -492,3 +492,17 @@ enabled = true
 strategy = "teamtailor"
 feed_url = "https://werkenbij.infosupport.com/en/jobs.json"
 employer = "Info Support"
+
+[[companies]]
+id = "wolters-kluwer"
+name = "Wolters Kluwer"
+industry = "Professional information, Healthcare software, Tax and accounting software, Compliance software"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "workday"
+base_url = "https://wk.wd3.myworkdayjobs.com"
+tenant = "wk"
+site = "External"
+country = "Netherlands"
+country_code = "NL"

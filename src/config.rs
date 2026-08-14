@@ -159,6 +159,13 @@ pub enum SourceConfig {
         account: String,
         country_filter: Option<String>,
     },
+    Workday {
+        base_url: String,
+        tenant: String,
+        site: String,
+        country: String,
+        country_code: String,
+    },
     Yuki {
         feed_url: String,
     },
@@ -210,6 +217,7 @@ impl SourceConfig {
             Self::Personio { .. } => "Personio XML Feed",
             Self::Lever { .. } => "Lever",
             Self::Workable { .. } => "Workable",
+            Self::Workday { .. } => "Workday",
             Self::Yuki { .. } => "Teamtailor JSON Feed",
             Self::Teamtailor { .. } => "Teamtailor JSON Feed",
             Self::Bol { .. } => "bol.com",
@@ -236,6 +244,7 @@ impl SourceConfig {
             | Self::Rabobank { base_url, .. }
             | Self::AlbertHeijn { base_url }
             | Self::Getnoticed { base_url, .. } => base_url,
+            Self::Workday { base_url, .. } => base_url,
             Self::Ebay { listing_url }
             | Self::Yuki {
                 feed_url: listing_url,
@@ -286,6 +295,19 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 validate_country(country, path("country_filter"))?;
             }
             Ok(())
+        }
+        SourceConfig::Workday {
+            base_url,
+            tenant,
+            site,
+            country,
+            country_code,
+        } => {
+            validate_https_url(base_url, path("base_url"))?;
+            validate_non_empty(tenant, path("tenant"))?;
+            validate_non_empty(site, path("site"))?;
+            validate_non_empty(country, path("country"))?;
+            validate_country(country_code, path("country_code"))
         }
         SourceConfig::Jibe { base_url, client } => {
             validate_https_url(base_url, path("base_url"))?;
