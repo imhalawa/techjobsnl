@@ -24,10 +24,10 @@ use job_watch::{
     insights::{AnalyticsFilters, AnalyticsResult, LibraryState},
     scanner::ScanService,
     sources::{
-        JobSource, afas, albert_heijn, amazon, anwb, ashby, bol, chipsoft, coolblue, deel, ebay,
-        eneco, exact, getnoticed, google, greenhouse, ing, jibe, lever, microsoft, ns, personio,
-        postnl, rabobank, recruitee, successfactors, successfactors_api, uber, workable, workday,
-        yuki,
+        JobSource, afas, albert_heijn, amazon, anwb, ashby, bol, buckaroo, chipsoft, coolblue,
+        deel, ebay, eneco, exact, getnoticed, google, greenhouse, ing, jibe, lever, microsoft, ns,
+        personio, postnl, rabobank, recruitee, successfactors, successfactors_api, uber, workable,
+        workday, yuki,
     },
     storage::{JobQuery, ScanReadModel, SourceReadModel, Store},
     ui::{App, AppCommand, View, render},
@@ -586,6 +586,9 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                 ))),
                 SourceConfig::Coolblue { listing_url } => Ok(Arc::new(
                     coolblue::CoolblueSource::new(&company.id, listing_url, client.clone()),
+                )),
+                SourceConfig::Buckaroo { listing_url } => Ok(Arc::new(
+                    buckaroo::BuckarooSource::new(&company.id, listing_url, client.clone()),
                 )),
                 SourceConfig::Rabobank { base_url, country } => Ok(Arc::new(
                     rabobank::RabobankSource::new(&company.id, base_url, country, client.clone()),
@@ -1409,7 +1412,8 @@ mod tests {
                 "klarna",
                 "flatexdegiro",
                 "google",
-                "worldline"
+                "worldline",
+                "buckaroo"
             ]
         );
 

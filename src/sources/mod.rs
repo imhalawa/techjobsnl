@@ -4,6 +4,7 @@ pub mod amazon;
 pub mod anwb;
 pub mod ashby;
 pub mod bol;
+pub mod buckaroo;
 pub mod chipsoft;
 pub mod coolblue;
 pub mod deel;
