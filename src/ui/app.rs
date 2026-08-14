@@ -153,8 +153,18 @@ pub enum Setting {
     Countries,
     IncludedTitles,
     ExcludedTitles,
-    AdvancedFilters,
+    IncludePreset(usize),
+    ExcludePreset(usize),
+    AdditionalIncludedTitles,
+    AdditionalExcludedTitles,
     SimpleSettings,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct TitlePreset {
+    pub label: &'static str,
+    pub examples: &'static str,
+    pub pattern: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -696,8 +706,8 @@ impl App {
                 self.focus = Focus::Navigation;
                 self.navigation_index = view_index(self.view);
             }
-            KeyCode::Enter if self.view == View::Settings => {
-                self.start_setting_edit();
+            KeyCode::Enter | KeyCode::Char(' ') if self.view == View::Settings => {
+                return self.start_setting_edit();
             }
             KeyCode::Enter if width < 80 => {
                 self.narrow_details_visible = !self.narrow_details_visible;
@@ -1569,7 +1579,7 @@ impl App {
                         column,
                         row,
                         area,
-                        1,
+                        if self.advanced_settings { 2 } else { 1 },
                         self.settings().len(),
                         self.selected_index,
                     )
@@ -1714,8 +1724,7 @@ impl App {
                 | MouseTarget::LibraryTab(_),
             ) => AppCommand::None,
             Some(MouseTarget::Setting(_)) if self.input_mode == InputMode::Normal => {
-                self.start_setting_edit();
-                AppCommand::None
+                self.start_setting_edit()
             }
             Some(MouseTarget::Help) => {
                 self.help_visible = !self.help_visible;
@@ -2131,13 +2140,25 @@ impl App {
                             .map(|country| country.to_uppercase())
                             .collect();
                     }
-                    Setting::IncludedTitles => {
-                        filters.include_title_patterns = split_setting(&self.setting_input, ';');
+                    Setting::AdditionalIncludedTitles => {
+                        filters.include_title_patterns = replace_additional_patterns(
+                            &filters.include_title_patterns,
+                            &INCLUDE_TITLE_PRESETS,
+                            split_setting(&self.setting_input, ';'),
+                        );
                     }
-                    Setting::ExcludedTitles => {
-                        filters.exclude_title_patterns = split_setting(&self.setting_input, ';');
+                    Setting::AdditionalExcludedTitles => {
+                        filters.exclude_title_patterns = replace_additional_patterns(
+                            &filters.exclude_title_patterns,
+                            &EXCLUDE_TITLE_PRESETS,
+                            split_setting(&self.setting_input, ';'),
+                        );
                     }
-                    Setting::AdvancedFilters | Setting::SimpleSettings => unreachable!(),
+                    Setting::IncludePreset(_)
+                    | Setting::ExcludePreset(_)
+                    | Setting::IncludedTitles
+                    | Setting::ExcludedTitles
+                    | Setting::SimpleSettings => unreachable!(),
                 }
                 if let Err(error) = filters.validate() {
                     self.setting_error = Some(error.to_string());
@@ -2153,28 +2174,39 @@ impl App {
         AppCommand::None
     }
 
-    fn start_setting_edit(&mut self) {
+    fn start_setting_edit(&mut self) -> AppCommand {
         let setting = self.setting();
         match setting {
-            Setting::AdvancedFilters => {
-                self.advanced_settings = true;
-                self.selected_index = 0;
-                return;
-            }
             Setting::SimpleSettings => {
                 self.advanced_settings = false;
                 self.selected_index = 0;
-                return;
+                return AppCommand::None;
             }
-            Setting::IncludedTitles if !self.advanced_settings => {
+            Setting::IncludedTitles => {
                 self.advanced_settings = true;
                 self.selected_index = 1;
-                return;
+                return AppCommand::None;
             }
-            Setting::ExcludedTitles if !self.advanced_settings => {
+            Setting::ExcludedTitles => {
                 self.advanced_settings = true;
-                self.selected_index = 2;
-                return;
+                self.selected_index = 7;
+                return AppCommand::None;
+            }
+            Setting::IncludePreset(index) => {
+                let mut filters = self.config.filters.clone();
+                toggle_pattern(
+                    &mut filters.include_title_patterns,
+                    INCLUDE_TITLE_PRESETS[index].pattern,
+                );
+                return AppCommand::SaveFilters(filters);
+            }
+            Setting::ExcludePreset(index) => {
+                let mut filters = self.config.filters.clone();
+                toggle_pattern(
+                    &mut filters.exclude_title_patterns,
+                    EXCLUDE_TITLE_PRESETS[index].pattern,
+                );
+                return AppCommand::SaveFilters(filters);
             }
             _ => {}
         }
@@ -2182,12 +2214,25 @@ impl App {
         self.setting_input = match setting {
             Setting::NewJobAge => self.config.filters.new_job_max_age_days.to_string(),
             Setting::Countries => self.config.filters.countries.join(", "),
-            Setting::IncludedTitles => self.config.filters.include_title_patterns.join("; "),
-            Setting::ExcludedTitles => self.config.filters.exclude_title_patterns.join("; "),
-            Setting::AdvancedFilters | Setting::SimpleSettings => unreachable!(),
+            Setting::AdditionalIncludedTitles => additional_patterns(
+                &self.config.filters.include_title_patterns,
+                &INCLUDE_TITLE_PRESETS,
+            )
+            .join("; "),
+            Setting::AdditionalExcludedTitles => additional_patterns(
+                &self.config.filters.exclude_title_patterns,
+                &EXCLUDE_TITLE_PRESETS,
+            )
+            .join("; "),
+            Setting::IncludePreset(_)
+            | Setting::ExcludePreset(_)
+            | Setting::IncludedTitles
+            | Setting::ExcludedTitles
+            | Setting::SimpleSettings => unreachable!(),
         };
         self.setting_error = None;
         self.input_mode = InputMode::Setting;
+        AppCommand::None
     }
 
     fn resize_job_panes(&mut self, column: u16, width: u16) {
@@ -2517,18 +2562,89 @@ const LIBRARY_TABS: [LibraryTab; 5] = [
     LibraryTab::Companies,
 ];
 
-const SETTINGS: [Setting; 5] = [
+const SETTINGS: [Setting; 4] = [
     Setting::NewJobAge,
     Setting::Countries,
     Setting::IncludedTitles,
     Setting::ExcludedTitles,
-    Setting::AdvancedFilters,
 ];
 
-const ADVANCED_SETTINGS: [Setting; 3] = [
+const ADVANCED_SETTINGS: [Setting; 14] = [
     Setting::SimpleSettings,
-    Setting::IncludedTitles,
-    Setting::ExcludedTitles,
+    Setting::IncludePreset(0),
+    Setting::IncludePreset(1),
+    Setting::IncludePreset(2),
+    Setting::IncludePreset(3),
+    Setting::IncludePreset(4),
+    Setting::IncludePreset(5),
+    Setting::ExcludePreset(0),
+    Setting::ExcludePreset(1),
+    Setting::ExcludePreset(2),
+    Setting::ExcludePreset(3),
+    Setting::ExcludePreset(4),
+    Setting::AdditionalIncludedTitles,
+    Setting::AdditionalExcludedTitles,
+];
+
+pub(crate) const INCLUDE_TITLE_PRESETS: [TitlePreset; 6] = [
+    TitlePreset {
+        label: "Software engineering",
+        examples: "Backend Engineer, Frontend Developer, Mobile Engineer",
+        pattern: "(software|backend|front.?end|full.?stack|application|mobile|ios|android).*(engineer|developer)|(engineer|developer).*(software|backend|front.?end|full.?stack|application|mobile|ios|android)",
+    },
+    TitlePreset {
+        label: "Platform and cloud",
+        examples: "Platform Engineer, DevOps Engineer, Cloud Engineer",
+        pattern: "platform engineer|devops|cloud engineer|infrastructure engineer|developer experience|release tooling",
+    },
+    TitlePreset {
+        label: "Site reliability",
+        examples: "Site Reliability Engineer, SRE",
+        pattern: r"site reliability|\bsre\b|reliability engineer",
+    },
+    TitlePreset {
+        label: "Data engineering",
+        examples: "Data Engineer, Analytics Engineer",
+        pattern: "data engineer|analytics engineer",
+    },
+    TitlePreset {
+        label: "AI and machine learning",
+        examples: "Machine Learning Engineer, AI Engineer",
+        pattern: r"machine learning engineer|\bml engineer\b|\bai engineer\b",
+    },
+    TitlePreset {
+        label: "Application security",
+        examples: "Security Engineer, Product Security Engineer",
+        pattern: "application security|product security|security engineer",
+    },
+];
+
+pub(crate) const EXCLUDE_TITLE_PRESETS: [TitlePreset; 5] = [
+    TitlePreset {
+        label: "Management",
+        examples: "Engineering Manager, Development Manager",
+        pattern: "manager",
+    },
+    TitlePreset {
+        label: "Director roles",
+        examples: "Engineering Director, Director of Technology",
+        pattern: "director",
+    },
+    TitlePreset {
+        label: "Product management",
+        examples: "Product Manager",
+        pattern: "product manager",
+    },
+    TitlePreset {
+        label: "Sales engineering",
+        examples: "Sales Engineer, Solutions Sales Engineer",
+        pattern: "sales engineer",
+    },
+    TitlePreset {
+        label: "Support roles",
+        examples: "Support Engineer, Technical Support",
+        pattern: "support",
+    },
 ];
 
 const MIN_JOB_LIST_WIDTH: u16 = 30;
@@ -2606,6 +2722,43 @@ fn split_setting(value: &str, separator: char) -> Vec<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_owned)
+        .collect()
+}
+
+fn toggle_pattern(patterns: &mut Vec<String>, pattern: &str) {
+    if let Some(index) = patterns.iter().position(|candidate| candidate == pattern) {
+        patterns.remove(index);
+    } else {
+        patterns.push(pattern.to_owned());
+    }
+}
+
+fn additional_patterns(patterns: &[String], presets: &[TitlePreset]) -> Vec<String> {
+    patterns
+        .iter()
+        .filter(|pattern| {
+            !presets
+                .iter()
+                .any(|preset| preset.pattern == pattern.as_str())
+        })
+        .cloned()
+        .collect()
+}
+
+fn replace_additional_patterns(
+    current: &[String],
+    presets: &[TitlePreset],
+    additional: Vec<String>,
+) -> Vec<String> {
+    current
+        .iter()
+        .filter(|pattern| {
+            presets
+                .iter()
+                .any(|preset| preset.pattern == pattern.as_str())
+        })
+        .cloned()
+        .chain(additional)
         .collect()
 }
 

@@ -17,6 +17,7 @@ use crate::{
     storage::{ScanOutcome, SourceHealth},
 };
 
+use super::app::{EXCLUDE_TITLE_PRESETS, INCLUDE_TITLE_PRESETS, TitlePreset};
 use super::{
     AnalyticsTab, App, Focus, InputMode, LibraryTab, MarketSection, MouseTarget, Setting, View,
 };
@@ -2025,15 +2026,19 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
                 "Where?",
                 "Enter countries separated by commas, for example NL, DE.",
             ),
-            Setting::IncludedTitles => (
-                "Advanced · jobs to include",
-                "Separate regular expressions with ; or leave empty to include every job title.",
+            Setting::AdditionalIncludedTitles => (
+                "Additional include rules",
+                "Enter regular expressions separated by ;. These rules match job titles only.",
             ),
-            Setting::ExcludedTitles => (
-                "Advanced · jobs to hide",
-                "Separate regular expressions with ; or leave empty to exclude no job titles.",
+            Setting::AdditionalExcludedTitles => (
+                "Additional hide rules",
+                "Enter regular expressions separated by ;. Hide rules take precedence.",
             ),
-            Setting::AdvancedFilters | Setting::SimpleSettings => unreachable!(),
+            Setting::IncludePreset(_)
+            | Setting::ExcludePreset(_)
+            | Setting::IncludedTitles
+            | Setting::ExcludedTitles
+            | Setting::SimpleSettings => unreachable!(),
         };
         let mut lines = vec![
             Line::styled(
@@ -2068,27 +2073,65 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
 
     let filters = &app.config().filters;
     let (title, items) = if app.advanced_settings() {
+        let mut items = vec![advanced_setting_item(
+            app,
+            0,
+            "Back",
+            "Job titles only; descriptions are not checked. Hide rules take priority.",
+        )];
+        items.extend(
+            INCLUDE_TITLE_PRESETS
+                .iter()
+                .enumerate()
+                .map(|(index, preset)| {
+                    preset_item(
+                        app,
+                        index + 1,
+                        "Include",
+                        preset,
+                        filters
+                            .include_title_patterns
+                            .iter()
+                            .any(|rule| rule == preset.pattern),
+                    )
+                }),
+        );
+        items.extend(
+            EXCLUDE_TITLE_PRESETS
+                .iter()
+                .enumerate()
+                .map(|(index, preset)| {
+                    preset_item(
+                        app,
+                        index + 7,
+                        "Hide",
+                        preset,
+                        filters
+                            .exclude_title_patterns
+                            .iter()
+                            .any(|rule| rule == preset.pattern),
+                    )
+                }),
+        );
+        items.push(advanced_setting_item(
+            app,
+            12,
+            "Additional include rules",
+            &custom_rule_count(&filters.include_title_patterns, &INCLUDE_TITLE_PRESETS),
+        ));
+        items.push(advanced_setting_item(
+            app,
+            13,
+            "Additional hide rules",
+            &custom_rule_count(&filters.exclude_title_patterns, &EXCLUDE_TITLE_PRESETS),
+        ));
         (
-            "Advanced title rules · 3 · Enter to change",
-            vec![
-                setting_item(app, 0, "Simple settings", "Back".to_owned()),
-                setting_item(
-                    app,
-                    1,
-                    "Include rules",
-                    rule_count(filters.include_title_patterns.len()),
-                ),
-                setting_item(
-                    app,
-                    2,
-                    "Hide rules",
-                    rule_count(filters.exclude_title_patterns.len()),
-                ),
-            ],
+            "Title filters · 11 presets · Space or Enter to toggle",
+            items,
         )
     } else {
         (
-            "Settings · 5 · Enter to change",
+            "Settings · 4 · Enter to change",
             vec![
                 setting_item(
                     app,
@@ -2119,7 +2162,6 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
                     "Hide jobs",
                     hidden_title_summary(&filters.exclude_title_patterns),
                 ),
-                setting_item(app, 4, "Advanced", "Custom title rules".to_owned()),
             ],
         )
     };
@@ -2143,9 +2185,13 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
         frame,
         app,
         area,
-        if app.advanced_settings() { 3 } else { 5 },
+        if app.advanced_settings() { 14 } else { 4 },
         state.offset(),
-        usize::from(area.height.saturating_sub(2)).max(1),
+        if app.advanced_settings() {
+            usize::from(area.height.saturating_sub(2) / 2).max(1)
+        } else {
+            usize::from(area.height.saturating_sub(2)).max(1)
+        },
     );
 }
 
@@ -2158,12 +2204,37 @@ fn setting_item(app: &App, index: usize, label: &'static str, value: String) -> 
     .style(mouse_style(app, MouseTarget::Setting(index)))
 }
 
-fn rule_count(count: usize) -> String {
-    match count {
-        0 => "None".to_owned(),
-        1 => "1 regex rule".to_owned(),
-        count => format!("{count} regex rules"),
-    }
+fn advanced_setting_item(app: &App, index: usize, label: &str, detail: &str) -> ListItem<'static> {
+    let theme = app.theme();
+    ListItem::new(vec![
+        Line::styled(label.to_owned(), Style::new().fg(theme.primary_text)),
+        Line::styled(format!("  {detail}"), Style::new().fg(theme.muted_text)),
+    ])
+    .style(mouse_style(app, MouseTarget::Setting(index)))
+}
+
+fn preset_item(
+    app: &App,
+    index: usize,
+    action: &str,
+    preset: &TitlePreset,
+    enabled: bool,
+) -> ListItem<'static> {
+    let theme = app.theme();
+    ListItem::new(vec![
+        Line::from(vec![
+            Span::styled(
+                format!("{action:<8}[{}] ", if enabled { "x" } else { " " }),
+                Style::new().fg(if enabled { theme.new } else { theme.muted_text }),
+            ),
+            Span::styled(preset.label, Style::new().fg(theme.primary_text)),
+        ]),
+        Line::styled(
+            format!("          Examples: {}", preset.examples),
+            Style::new().fg(theme.muted_text),
+        ),
+    ])
+    .style(mouse_style(app, MouseTarget::Setting(index)))
 }
 
 fn country_name(code: &str) -> String {
@@ -2192,55 +2263,50 @@ fn job_type_summary(patterns: &[String]) -> String {
     if patterns.is_empty() {
         return "All job types".to_owned();
     }
-    let rules = patterns.join("|").to_ascii_lowercase();
-    let groups = [
-        (
-            "Software",
-            ["software", "backend", "front", "full", "mobile"].as_slice(),
-        ),
-        (
-            "Platform",
-            ["platform", "devops", "cloud", "reliability", "sre"].as_slice(),
-        ),
-        ("Data", ["data engineer", "analytics engineer"].as_slice()),
-        (
-            "AI",
-            ["machine learning", "ml engineer", "ai engineer"].as_slice(),
-        ),
-        ("Security", ["security"].as_slice()),
-    ]
-    .into_iter()
-    .filter(|(_, words)| words.iter().any(|word| rules.contains(word)))
-    .map(|(label, _)| label)
-    .collect::<Vec<_>>();
-    if groups.is_empty() {
-        "Custom rules".to_owned()
-    } else {
-        groups.join(", ")
-    }
+    preset_summary(patterns, &INCLUDE_TITLE_PRESETS)
 }
 
 fn hidden_title_summary(patterns: &[String]) -> String {
     if patterns.is_empty() {
         return "Nothing".to_owned();
     }
-    if patterns.iter().any(|pattern| {
-        pattern
-            .chars()
-            .any(|character| !character.is_alphanumeric() && character != ' ' && character != '-')
-    }) {
-        return "Custom rules".to_owned();
-    }
-    patterns
+    preset_summary(patterns, &EXCLUDE_TITLE_PRESETS)
+}
+
+fn preset_summary(patterns: &[String], presets: &[TitlePreset]) -> String {
+    let enabled = presets
         .iter()
-        .map(|pattern| {
-            let mut characters = pattern.chars();
-            characters.next().map_or_else(String::new, |first| {
-                first.to_uppercase().collect::<String>() + characters.as_str()
-            })
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
+        .filter(|preset| patterns.iter().any(|rule| rule == preset.pattern))
+        .count();
+    let custom = patterns
+        .iter()
+        .filter(|rule| !presets.iter().any(|preset| preset.pattern == rule.as_str()))
+        .count();
+    let mut summary = if enabled == presets.len() {
+        format!("All {enabled} groups enabled")
+    } else if enabled == 0 {
+        "No standard groups enabled".to_owned()
+    } else {
+        format!("{enabled} of {} groups enabled", presets.len())
+    };
+    match custom {
+        0 => {}
+        1 => summary.push_str(" · 1 custom rule"),
+        count => summary.push_str(&format!(" · {count} custom rules")),
+    }
+    summary
+}
+
+fn custom_rule_count(patterns: &[String], presets: &[TitlePreset]) -> String {
+    let count = patterns
+        .iter()
+        .filter(|rule| !presets.iter().any(|preset| preset.pattern == rule.as_str()))
+        .count();
+    match count {
+        0 => "None".to_owned(),
+        1 => "1 custom regular expression".to_owned(),
+        count => format!("{count} custom regular expressions"),
+    }
 }
 
 fn metadata_line(
@@ -2541,11 +2607,19 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         }
         actions
     } else if app.view() == View::Settings {
-        let mut actions = vec![
-            "↑/↓ settings".to_owned(),
-            "Enter change".to_owned(),
-            "Tab navigation".to_owned(),
-        ];
+        let mut actions = if app.advanced_settings() {
+            vec![
+                "↑/↓ filters".to_owned(),
+                "Space/Enter toggle or edit".to_owned(),
+                "Tab navigation".to_owned(),
+            ]
+        } else {
+            vec![
+                "↑/↓ settings".to_owned(),
+                "Enter change".to_owned(),
+                "Tab navigation".to_owned(),
+            ]
+        };
         if area.width >= 80 {
             actions.push(format!("{} quit", keys.quit));
         }

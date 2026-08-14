@@ -603,7 +603,10 @@ fn settings_can_clear_title_filters_to_show_every_job_type() {
     app.handle_key(special(KeyCode::Down));
     app.handle_key(special(KeyCode::Down));
     app.handle_key(special(KeyCode::Enter));
-    assert!(rendered(&app, 120, 24).contains("Advanced title rules"));
+    assert!(rendered(&app, 120, 24).contains("Title filters"));
+    for _ in 0..11 {
+        app.handle_key(special(KeyCode::Down));
+    }
     app.handle_key(special(KeyCode::Enter));
     for _ in 0..app.setting_input().chars().count() {
         app.handle_key(special(KeyCode::Backspace));
@@ -616,7 +619,9 @@ fn settings_can_clear_title_filters_to_show_every_job_type() {
         AppCommand::SaveFilters(expected.clone())
     );
     app.apply_filters(expected);
-    app.handle_key(special(KeyCode::Up));
+    for _ in 0..12 {
+        app.handle_key(special(KeyCode::Up));
+    }
     app.handle_key(special(KeyCode::Enter));
     let settings = rendered(&app, 120, 24);
     assert!(settings.contains("Job types"));
@@ -627,31 +632,47 @@ fn settings_can_clear_title_filters_to_show_every_job_type() {
 fn simple_settings_hide_regex_and_use_everyday_language() {
     let mut configured = config();
     configured.filters.include_title_patterns = vec![
-        "software engineer".into(),
-        "platform engineer".into(),
-        "data engineer".into(),
-        "machine learning engineer".into(),
-        "security engineer".into(),
+        "data engineer|analytics engineer".into(),
+        "application security|product security|security engineer".into(),
     ];
-    configured.filters.exclude_title_patterns = vec![
-        "manager".into(),
-        "director".into(),
-        "product manager".into(),
-        "sales engineer".into(),
-        "support".into(),
-    ];
+    configured.filters.exclude_title_patterns = vec!["manager".into(), "support".into()];
     let mut app = App::new(configured, vec![]);
     open_view(&mut app, 8);
 
     let settings = normalized_interior(&rendered_buffer(&app, 120, 24));
     assert!(settings.contains("New jobs Last 7 days"));
     assert!(settings.contains("Locations Netherlands"));
-    assert!(settings.contains("Job types Software, Platform, Data, AI, Security"));
-    assert!(
-        settings.contains("Hide jobs Manager, Director, Product manager, Sales engineer, Support")
-    );
+    assert!(settings.contains("Job types 2 of 6 groups enabled"));
+    assert!(settings.contains("Hide jobs 2 of 5 groups enabled"));
     assert!(!settings.contains("regex"));
     assert!(!settings.contains("patterns"));
+}
+
+#[test]
+fn advanced_title_filters_explain_scope_and_toggle_named_presets() {
+    let mut configured = config();
+    configured.filters.include_title_patterns = vec!["data engineer|analytics engineer".into()];
+    let mut app = App::new(configured.clone(), vec![]);
+    open_view(&mut app, 8);
+    for _ in 0..2 {
+        app.handle_key(special(KeyCode::Down));
+    }
+    app.handle_key(special(KeyCode::Enter));
+
+    let filters = normalized_interior(&rendered_buffer(&app, 120, 32));
+    assert!(filters.contains("Job titles only; descriptions are not checked."));
+    assert!(filters.contains("Hide rules take priority."));
+    assert!(filters.contains("Include [x] Data engineering"));
+    assert!(filters.contains("Examples: Data Engineer, Analytics Engineer"));
+    assert!(filters.contains("Hide [ ] Management"));
+    assert!(!filters.contains("6 regex rules"));
+
+    for _ in 0..3 {
+        app.handle_key(special(KeyCode::Down));
+    }
+    let mut expected = configured.filters;
+    expected.include_title_patterns.clear();
+    assert_eq!(app.handle_key(key(' ')), AppCommand::SaveFilters(expected));
 }
 
 #[test]
@@ -866,7 +887,7 @@ fn reported_listing_views_show_their_totals() {
     open_view(&mut app, 5);
     assert!(rendered(&app, 120, 24).contains("Sources · 1"));
     open_view(&mut app, 8);
-    assert!(rendered(&app, 120, 24).contains("Settings · 5"));
+    assert!(rendered(&app, 120, 24).contains("Settings · 4"));
 }
 
 #[test]
