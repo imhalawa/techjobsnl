@@ -78,6 +78,12 @@
 - Finom's official careers page reports 500+ employees: <https://careers.finom.co/>.
 - The board identifies the Finom brand, not the legal employer for each contract. Confirm the employment entity before relying on sponsor status.
 
+## TomTom
+
+- Official source: <https://www.tomtom.com/careers/joboverview/>. TomTom's first-party careers API at <https://www.tomtom.com/api/careers/jobs> and its Lever board at <https://api.eu.lever.co/v0/postings/tomtom?mode=json> currently expose the same complete 32-role board.
+- The configured Netherlands filter includes explicit Amsterdam and multi-location roles that list Amsterdam as an eligible location. TomTom's first-party board currently has 14 Amsterdam-primary roles; Lever additionally identifies one Madrid-primary role as eligible in Amsterdam, Gent, or Madrid.
+- TomTom describes a workforce of 3,300+ in its current job descriptions. The board does not state visa sponsorship per role; confirm it before relying on sponsor status.
+
 ## Silverflow and Ohpen
 
 - Official sources: <https://silverflow.jobs.personio.com/xml?language=en> and <https://ohpen.jobs.personio.com/xml?language=en>. Each Personio XML feed returns every public position with stable IDs, offices, descriptions, employment metadata, and creation dates in one response.

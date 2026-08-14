@@ -591,3 +591,14 @@ enabled = true
 [companies.source]
 strategy = "postnl"
 api_url = "https://vacatures-website.postnl.nl/vacatures-widget/api/"
+
+[[companies]]
+id = "tomtom"
+name = "TomTom"
+industry = "Location technology, Digital maps, Navigation, Automotive software"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "lever"
+api_url = "https://api.eu.lever.co/v0/postings/tomtom"
+country_filter = "NL"

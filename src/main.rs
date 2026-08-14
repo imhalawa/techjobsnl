@@ -1003,7 +1003,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 53);
+        assert_eq!(migrated.companies.len(), 54);
         assert!(
             migrated
                 .companies
@@ -1353,7 +1353,8 @@ mod tests {
                 "ns",
                 "chipsoft",
                 "anwb",
-                "postnl"
+                "postnl",
+                "tomtom"
             ]
         );
 
