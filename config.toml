@@ -581,3 +581,13 @@ enabled = true
 [companies.source]
 strategy = "anwb"
 feed_url = "https://www.werkenbijanwb.nl/fuse/vacancies.json"
+
+[[companies]]
+id = "postnl"
+name = "PostNL"
+industry = "Postal services, Parcel delivery, Logistics, E-commerce"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "postnl"
+api_url = "https://vacatures-website.postnl.nl/vacatures-widget/api/"

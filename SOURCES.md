@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## PostNL
+
+- Official source: <https://vacatures-website.postnl.nl/vacatures-widget/api/vacanciesoverview?isProfessional=true&distance=-1&page=1>. The adapter follows every declared page, verifies the exact total and unique IDs, fetches every official detail, and accepts only professional roles with matching Netherlands-widget locations and official job/application URLs.
+- PostNL reported 31,531 employees at year-end 2025: <https://annualreport.postnl.nl/2025/sustainability-statements/3-social-disclosures/3-2-own-workforce>. The configured `2,000+` band follows the app's EU large-company classification.
+- Language requirements vary. The current professional feed includes English-language technology roles as well as roles requiring Dutch; check each vacancy.
+- The API identifies the PostNL brand, not the legal contract entity for every role. Confirm that entity and visa support before relying on recognised-sponsor status.
+
 ## ANWB
 
 - Official source: <https://www.werkenbijanwb.nl/fuse/vacancies.json>. The one-response feed exposes all public vacancy IDs and official URLs; the adapter validates every feed row against its JobPosting detail, Netherlands location, publication date, hiring brand, description, and on-page application form.
