@@ -642,3 +642,13 @@ enabled = true
 [companies.source]
 strategy = "microsoft"
 search_url = "https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com&query=&location=Netherlands&start=0&hl=en"
+
+[[companies]]
+id = "google"
+name = "Google"
+industry = "Software, Cloud computing, Artificial intelligence, Digital advertising, Consumer technology"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "google"
+search_url = "https://www.google.com/about/careers/applications/jobs/results/?company=Google&location=Netherlands&sort_by=date"

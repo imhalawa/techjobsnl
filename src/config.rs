@@ -216,6 +216,9 @@ pub enum SourceConfig {
     Microsoft {
         search_url: String,
     },
+    Google {
+        search_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -264,6 +267,7 @@ impl SourceConfig {
             Self::Amazon { .. } => "Amazon Jobs API",
             Self::Uber { .. } => "Uber Oracle HCM API",
             Self::Microsoft { .. } => "Microsoft Careers API",
+            Self::Google { .. } => "Google Careers HTML",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -307,6 +311,7 @@ impl SourceConfig {
             Self::Amazon { search_url } => search_url,
             Self::Uber { api_url } => api_url,
             Self::Microsoft { search_url } => search_url,
+            Self::Google { search_url } => search_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -498,6 +503,18 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("search_url"),
                     "must be the exact official Microsoft Netherlands search API",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Google { search_url } => {
+            validate_https_url(search_url, path("search_url"))?;
+            if search_url
+                != "https://www.google.com/about/careers/applications/jobs/results/?company=Google&location=Netherlands&sort_by=date"
+            {
+                return Err(ConfigError::invalid(
+                    path("search_url"),
+                    "must be the exact official Google Netherlands search URL",
                 ));
             }
             Ok(())

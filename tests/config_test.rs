@@ -374,6 +374,11 @@ fn parses_and_validates_every_source_strategy() {
             "microsoft",
         ),
         (
+            "strategy = \"google\"\nsearch_url = \"https://www.google.com/about/careers/applications/jobs/results/?company=Google&location=Netherlands&sort_by=date\"",
+            true,
+            "google",
+        ),
+        (
             "strategy = \"unsupported\"\nreason = \"official source blocks unattended requests\"",
             false,
             "mollie",
@@ -452,6 +457,9 @@ fn rejects_empty_source_fields() {
         SourceConfig::Microsoft {
             search_url: " ".into(),
         },
+        SourceConfig::Google {
+            search_url: " ".into(),
+        },
         SourceConfig::Unsupported { reason: " ".into() },
     ];
 
@@ -506,6 +514,9 @@ fn rejects_non_https_source_urls() {
         },
         SourceConfig::Microsoft {
             search_url: "http://apply.careers.microsoft.com/api/pcsx/search".into(),
+        },
+        SourceConfig::Google {
+            search_url: "http://www.google.com/about/careers/applications/jobs/results/".into(),
         },
     ];
 

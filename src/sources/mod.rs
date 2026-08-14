@@ -10,6 +10,7 @@ pub mod ebay;
 pub mod eneco;
 pub mod exact;
 pub mod getnoticed;
+pub mod google;
 pub mod greenhouse;
 pub mod http;
 pub mod ing;

@@ -1,5 +1,14 @@
 # Source and sponsor evidence
 
+## Google
+
+- Official source: <https://www.google.com/about/careers/applications/jobs/results/?company=Google&location=Netherlands&sort_by=date>. Google's first-party server-rendered search data declares the exact total and fixed 20-row pagination. The adapter verifies every page, unique numeric job IDs and application URLs, Google ownership, publication timestamps, descriptions, and explicit `NL` location codes before accepting a complete scan.
+- Live discovery: the source declared 20 Google jobs matching Netherlands on 2026-08-14. All 20 had explicit Netherlands locations, unique IDs, official job and application URLs, descriptions, and valid timestamps. The count is volatile and is not hardcoded in the smoke test.
+- Alphabet reported 183,323 employees at year-end 2024: <https://abc.xyz/assets/99/21/46cafdba41089a12a2d86ea47d44/goog026-annualreport2024-web.pdf>. The configured `2,000+` band follows the app's EU large-company classification.
+- The configured industries cover Google Services and Google Cloud: software, cloud computing, artificial intelligence, digital advertising, and consumer technology. Alphabet describes these businesses and products at <https://abc.xyz/investor/faqs-and-general-information/default.aspx>.
+- The careers source is in English, but language, relocation, work-authorisation, and visa sponsorship conditions vary by vacancy. Confirm them on each role.
+- The board identifies the Google brand, not the legal contract entity for each vacancy. Confirm that entity before relying on recognised-sponsor status.
+
 ## Microsoft
 
 - Official source: <https://apply.careers.microsoft.com/careers?location=Netherlands&hl=en>. Its first-party search API at <https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com&query=&location=Netherlands&start=0&hl=en> declares an exact total and exposes fixed 10-row pagination. The adapter verifies every declared page, unique Eightfold and Microsoft job IDs, matching detail records, official URLs, dates, descriptions, and explicit Netherlands locations before accepting a complete scan.
