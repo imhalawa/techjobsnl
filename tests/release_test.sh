@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 
 sh -n scripts/check-release-version.sh
 sh -n scripts/install.sh
+sh -n scripts/uninstall.sh
 sh scripts/check-release-version.sh v0.1.0 >/dev/null
 if sh scripts/check-release-version.sh v9.9.9 >/dev/null 2>&1; then
     printf '%s\n' 'release version check accepted the wrong tag' >&2
@@ -42,6 +43,20 @@ TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" \
     sh scripts/install.sh >/dev/null
 
 test "$("$temporary_dir/bin/techjobsnl")" = installed
+printf stale > "$temporary_dir/bin/techjobsnl"
+update_output=$(
+    TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
+    TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" \
+        sh scripts/install.sh
+)
+test "$("$temporary_dir/bin/techjobsnl")" = installed
+printf '%s\n' "$update_output" | grep -q '^Updated techjobsnl at '
+
+uninstall_output=$(TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" sh scripts/uninstall.sh)
+test ! -e "$temporary_dir/bin/techjobsnl"
+printf '%s\n' "$uninstall_output" | grep -q 'Configuration and job history were not removed.'
+TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" sh scripts/uninstall.sh >/dev/null
+
 release_workflow=.github/workflows/release.yml
 ci_workflow=.github/workflows/ci.yml
 
@@ -65,3 +80,4 @@ grep -q 'pull_request:' "$ci_workflow"
 grep -q 'cargo test --locked --all-targets' "$ci_workflow"
 grep -q 'cargo build --locked --release' "$ci_workflow"
 grep -q 'Download checksum verification failed' scripts/install.ps1
+grep -q 'Configuration and job history were not removed.' scripts/uninstall.ps1

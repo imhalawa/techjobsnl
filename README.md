@@ -65,13 +65,32 @@ irm https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.p
 
 The installer verifies the release checksum, writes to `%LOCALAPPDATA%\Programs\techjobsnl\bin`, and adds that directory to the user `PATH`. Open a new terminal after installation. Set `$env:TECHJOBSNL_VERSION = "v0.1.0"` before running the installer to select a specific tag.
 
+### Update
+
+Run the installer again to replace the existing executable with the latest release. Configuration, job history, and application state stay unchanged.
+
+### Uninstall
+
+macOS and Linux:
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/uninstall.sh | sh
+```
+
+Windows:
+
+```powershell
+irm https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/uninstall.ps1 | iex
+```
+
+The uninstallers remove the executable. The Windows uninstaller also removes its installation directory from the user `PATH`. Configuration and job history are preserved.
+
 You can also download an archive and `SHA256SUMS` from [GitHub Releases](https://github.com/imhalawa/techjobsnl/releases), or install a tag with Cargo:
 
 ```bash
 cargo install --locked --git https://github.com/imhalawa/techjobsnl.git --tag v0.1.0 techjobsnl
 ```
-
-Uninstalling the executable does not delete configuration or job history.
 
 ## Main workflow
 

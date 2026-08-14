@@ -74,12 +74,16 @@ fi
 
 tar -xzf "$temporary_dir/$asset" -C "$temporary_dir" techjobsnl
 mkdir -p "$install_dir"
+action=Installed
+if [ -e "$install_dir/techjobsnl" ]; then
+    action=Updated
+fi
 temporary_binary="$install_dir/.techjobsnl.$$"
 cp "$temporary_dir/techjobsnl" "$temporary_binary"
 chmod 755 "$temporary_binary"
 mv "$temporary_binary" "$install_dir/techjobsnl"
 
-printf 'Installed techjobsnl to %s/techjobsnl\n' "$install_dir"
+printf '%s techjobsnl at %s/techjobsnl\n' "$action" "$install_dir"
 case ":$PATH:" in
     *":$install_dir:"*) ;;
     *) printf 'Add %s to PATH before running techjobsnl.\n' "$install_dir" ;;

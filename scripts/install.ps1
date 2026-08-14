@@ -44,6 +44,7 @@ try {
     $Expanded = Join-Path $TemporaryDir "expanded"
     Expand-Archive -Path $Archive -DestinationPath $Expanded
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+    $Action = if (Test-Path (Join-Path $InstallDir "techjobsnl.exe")) { "Updated" } else { "Installed" }
     Copy-Item -Force (Join-Path $Expanded "techjobsnl.exe") (Join-Path $InstallDir "techjobsnl.exe")
 
     $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -54,7 +55,7 @@ try {
         $env:Path = "$env:Path;$InstallDir"
         Write-Host "Added $InstallDir to your user PATH. Open a new terminal to use it."
     }
-    Write-Host "Installed techjobsnl to $InstallDir\techjobsnl.exe"
+    Write-Host "$Action techjobsnl at $InstallDir\techjobsnl.exe"
 } finally {
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TemporaryDir
 }

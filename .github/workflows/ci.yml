@@ -58,3 +58,11 @@ jobs:
         run: |
           bash tests/release_test.sh
           $null = [scriptblock]::Create((Get-Content scripts/install.ps1 -Raw))
+          $null = [scriptblock]::Create((Get-Content scripts/uninstall.ps1 -Raw))
+          $testInstallDir = Join-Path $env:RUNNER_TEMP "techjobsnl-uninstall-test"
+          New-Item -ItemType Directory -Force $testInstallDir | Out-Null
+          Set-Content (Join-Path $testInstallDir "techjobsnl.exe") "test"
+          & scripts/uninstall.ps1 -InstallDir $testInstallDir
+          if (Test-Path (Join-Path $testInstallDir "techjobsnl.exe")) {
+            throw "Windows uninstaller did not remove techjobsnl.exe"
+          }
