@@ -62,7 +62,7 @@ quit = "q"
 [[companies]]
 id = "mollie"
 name = "Mollie"
-industry = "Fintech and payments"
+industry = "Fintech, Payments, Financial services"
 scale = "European product company"
 enabled = true
 [companies.source]
@@ -72,7 +72,7 @@ board = "mollie"
 [[companies]]
 id = "booking-com"
 name = "Booking.com"
-industry = "Travel marketplace"
+industry = "Travel, Marketplace, E-commerce"
 scale = "Global enterprise"
 enabled = true
 [companies.source]
@@ -83,7 +83,7 @@ client = "Booking.com"
 [[companies]]
 id = "ebay"
 name = "eBay"
-industry = "E-commerce marketplace"
+industry = "E-commerce, Marketplace, Advertising"
 scale = "Global enterprise"
 enabled = true
 [companies.source]
@@ -93,7 +93,7 @@ listing_url = "https://jobs.ebayinc.com/us/en/jobs-in-netherlands"
 [[companies]]
 id = "airwallex"
 name = "Airwallex"
-industry = "Fintech and payments"
+industry = "Fintech, Payments, Banking infrastructure"
 scale = "Global scale-up"
 enabled = true
 [companies.source]
@@ -103,7 +103,7 @@ board = "airwallex"
 [[companies]]
 id = "adyen"
 name = "Adyen"
-industry = "Fintech and payments"
+industry = "Fintech, Payments, Financial infrastructure"
 scale = "Global enterprise"
 enabled = true
 [companies.source]
@@ -113,7 +113,7 @@ board = "adyen"
 [[companies]]
 id = "funda"
 name = "Funda"
-industry = "Real-estate marketplace"
+industry = "Real estate, Marketplace, Advertising"
 scale = "National product company"
 enabled = true
 [companies.source]
@@ -123,7 +123,7 @@ base_url = "https://jobs.funda.nl"
 [[companies]]
 id = "bol"
 name = "bol.com"
-industry = "E-commerce marketplace"
+industry = "E-commerce, Marketplace, Retail"
 scale = "Large Benelux company"
 enabled = true
 [companies.source]
@@ -133,7 +133,7 @@ base_url = "https://careers.bol.com"
 [[companies]]
 id = "rabobank"
 name = "Rabobank"
-industry = "Banking"
+industry = "Banking, Financial services, Insurance"
 scale = "Large national enterprise"
 enabled = true
 [companies.source]
@@ -144,7 +144,7 @@ country = "NL"
 [[companies]]
 id = "eneco"
 name = "Eneco"
-industry = "Energy"
+industry = "Energy, Utilities, Sustainability"
 scale = "Large regional enterprise"
 enabled = true
 [companies.source]
@@ -154,7 +154,7 @@ listing_url = "https://www.werkenbijeneco.nl/vacatures?f=1270"
 [[companies]]
 id = "ahold"
 name = "Albert Heijn Tech"
-industry = "Retail and e-commerce"
+industry = "Retail, E-commerce, Logistics"
 scale = "Large national enterprise"
 enabled = true
 [companies.source]
@@ -164,7 +164,7 @@ base_url = "https://werk.ah.nl"
 [[companies]]
 id = "ing"
 name = "ING"
-industry = "Banking"
+industry = "Banking, Financial services, Fintech"
 scale = "Global enterprise"
 enabled = true
 [companies.source]
@@ -174,7 +174,7 @@ listing_url = "https://careers.ing.com/en/location/netherlands-jobs/2618/2750405
 [[companies]]
 id = "abn-amro"
 name = "ABN AMRO"
-industry = "Banking"
+industry = "Banking, Financial services, Wealth management"
 scale = "Large national enterprise"
 enabled = true
 [companies.source]
@@ -185,7 +185,7 @@ country_filter = "Nederland"
 [[companies]]
 id = "datasnipper"
 name = "DataSnipper"
-industry = "Audit software SaaS"
+industry = "Audit, Accounting, B2B SaaS"
 scale = "International scale-up"
 enabled = true
 [companies.source]
@@ -195,7 +195,7 @@ board = "datasnipper"
 [[companies]]
 id = "databricks"
 name = "Databricks"
-industry = "Data and AI platform"
+industry = "Data, AI, Cloud infrastructure"
 scale = "Global enterprise"
 enabled = true
 [companies.source]
@@ -204,9 +204,19 @@ board = "databricks"
 country_filter = "NL"
 
 [[companies]]
+id = "coolblue"
+name = "Coolblue"
+industry = "E-commerce, Retail, Logistics, Energy"
+scale = "Large European product company"
+enabled = true
+[companies.source]
+strategy = "coolblue"
+listing_url = "https://www.coolblue.nl/en/vacancies/search"
+
+[[companies]]
 id = "reddit"
 name = "Reddit"
-industry = "Social platform"
+industry = "Social media, Advertising, Community platform"
 scale = "Global product company"
 enabled = true
 [companies.source]

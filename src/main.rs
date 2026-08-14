@@ -21,8 +21,8 @@ use job_watch::{
     filter::EligibilityFilter,
     scanner::ScanService,
     sources::{
-        JobSource, albert_heijn, ashby, bol, ebay, eneco, getnoticed, greenhouse, ing, jibe,
-        rabobank, recruitee,
+        JobSource, albert_heijn, ashby, bol, coolblue, ebay, eneco, getnoticed, greenhouse, ing,
+        jibe, rabobank, recruitee,
     },
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
@@ -372,6 +372,9 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     base_url,
                     client.clone(),
                 ))),
+                SourceConfig::Coolblue { listing_url } => Ok(Arc::new(
+                    coolblue::CoolblueSource::new(&company.id, listing_url, client.clone()),
+                )),
                 SourceConfig::Rabobank { base_url, country } => Ok(Arc::new(
                     rabobank::RabobankSource::new(&company.id, base_url, country, client.clone()),
                 )),
@@ -779,6 +782,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "reddit")
             .collect::<Vec<_>>();
+        let coolblue = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "coolblue")
+            .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
         assert!(adyen[0].enabled);
@@ -875,6 +883,18 @@ mod tests {
             } if board == "reddit" && country_filter == "NL"
         ));
 
+        assert_eq!(coolblue.len(), 1);
+        assert!(coolblue[0].enabled);
+        assert_eq!(
+            coolblue[0].industry,
+            "E-commerce, Retail, Logistics, Energy"
+        );
+        assert!(matches!(
+            &coolblue[0].source,
+            SourceConfig::Coolblue { listing_url }
+                if listing_url == "https://www.coolblue.nl/en/vacancies/search"
+        ));
+
         let enabled_ids = config
             .companies
             .iter()
@@ -898,6 +918,7 @@ mod tests {
                 "abn-amro",
                 "datasnipper",
                 "databricks",
+                "coolblue",
                 "reddit"
             ]
         );

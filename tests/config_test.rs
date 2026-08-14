@@ -335,6 +335,11 @@ fn parses_and_validates_every_source_strategy() {
             "mollie",
         ),
         (
+            "strategy = \"coolblue\"\nlisting_url = \"https://www.coolblue.nl/en/vacancies/search\"",
+            true,
+            "coolblue",
+        ),
+        (
             "strategy = \"ing\"\nlisting_url = \"https://careers.ing.com/en/search-jobs\"",
             true,
             "mollie",
@@ -387,6 +392,9 @@ fn rejects_empty_source_fields() {
         },
         SourceConfig::Bol {
             base_url: " ".into(),
+        },
+        SourceConfig::Coolblue {
+            listing_url: " ".into(),
         },
         SourceConfig::Rabobank {
             base_url: "https://rabobank.jobs".into(),
@@ -445,6 +453,9 @@ fn rejects_non_https_source_urls() {
         },
         SourceConfig::Bol {
             base_url: "http://careers.bol.com".into(),
+        },
+        SourceConfig::Coolblue {
+            listing_url: "http://www.coolblue.nl/en/vacancies/search".into(),
         },
         SourceConfig::Rabobank {
             base_url: "http://rabobank.jobs".into(),

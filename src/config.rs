@@ -155,6 +155,9 @@ pub enum SourceConfig {
     Bol {
         base_url: String,
     },
+    Coolblue {
+        listing_url: String,
+    },
     Rabobank {
         base_url: String,
         country: String,
@@ -191,6 +194,7 @@ impl SourceConfig {
             Self::Ebay { .. } => "eBay",
             Self::Recruitee { .. } => "Recruitee",
             Self::Bol { .. } => "bol.com",
+            Self::Coolblue { .. } => "Coolblue HTML",
             Self::Rabobank { .. } => "Rabobank API",
             Self::Eneco { .. } => "Eneco HTML",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
@@ -211,6 +215,7 @@ impl SourceConfig {
             | Self::AlbertHeijn { base_url }
             | Self::Getnoticed { base_url, .. } => base_url,
             Self::Ebay { listing_url }
+            | Self::Coolblue { listing_url }
             | Self::Eneco { listing_url }
             | Self::Ing { listing_url }
             | Self::PagedHtml { listing_url, .. } => listing_url,
@@ -239,6 +244,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
         }
         SourceConfig::Recruitee { base_url } | SourceConfig::Bol { base_url } => {
             validate_https_url(base_url, path("base_url"))?;
+            Ok(())
+        }
+        SourceConfig::Coolblue { listing_url } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            if listing_url != "https://www.coolblue.nl/en/vacancies/search" {
+                return Err(ConfigError::invalid(
+                    path("listing_url"),
+                    "must be the official Coolblue Netherlands vacancy URL",
+                ));
+            }
             Ok(())
         }
         SourceConfig::Rabobank { base_url, country } => {
