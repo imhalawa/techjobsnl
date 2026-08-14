@@ -25,9 +25,9 @@ use job_watch::{
     scanner::ScanService,
     sources::{
         JobSource, afas, albert_heijn, amazon, anwb, ashby, bol, chipsoft, coolblue, deel, ebay,
-        eneco, exact, getnoticed, google, greenhouse, ing, jibe, lever, microsoft, ns, personio,
-        postnl, rabobank, recruitee, successfactors, successfactors_api, uber, workable, workday,
-        yuki,
+        eneco, exact, getnoticed, google, greenhouse, ing, jibe, lever, microsoft, ns, pay,
+        personio, postnl, rabobank, recruitee, successfactors, successfactors_api, uber, workable,
+        workday, yuki,
     },
     storage::{JobQuery, ScanReadModel, SourceReadModel, Store},
     ui::{App, AppCommand, View, render},
@@ -587,6 +587,11 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                 SourceConfig::Coolblue { listing_url } => Ok(Arc::new(
                     coolblue::CoolblueSource::new(&company.id, listing_url, client.clone()),
                 )),
+                SourceConfig::Pay { listing_url } => Ok(Arc::new(pay::PaySource::new(
+                    &company.id,
+                    listing_url,
+                    client.clone(),
+                ))),
                 SourceConfig::Rabobank { base_url, country } => Ok(Arc::new(
                     rabobank::RabobankSource::new(&company.id, base_url, country, client.clone()),
                 )),
@@ -1050,7 +1055,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 62);
+        assert_eq!(migrated.companies.len(), 63);
         assert!(
             migrated
                 .companies
@@ -1408,7 +1413,8 @@ mod tests {
                 "klarna",
                 "flatexdegiro",
                 "google",
-                "worldline"
+                "worldline",
+                "pay"
             ]
         );
 
