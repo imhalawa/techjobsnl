@@ -1319,6 +1319,7 @@ dependencies = [
  "crossterm",
  "futures-util",
  "opener",
+ "quick-xml",
  "ratatui",
  "regex",
  "reqwest",
@@ -1867,6 +1868,16 @@ checksum = "6f42ea446cab60335f76979ec15e12619a2165b5ae2c12166bef27d283a9fadf"
 dependencies = [
  "idna",
  "psl-types",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.39.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdcc8dd4e2f670d309a5f0e83fe36dfdc05af317008fea29144da1a2ac858e5e"
+dependencies = [
+ "memchr",
+ "serde",
 ]
 
 [[package]]

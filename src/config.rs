@@ -148,6 +148,9 @@ pub enum SourceConfig {
     Recruitee {
         base_url: String,
     },
+    Personio {
+        base_url: String,
+    },
     Yuki {
         feed_url: String,
     },
@@ -192,6 +195,7 @@ impl SourceConfig {
             Self::Jibe { .. } => "Jibe",
             Self::Ebay { .. } => "eBay",
             Self::Recruitee { .. } => "Recruitee",
+            Self::Personio { .. } => "Personio XML Feed",
             Self::Yuki { .. } => "Teamtailor JSON Feed",
             Self::Bol { .. } => "bol.com",
             Self::Coolblue { .. } => "Coolblue HTML",
@@ -210,6 +214,7 @@ impl SourceConfig {
             Self::Ashby { board } | Self::Greenhouse { board, .. } => board,
             Self::Jibe { base_url, .. }
             | Self::Recruitee { base_url }
+            | Self::Personio { base_url }
             | Self::Bol { base_url }
             | Self::Rabobank { base_url, .. }
             | Self::AlbertHeijn { base_url }
@@ -245,7 +250,9 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
             validate_https_url(base_url, path("base_url"))?;
             validate_non_empty(client, path("client"))
         }
-        SourceConfig::Recruitee { base_url } | SourceConfig::Bol { base_url } => {
+        SourceConfig::Recruitee { base_url }
+        | SourceConfig::Personio { base_url }
+        | SourceConfig::Bol { base_url } => {
             validate_https_url(base_url, path("base_url"))?;
             Ok(())
         }

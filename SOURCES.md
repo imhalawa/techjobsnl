@@ -1,5 +1,11 @@
 # Source and sponsor evidence
 
+## Silverflow and Ohpen
+
+- Official sources: <https://silverflow.jobs.personio.com/xml?language=en> and <https://ohpen.jobs.personio.com/xml?language=en>. Each Personio XML feed returns every public position with stable IDs, offices, descriptions, employment metadata, and creation dates in one response.
+- Silverflow's current feed states that its international team has 80+ colleagues. Ohpen's public band is approximate until a newer first-party headcount is published.
+- The feeds identify company brands, not the legal employer for every contract. Confirm the employment entity before relying on sponsor status.
+
 ## Hosted ATS expansion
 
 The following enabled companies use the same complete-board adapters documented elsewhere in this file. Every Greenhouse source is filtered to explicit Netherlands offices; Recruitee and Ashby scans consume their complete public board before the application filter runs.
