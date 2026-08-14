@@ -59,7 +59,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 48. [x] **PostNL** — shipped · official paginated vacancy API with complete detail validation.
 49. [ ] **PGGM** — blocked/needs research · official custom source has current .NET roles; no reusable complete feed proved.
 50. [x] **NS** — shipped · NS custom/Hamilton feed.
-51. [ ] **Achmea** — blocked/needs research · live roles use a Hamilton/custom feed; compatibility with the NS implementation needs proof.
+51. [x] **Achmea** — shipped · Hamilton feed using the verified NS adapter profile.
 52. [ ] **a.s.r.** — blocked/needs research · live roles use an unsupported custom Vue/API source.
 53. [ ] **Nationale-Nederlanden** — blocked/needs research · live roles use an unsupported custom careers source.
 54. [ ] **Alliander** — blocked/needs research · live roles use an unsupported custom Next.js/API source.
