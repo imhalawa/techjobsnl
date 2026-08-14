@@ -663,3 +663,13 @@ enabled = true
 strategy = "successfactors"
 listing_url = "https://jobs.flatexdegiro.com/search/?q=&locationsearch=NL"
 employer = "flatexDEGIRO AG"
+
+[[companies]]
+id = "google"
+name = "Google"
+industry = "Software, Cloud computing, Artificial intelligence, Digital advertising, Consumer technology"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "google"
+search_url = "https://www.google.com/about/careers/applications/jobs/results/?company=Google&location=Netherlands&sort_by=date"

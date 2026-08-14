@@ -25,8 +25,8 @@ use job_watch::{
     scanner::ScanService,
     sources::{
         JobSource, afas, albert_heijn, amazon, anwb, ashby, bol, chipsoft, coolblue, deel, ebay,
-        eneco, exact, getnoticed, greenhouse, ing, jibe, lever, microsoft, ns, personio, postnl,
-        rabobank, recruitee, successfactors, uber, workable, workday, yuki,
+        eneco, exact, getnoticed, google, greenhouse, ing, jibe, lever, microsoft, ns, personio,
+        postnl, rabobank, recruitee, successfactors, uber, workable, workday, yuki,
     },
     storage::{JobQuery, ScanReadModel, SourceReadModel, Store},
     ui::{App, AppCommand, View, render},
@@ -655,6 +655,11 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     employer,
                     client.clone(),
                 ))),
+                SourceConfig::Google { search_url } => Ok(Arc::new(google::GoogleSource::new(
+                    &company.id,
+                    search_url,
+                    client.clone(),
+                ))),
                 SourceConfig::AlbertHeijn { base_url } => Ok(Arc::new(
                     albert_heijn::AlbertHeijnSource::new(&company.id, base_url, client.clone()),
                 )),
@@ -1036,7 +1041,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 60);
+        assert_eq!(migrated.companies.len(), 61);
         assert!(
             migrated
                 .companies
@@ -1392,7 +1397,8 @@ mod tests {
                 "uber",
                 "microsoft",
                 "klarna",
-                "flatexdegiro"
+                "flatexdegiro",
+                "google"
             ]
         );
 

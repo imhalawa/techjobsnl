@@ -223,6 +223,9 @@ pub enum SourceConfig {
         listing_url: String,
         employer: String,
     },
+    Google {
+        search_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -273,6 +276,7 @@ impl SourceConfig {
             Self::Microsoft { .. } => "Microsoft Careers API",
             Self::Deel { .. } => "Deel Jobs",
             Self::Successfactors { .. } => "SAP SuccessFactors HTML",
+            Self::Google { .. } => "Google Careers HTML",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -318,6 +322,7 @@ impl SourceConfig {
             Self::Microsoft { search_url } => search_url,
             Self::Deel { board_url } => board_url,
             Self::Successfactors { listing_url, .. } => listing_url,
+            Self::Google { search_url } => search_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -546,6 +551,18 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("listing_url"),
                     "must match flatexDEGIRO's exact official NL SuccessFactors board",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Google { search_url } => {
+            validate_https_url(search_url, path("search_url"))?;
+            if search_url
+                != "https://www.google.com/about/careers/applications/jobs/results/?company=Google&location=Netherlands&sort_by=date"
+            {
+                return Err(ConfigError::invalid(
+                    path("search_url"),
+                    "must be the exact official Google Netherlands search URL",
                 ));
             }
             Ok(())

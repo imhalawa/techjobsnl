@@ -53,7 +53,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 42. [ ] **OTC Flow** — blocked/needs research · first-party careers links to unsupported BambooHR.
 43. [ ] **Vitol** — blocked/needs research · complete SmartRecruiters feed had no Netherlands role.
 44. [x] **Amazon / AWS** — shipped · official Amazon Jobs API with exact Netherlands pagination and full descriptions.
-45. [ ] **Google** — blocked/needs research · official proprietary search has Netherlands results; no complete reusable feed proved.
+45. [x] **Google** — shipped · official server-rendered Netherlands search with exact total and pagination validation.
 46. [x] **Microsoft** — shipped · official Eightfold API with exact pagination, complete detail validation, and explicit Netherlands filtering.
 47. [ ] **Meta** — blocked/needs research · public/login-gated interface did not safely expose a current Netherlands vacancy.
 48. [x] **PostNL** — shipped · official paginated vacancy API with complete detail validation.
