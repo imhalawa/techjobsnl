@@ -83,9 +83,10 @@ cargo test --test structured_sources_test bol_live_returns_complete_unique_jobs_
 cargo test --test html_sources_test ing_live_returns_complete_unique_jobs -- --ignored --exact --nocapture
 cargo test --test getnoticed_test getnoticed_live_returns_complete_unique_abn_jobs -- --ignored --exact --nocapture
 cargo test --test ebay_test ebay_live_returns_complete_unique_netherlands_jobs -- --ignored --nocapture
+cargo test --test uber_test uber_live_returns_complete_unique_netherlands_jobs -- --ignored --exact --nocapture
 ```
 
-The live smoke tests check Mollie's, Airwallex's, DataSnipper's, Adyen's, Databricks', Reddit's, Booking.com's, Funda's, bol.com's, ING's, ABN AMRO's, and eBay's current public payloads. The offline suite is the deterministic verification path.
+The live smoke tests check every supported source, including Uber's current public Oracle HCM payload. The offline suite is the deterministic verification path.
 
 ## Company onboarding
 

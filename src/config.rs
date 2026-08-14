@@ -210,6 +210,9 @@ pub enum SourceConfig {
     Amazon {
         search_url: String,
     },
+    Uber {
+        api_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -256,6 +259,7 @@ impl SourceConfig {
             Self::Anwb { .. } => "ANWB JSON + JSON-LD",
             Self::Postnl { .. } => "PostNL paged API",
             Self::Amazon { .. } => "Amazon Jobs API",
+            Self::Uber { .. } => "Uber Oracle HCM API",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -297,6 +301,7 @@ impl SourceConfig {
             Self::Anwb { feed_url } => feed_url,
             Self::Postnl { api_url } => api_url,
             Self::Amazon { search_url } => search_url,
+            Self::Uber { api_url } => api_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -466,6 +471,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("search_url"),
                     "must be the exact official Amazon Netherlands search API",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Uber { api_url } => {
+            validate_https_url(api_url, path("api_url"))?;
+            if api_url != "https://iaziqy.fa.ocs.oraclecloud.com/hcmRestApi/resources/latest/" {
+                return Err(ConfigError::invalid(
+                    path("api_url"),
+                    "must be the official Uber Oracle HCM API",
                 ));
             }
             Ok(())

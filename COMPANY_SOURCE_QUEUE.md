@@ -9,7 +9,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 1. [x] **Backbase** — shipped · Greenhouse (`workatbackbase`).
 2. [x] **Bitvavo** — shipped · Ashby with verified `Headquarters = NL` override.
 3. [x] **Da Vinci Derivatives** — shipped · Greenhouse (`davinciderivatives`).
-4. [ ] **Uber** — blocked/needs research · official Amsterdam custom careers search; no reusable adapter or complete feed proved.
+4. [x] **Uber** — shipped · official Oracle HCM API with exact NL pagination and complete detail validation.
 5. [ ] **Optiver** — blocked · the official API declared 31 Amsterdam jobs on 2026-08-14, but declared `componentID 16321` returned HTTP 404 from its first-party detail URL, so an exact complete scan cannot currently succeed.
 6. [x] **IMC Trading** — shipped · Greenhouse (`imc`).
 7. [x] **Flow Traders** — shipped · Greenhouse (`flowtraders`).

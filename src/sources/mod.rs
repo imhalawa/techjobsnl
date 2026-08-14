@@ -21,6 +21,7 @@ pub mod personio;
 pub mod postnl;
 pub mod rabobank;
 pub mod recruitee;
+pub mod uber;
 pub mod workable;
 pub mod workday;
 pub mod yuki;
