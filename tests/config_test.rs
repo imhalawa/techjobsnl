@@ -349,6 +349,9 @@ fn rejects_empty_source_fields() {
             base_url: "https://rabobank.jobs".into(),
             country: " ".into(),
         },
+        SourceConfig::Eneco {
+            listing_url: " ".into(),
+        },
         SourceConfig::Ing {
             listing_url: "".into(),
         },
@@ -400,6 +403,9 @@ fn rejects_non_https_source_urls() {
         SourceConfig::Rabobank {
             base_url: "http://rabobank.jobs".into(),
             country: "nl".into(),
+        },
+        SourceConfig::Eneco {
+            listing_url: "http://www.werkenbijeneco.nl/vacatures?f=1270".into(),
         },
         SourceConfig::Ing {
             listing_url: "http://careers.ing.com/en/search-jobs".into(),

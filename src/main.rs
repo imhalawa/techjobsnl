@@ -17,7 +17,7 @@ use job_watch::{
     filter::EligibilityFilter,
     scanner::ScanService,
     sources::{
-        JobSource, ashby, bol, ebay, getnoticed, greenhouse, ing, jibe, rabobank, recruitee,
+        JobSource, ashby, bol, ebay, eneco, getnoticed, greenhouse, ing, jibe, rabobank, recruitee,
     },
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
@@ -291,6 +291,11 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                 SourceConfig::Rabobank { base_url, country } => Ok(Arc::new(
                     rabobank::RabobankSource::new(&company.id, base_url, country, client.clone()),
                 )),
+                SourceConfig::Eneco { listing_url } => Ok(Arc::new(eneco::EnecoSource::new(
+                    &company.id,
+                    listing_url,
+                    client.clone(),
+                ))),
                 SourceConfig::Ing { listing_url } => Ok(Arc::new(ing::IngSource::new(
                     &company.id,
                     listing_url,
@@ -652,10 +657,11 @@ mod tests {
         ));
 
         assert_eq!(eneco.len(), 1);
-        assert!(!eneco[0].enabled);
+        assert!(eneco[0].enabled);
         assert!(matches!(
             &eneco[0].source,
-            SourceConfig::Unsupported { reason } if reason == "legal employer not established"
+            SourceConfig::Eneco { listing_url }
+                if listing_url == "https://www.werkenbijeneco.nl/vacatures?f=1270"
         ));
 
         assert_eq!(ahold.len(), 1);
@@ -710,6 +716,7 @@ mod tests {
                 "funda",
                 "bol",
                 "rabobank",
+                "eneco",
                 "ing",
                 "abn-amro",
                 "datasnipper",

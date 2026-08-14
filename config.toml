@@ -99,10 +99,10 @@ country = "NL"
 [[companies]]
 id = "eneco"
 name = "Eneco"
-enabled = false
+enabled = true
 [companies.source]
-strategy = "unsupported"
-reason = "legal employer not established"
+strategy = "eneco"
+listing_url = "https://www.werkenbijeneco.nl/vacatures?f=1270"
 
 [[companies]]
 id = "ahold"

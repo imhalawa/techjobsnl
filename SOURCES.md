@@ -81,9 +81,10 @@
 ## Eneco
 
 - Sponsor candidates: the current IND public register lists `Eneco Zakelijk` (KvK `24296168`), `Eneco Diamond Hydrogen B.V.` (KvK `90411285`), and `N.V. Eneco` (KvK `24246970`): <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.
-- Official source: Eneco's public careers source returned 21 live postings on 2026-08-12. Each posting's `hiringOrganization` was only `Eneco`; it did not identify a legal employer or a KvK number that could be matched to a sponsor candidate.
+- Official source: <https://www.werkenbijeneco.nl/vacatures?f=1270>. The adapter walks every Tech listing page, requires the displayed total and ranges to remain complete, rejects duplicate IDs, and parses each official detail's `JobPosting` JSON-LD.
+- Live discovery: 11 complete Tech jobs on 2026-08-14. IDs were unique and every job had the required title, description, date, and Netherlands location. The count is volatile and is not hardcoded in the smoke test.
 - Privacy evidence: Eneco's privacy controller, `Eneco B.V.`, is not employment proof and must not be used to infer the hiring entity.
-- Policy: Eneco remains configured as disabled and unsupported because its legal employer is not established. Re-enable it only when an official vacancy or employment document names the legal entity and its KvK number matches a current IND-recognised sponsor.
+- Hiring entity: each vacancy identifies only `Eneco`. The exact employment-contract entity remains unproven; confirm it before relying on sponsor status.
 
 ## Albert Heijn Tech
 
