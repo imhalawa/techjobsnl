@@ -531,3 +531,13 @@ location_country_overrides = { Headquarters = "NL" }
 [companies.source]
 strategy = "ashby"
 board = "bitvavo"
+
+[[companies]]
+id = "exact"
+name = "Exact"
+industry = "Accounting software, ERP, HR software, B2B SaaS"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "exact"
+listing_url = "https://www.exact.com/careers/vacancies"

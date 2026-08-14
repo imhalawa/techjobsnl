@@ -1,5 +1,11 @@
 # Source and sponsor evidence
 
+## Exact
+
+- Official source: <https://www.exact.com/careers/vacancies>. The board exposes complete 20-item pagination, explicit country labels, stable vacancy IDs, and JobPosting JSON-LD details.
+- Exact's official company profile reports more than 2,000 employees and 675,000 customers: <https://www.exact.com/about-us>.
+- Sponsorship varies by vacancy; some current roles explicitly reject applicants who need visa sponsorship. Check each vacancy before applying.
+
 ## Bitvavo
 
 - Official source: <https://api.ashbyhq.com/posting-api/job-board/bitvavo>. Bitvavo's official careers site labels the same roles as Amsterdam while Ashby calls the location `Headquarters`: <https://jobs.bitvavo.com/find-your-role>.
