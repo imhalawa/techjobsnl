@@ -86,6 +86,17 @@ fn parses_complete_ashby_board() {
 }
 
 #[test]
+fn resolves_an_ashby_location_when_the_optional_address_is_null() {
+    let mut board = fixture_board();
+    board["jobs"][0]["address"] = serde_json::Value::Null;
+    board["jobs"][0]["location"] = "Amsterdam".into();
+
+    let jobs = parse_ashby_response("mollie", &board.to_string()).unwrap();
+
+    assert_eq!(jobs[0].countries, ["NL"]);
+}
+
+#[test]
 fn excludes_unlisted_jobs_from_the_board() {
     let mut board = fixture_board();
     board["jobs"][1]["isListed"] = false.into();

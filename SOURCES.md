@@ -1,5 +1,28 @@
 # Source and sponsor evidence
 
+## Hosted ATS expansion
+
+The following enabled companies use the same complete-board adapters documented elsewhere in this file. Every Greenhouse source is filtered to explicit Netherlands offices; Recruitee and Ashby scans consume their complete public board before the application filter runs.
+
+- IMC Trading: <https://boards-api.greenhouse.io/v1/boards/imc/jobs?content=true>
+- Flow Traders: <https://boards-api.greenhouse.io/v1/boards/flowtraders/jobs?content=true>
+- bunq: <https://bunq.recruitee.com/api/offers/>
+- DPG Media: <https://vacatures.dpgmedia.nl/api/offers/>
+- Miro: <https://api.ashbyhq.com/posting-api/job-board/miro>
+- Checkout.com: <https://api.ashbyhq.com/posting-api/job-board/checkout.com>
+- Fourthline: <https://boards-api.greenhouse.io/v1/boards/fourthline/jobs?content=true>
+- Ockto: <https://ockto.recruitee.com/api/offers/>
+- DRW: <https://boards-api.greenhouse.io/v1/boards/drweng/jobs?content=true>
+- Jump Trading: <https://boards-api.greenhouse.io/v1/boards/jumptrading/jobs?content=true>
+- Tower Research: <https://boards-api.greenhouse.io/v1/boards/towerresearchcapital/jobs?content=true>
+- WEBB Traders: <https://webbtraders.recruitee.com/api/offers/>
+- STX Group: <https://boards-api.greenhouse.io/v1/boards/stxgroup/jobs?content=true>
+- Elastic: <https://boards-api.greenhouse.io/v1/boards/elastic/jobs?content=true>
+- MultiSafepay: <https://careers.multisafepay.com/api/offers/>
+- ACT Commodities: <https://boards-api.greenhouse.io/v1/boards/testendouble/jobs?content=true>. The unusual board token is linked by ACT's official careers site.
+
+Each board names the company brand, not necessarily the legal employer for every contract. Confirm the employment entity before relying on sponsor status. Scale bands are approximate public headcount bands and should be rechecked when companies publish newer first-party figures.
+
 ## Da Vinci
 
 - Official source: <https://boards-api.greenhouse.io/v1/boards/davinciderivatives/jobs?content=true>. The Greenhouse payload declares its complete global total; the configured country filter keeps only vacancies with an explicit Netherlands office.

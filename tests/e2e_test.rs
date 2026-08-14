@@ -128,6 +128,22 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
             "CM.com",
             "Yuki",
             "Reddit",
+            "IMC Trading",
+            "Flow Traders",
+            "bunq",
+            "DPG Media",
+            "Miro",
+            "Checkout.com",
+            "Fourthline",
+            "Ockto",
+            "DRW",
+            "Jump Trading",
+            "Tower Research",
+            "WEBB Traders",
+            "STX Group",
+            "Elastic",
+            "MultiSafepay",
+            "ACT Commodities",
         ]
     );
 
