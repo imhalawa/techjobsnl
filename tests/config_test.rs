@@ -327,7 +327,10 @@ fn parses_and_validates_every_source_strategy() {
 fn rejects_empty_source_fields() {
     let cases = [
         SourceConfig::Ashby { board: " ".into() },
-        SourceConfig::Greenhouse { board: "".into() },
+        SourceConfig::Greenhouse {
+            board: "".into(),
+            country_filter: None,
+        },
         SourceConfig::Jibe {
             base_url: "https://jobs.booking.com".into(),
             client: " ".into(),

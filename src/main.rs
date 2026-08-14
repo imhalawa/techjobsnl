@@ -262,8 +262,12 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     board,
                     client.clone(),
                 ))),
-                SourceConfig::Greenhouse { board } => Ok(Arc::new(
-                    greenhouse::GreenhouseSource::new(&company.id, board, client.clone()),
+                SourceConfig::Greenhouse {
+                    board,
+                    country_filter,
+                } => Ok(Arc::new(
+                    greenhouse::GreenhouseSource::new(&company.id, board, client.clone())
+                        .with_country_filter(country_filter.as_deref()),
                 )),
                 SourceConfig::Jibe {
                     base_url,
@@ -579,12 +583,20 @@ mod tests {
             .iter()
             .filter(|company| company.id == "datasnipper")
             .collect::<Vec<_>>();
+        let databricks = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "databricks")
+            .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
         assert!(adyen[0].enabled);
         assert!(matches!(
             &adyen[0].source,
-            SourceConfig::Greenhouse { board } if board == "adyen"
+            SourceConfig::Greenhouse {
+                board,
+                country_filter: None,
+            } if board == "adyen"
         ));
 
         assert_eq!(funda.len(), 1);
@@ -651,6 +663,16 @@ mod tests {
             SourceConfig::Ashby { board } if board == "datasnipper"
         ));
 
+        assert_eq!(databricks.len(), 1);
+        assert!(databricks[0].enabled);
+        assert!(matches!(
+            &databricks[0].source,
+            SourceConfig::Greenhouse {
+                board,
+                country_filter: Some(country_filter),
+            } if board == "databricks" && country_filter == "NL"
+        ));
+
         let enabled_ids = config
             .companies
             .iter()
@@ -669,7 +691,8 @@ mod tests {
                 "bol",
                 "ing",
                 "abn-amro",
-                "datasnipper"
+                "datasnipper",
+                "databricks"
             ]
         );
 

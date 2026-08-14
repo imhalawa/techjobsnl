@@ -127,6 +127,7 @@ pub enum SourceConfig {
     },
     Greenhouse {
         board: String,
+        country_filter: Option<String>,
     },
     Jibe {
         base_url: String,
@@ -161,8 +162,16 @@ pub enum SourceConfig {
 fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigError> {
     let path = |field: &str| format!("companies[{index}].source.{field}");
     match &company.source {
-        SourceConfig::Ashby { board } | SourceConfig::Greenhouse { board } => {
-            validate_non_empty(board, path("board"))
+        SourceConfig::Ashby { board } => validate_non_empty(board, path("board")),
+        SourceConfig::Greenhouse {
+            board,
+            country_filter,
+        } => {
+            validate_non_empty(board, path("board"))?;
+            if let Some(country) = country_filter {
+                validate_country(country, path("country_filter"))?;
+            }
+            Ok(())
         }
         SourceConfig::Jibe { base_url, client } => {
             validate_https_url(base_url, path("base_url"))?;

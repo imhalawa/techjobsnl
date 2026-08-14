@@ -135,3 +135,12 @@ enabled = true
 [companies.source]
 strategy = "ashby"
 board = "datasnipper"
+
+[[companies]]
+id = "databricks"
+name = "Databricks"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "databricks"
+country_filter = "NL"

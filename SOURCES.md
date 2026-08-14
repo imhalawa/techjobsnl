@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Databricks
+
+- Sponsor: the IND public register for work dated 2026-08-03 lists `Databricks` with KvK `51208121`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.
+- Hiring entity: the register omits a legal-form suffix and the vacancies identify only the Databricks brand. Confirm the exact Dutch employment entity and KvK number before relying on sponsor status.
+- Official source: <https://boards-api.greenhouse.io/v1/boards/databricks/jobs?content=true>. The API's `meta.total` verifies the complete global payload. The configured country filter then accepts only jobs with an explicit Netherlands office, avoiding unsafe country guesses for regional labels such as `APAC` and `EMEA`.
+- Live discovery: 18 complete Netherlands jobs on 2026-08-14. IDs were unique and every accepted job had the parser-required fields. The count is volatile and is not hardcoded in the smoke test.
+
 ## DataSnipper
 
 - Sponsor: the IND public register for work dated 2026-08-03 lists `DataSnipper B.V.` with KvK `69343861`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>. DataSnipper's official terms identify the Amsterdam entity with the same legal name and KvK number: <https://www.datasnipper.com/pdf-proxy.pdf?url=https%3A%2F%2Feu-assets.contentstack.com%2Fv3%2Fassets%2Fbltc08aa646f32b9827%2Fblt2109238ccab969a1%2F696a12bc34206b2e8465af0d%2FDataSnipper_Terms_and_Conditions_-_Version_2025-07-01.pdf>.

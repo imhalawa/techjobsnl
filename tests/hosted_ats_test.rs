@@ -1,15 +1,40 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use job_watch::{
+    config::Config,
     domain::{ObservedJob, SourceErrorKind, SourceScan},
+    filter::EligibilityFilter,
     sources::{
         JobSource,
         ashby::build_client,
-        greenhouse::{GreenhouseSource, parse_greenhouse_response},
+        greenhouse::{
+            GreenhouseSource, parse_greenhouse_response, parse_greenhouse_response_for_country,
+        },
         jibe::{JibeSource, parse_jibe_pages},
         recruitee::{RecruiteeSource, parse_recruitee_response},
     },
 };
+
+#[test]
+fn parses_and_filters_sanitized_databricks_board() {
+    let jobs = parse_greenhouse_response_for_country(
+        "databricks",
+        include_str!("fixtures/greenhouse/databricks.json"),
+        "NL",
+    )
+    .unwrap();
+    let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
+    let filter = EligibilityFilter::new(&config.filters).unwrap();
+
+    assert_eq!(jobs.len(), 1);
+    assert_eq!(jobs[0].title, "Software Engineer - Backend");
+    assert_eq!(jobs[0].locations, ["Amsterdam, Netherlands"]);
+    assert_eq!(jobs[0].countries, ["NL"]);
+    assert!(filter.classify(&jobs[0], &HashMap::new()).unwrap().eligible);
+}
 
 #[test]
 fn parses_complete_greenhouse_board() {
@@ -229,6 +254,23 @@ async fn greenhouse_live_returns_complete_unique_jobs() {
     let source = GreenhouseSource::new("adyen", "adyen", client);
     let jobs = complete_jobs(source.scan().await.unwrap());
     assert_live_jobs("Adyen", &jobs);
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn databricks_live_returns_complete_unique_netherlands_jobs() {
+    let source = GreenhouseSource::new("databricks", "databricks", live_client())
+        .with_country_filter(Some("NL"));
+    let jobs = complete_jobs(source.scan().await.unwrap());
+    assert_live_jobs("Databricks", &jobs);
+
+    let config = Config::load(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml")).unwrap();
+    let filter = EligibilityFilter::new(&config.filters).unwrap();
+    assert!(jobs.iter().any(|job| {
+        filter
+            .classify(job, &HashMap::new())
+            .is_ok_and(|result| result.eligible)
+    }));
 }
 
 #[tokio::test]

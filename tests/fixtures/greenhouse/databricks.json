@@ -1,0 +1,32 @@
+{
+  "jobs": [
+    {
+      "id": 201,
+      "title": "Software Engineer - Backend",
+      "updated_at": "2026-08-14T10:00:00Z",
+      "absolute_url": "https://jobs.example.test/databricks/201",
+      "content": "&lt;p&gt;Build reliable data platform services.&lt;/p&gt;",
+      "offices": [
+        {
+          "id": 1,
+          "name": "Amsterdam, Netherlands",
+          "location": "Amsterdam, Netherlands"
+        }
+      ],
+      "departments": [
+        { "id": 10, "name": "Engineering" }
+      ]
+    },
+    {
+      "id": 202,
+      "title": "Account Executive",
+      "updated_at": "2026-08-14T10:00:00Z",
+      "absolute_url": "https://jobs.example.test/databricks/202",
+      "content": "&lt;p&gt;Work with customers.&lt;/p&gt;",
+      "offices": [
+        { "id": 2, "name": "APAC", "location": "APAC" }
+      ]
+    }
+  ],
+  "meta": { "total": 2 }
+}
