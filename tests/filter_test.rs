@@ -17,8 +17,11 @@ type FilterCase = (
 fn filters() -> FiltersConfig {
     FiltersConfig {
         countries: vec!["NL".into()],
-        include_families: vec!["software".into(), "platform".into()],
-        include_title_patterns: vec!["principal engineer".into()],
+        new_job_max_age_days: 7,
+        include_title_patterns: vec![
+            "software engineer|platform engineer".into(),
+            "principal engineer".into(),
+        ],
         exclude_title_patterns: vec!["manager".into()],
     }
 }
@@ -55,7 +58,7 @@ fn classifies_country_role_and_overrides() {
         (
             observed("Software Engineer", &["Lisbon"], &["PT"]),
             HashMap::new(),
-            Ok((false, "outside-netherlands")),
+            Ok((false, "outside-configured-countries")),
         ),
         (
             observed("Engineering Manager", &["Amsterdam"], &["NL"]),
@@ -94,11 +97,36 @@ fn unresolved_location_makes_the_result_incomplete() {
 }
 
 #[test]
-fn rejects_filters_that_include_a_non_nl_country() {
+fn configured_countries_are_not_hardcoded_to_the_netherlands() {
     let mut config = filters();
-    config.countries.push("DE".into());
+    config.countries = vec!["DE".into()];
+    let filter = EligibilityFilter::new(&config).unwrap();
 
-    let error = EligibilityFilter::new(&config).unwrap_err();
+    assert!(
+        filter
+            .classify(
+                &observed("Software Engineer", &["Berlin"], &["DE"]),
+                &HashMap::new(),
+            )
+            .unwrap()
+            .eligible
+    );
+}
 
-    assert_eq!(error, FilterError::UnsupportedCountry("DE".into()));
+#[test]
+fn empty_title_filters_include_non_engineering_jobs() {
+    let mut config = filters();
+    config.include_title_patterns.clear();
+    config.exclude_title_patterns.clear();
+    let filter = EligibilityFilter::new(&config).unwrap();
+
+    assert!(
+        filter
+            .classify(
+                &observed("Senior Legal Counsel", &["Amsterdam"], &["NL"]),
+                &HashMap::new(),
+            )
+            .unwrap()
+            .eligible
+    );
 }

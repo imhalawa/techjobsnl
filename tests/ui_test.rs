@@ -1,19 +1,24 @@
 use std::collections::HashMap;
 
 use chrono::{TimeZone, Utc};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use job_watch::{
     config::{
-        CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig, SourceConfig,
-        ThemeOverrides, UiConfig,
+        AnalyticsConfig, CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig,
+        SourceConfig, ThemeOverrides, UiConfig,
     },
     domain::{
         ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanEvent, SourceErrorKind,
     },
     storage::{ScanOutcome, ScanReadModel, SourceHealth, SourceReadModel},
-    ui::{App, AppCommand, IconSet, InputMode, Theme, View, render},
+    ui::{App, AppCommand, IconSet, InputMode, MouseTarget, Theme, View, render},
 };
-use ratatui::{Terminal, backend::TestBackend, buffer::Buffer, style::Color};
+use ratatui::{
+    Terminal,
+    backend::TestBackend,
+    buffer::Buffer,
+    style::{Color, Modifier},
+};
 use serde_json::json;
 
 fn rendered(app: &App, width: u16, height: u16) -> String {
@@ -70,7 +75,7 @@ fn config() -> Config {
         }],
         filters: FiltersConfig {
             countries: vec!["NL".into()],
-            include_families: vec![],
+            new_job_max_age_days: 7,
             include_title_patterns: vec![],
             exclude_title_patterns: vec![],
         },
@@ -80,6 +85,7 @@ fn config() -> Config {
             retry_count: 0,
             user_agent: "ui-test".into(),
         },
+        analytics: AnalyticsConfig::default(),
         ui: UiConfig {
             theme: "clean-dark".into(),
             unicode_icons: true,
@@ -121,6 +127,29 @@ fn special(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
 }
 
+fn mouse(kind: MouseEventKind, column: u16, row: u16) -> MouseEvent {
+    MouseEvent {
+        kind,
+        column,
+        row,
+        modifiers: KeyModifiers::NONE,
+    }
+}
+
+fn open_view(app: &mut App, index: usize) {
+    app.handle_key(special(KeyCode::Tab));
+    for _ in 0..7 {
+        app.handle_key(special(KeyCode::Up));
+    }
+    for _ in 0..index {
+        app.handle_key(special(KeyCode::Down));
+    }
+    assert_eq!(
+        app.handle_key(special(KeyCode::Enter)),
+        AppCommand::ReloadJobs
+    );
+}
+
 fn job(title: &str, is_new: bool, applied: bool) -> JobRecord {
     job_for("acme", title, is_new, applied)
 }
@@ -142,7 +171,7 @@ fn job_for(company_id: &str, title: &str, is_new: bool, applied: bool) -> JobRec
                 apply_url: "https://example.test/apply".into(),
                 description: "Build reliable systems.".into(),
                 raw_payload: json!({}),
-                published_at: Some(seen_at),
+                published_at: is_new.then(Utc::now),
             },
             eligibility: Eligibility {
                 eligible: true,
@@ -339,7 +368,7 @@ fn explicit_view_change_keeps_first_row_after_reload_instead_of_stale_identity()
 }
 
 #[test]
-fn fixed_navigation_controls_move_jobs_scroll_details_and_switch_views() {
+fn arrows_stay_in_content_and_tabs_use_select_then_enter() {
     let mut app = App::new(
         config(),
         vec![
@@ -358,41 +387,457 @@ fn fixed_navigation_controls_move_jobs_scroll_details_and_switch_views() {
     assert_eq!(app.handle_key(key('K')), AppCommand::None);
     assert_eq!(app.detail_scroll(), 0);
 
-    assert_eq!(
-        app.handle_key(special(KeyCode::Right)),
-        AppCommand::ReloadJobs
-    );
+    assert_eq!(app.handle_key(special(KeyCode::Right)), AppCommand::None);
+    assert_eq!(app.view(), View::Active);
+    open_view(&mut app, 1);
     assert_eq!(app.view(), View::New);
     assert_eq!(app.visible_jobs().count(), 1);
-    assert_eq!(
-        app.handle_key(special(KeyCode::Right)),
-        AppCommand::ReloadJobs
-    );
+    open_view(&mut app, 2);
     assert_eq!(app.view(), View::Applied);
     assert_eq!(app.visible_jobs().count(), 1);
-    assert_eq!(
-        app.handle_key(special(KeyCode::Left)),
-        AppCommand::ReloadJobs
-    );
+    open_view(&mut app, 1);
     assert_eq!(app.view(), View::New);
 
     assert_eq!(app.handle_key(key('h')), AppCommand::ReloadJobs);
     assert_eq!(app.view(), View::History);
-    assert_eq!(
-        app.handle_key(special(KeyCode::Right)),
-        AppCommand::ReloadJobs
-    );
+    open_view(&mut app, 4);
     assert_eq!(app.view(), View::Scans);
-    assert_eq!(
-        app.handle_key(special(KeyCode::Right)),
-        AppCommand::ReloadJobs
-    );
+    open_view(&mut app, 5);
     assert_eq!(app.view(), View::Sources);
+    open_view(&mut app, 6);
+    assert_eq!(app.view(), View::Analytics);
+    open_view(&mut app, 0);
+    assert_eq!(app.view(), View::Active);
+}
+
+#[test]
+fn mouse_hover_click_focus_and_wheel_match_the_existing_ui_actions() {
+    let mut app = App::new(
+        config(),
+        vec![
+            job("Backend Engineer", false, false),
+            job("Platform Engineer", false, false),
+        ],
+    );
+
+    app.handle_mouse(mouse(MouseEventKind::Moved, 24, 3), 140, 30);
+    assert!(app.hovered(MouseTarget::Item(1)));
+    let buffer = rendered_buffer(&app, 140, 30);
+    assert!((22..78).any(|x| {
+        buffer
+            .cell((x, 3))
+            .is_some_and(|cell| cell.bg == app.theme().hovered_row)
+    }));
+
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 24, 3),
+        140,
+        30,
+    );
+    assert_eq!(app.selected_index(), 1);
+    assert!(app.pressed(MouseTarget::Item(1)));
+    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 24, 3), 140, 30);
+    assert!(!app.pressed(MouseTarget::Item(1)));
+
+    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 100, 5), 140, 30);
+    assert_eq!(app.detail_scroll(), 3);
+
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 2, 2),
+        140,
+        30,
+    );
     assert_eq!(
-        app.handle_key(special(KeyCode::Right)),
+        app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 2, 2), 140, 30,),
         AppCommand::ReloadJobs
     );
-    assert_eq!(app.view(), View::Active);
+    assert_eq!(app.view(), View::New);
+
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 2, 8),
+        140,
+        30,
+    );
+    assert_eq!(
+        app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 2, 8), 140, 30,),
+        AppCommand::ReloadJobs
+    );
+    assert_eq!(app.view(), View::Settings);
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 30, 2),
+        140,
+        30,
+    );
+    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 30, 2), 140, 30);
+    assert_eq!(app.input_mode(), InputMode::Setting);
+
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 139, 29),
+        140,
+        30,
+    );
+    app.handle_mouse(
+        mouse(MouseEventKind::Up(MouseButton::Left), 139, 29),
+        140,
+        30,
+    );
+    assert!(app.help_visible());
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 10, 10),
+        140,
+        30,
+    );
+    app.handle_mouse(
+        mouse(MouseEventKind::Up(MouseButton::Left), 10, 10),
+        140,
+        30,
+    );
+    assert!(!app.help_visible());
+}
+
+#[test]
+fn mouse_drag_resizes_job_panes_and_clamps_both_minimum_widths() {
+    let mut app = App::new(config(), vec![job("Backend Engineer", false, false)]);
+
+    app.handle_mouse(mouse(MouseEventKind::Moved, 44, 5), 100, 30);
+    assert!(app.hovered(MouseTarget::Divider));
+    assert_eq!(
+        rendered_buffer(&app, 100, 30).cell((44, 5)).unwrap().fg,
+        app.theme().new
+    );
+
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 44, 5),
+        100,
+        30,
+    );
+    app.handle_mouse(
+        mouse(MouseEventKind::Drag(MouseButton::Left), 59, 5),
+        100,
+        30,
+    );
+    assert!(app.pressed(MouseTarget::Divider));
+    assert_eq!(
+        rendered_buffer(&app, 100, 30).cell((59, 5)).unwrap().fg,
+        app.theme().warning
+    );
+    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 59, 5), 100, 30);
+    assert_eq!(symbol_x(&rendered_buffer(&app, 100, 30), 0, 0, "J"), 60);
+
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 59, 5),
+        100,
+        30,
+    );
+    app.handle_mouse(
+        mouse(MouseEventKind::Drag(MouseButton::Left), 0, 5),
+        100,
+        30,
+    );
+    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 0, 5), 100, 30);
+    assert_eq!(symbol_x(&rendered_buffer(&app, 100, 30), 0, 0, "J"), 30);
+
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 29, 5),
+        100,
+        30,
+    );
+    app.handle_mouse(
+        mouse(MouseEventKind::Drag(MouseButton::Left), 99, 5),
+        100,
+        30,
+    );
+    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 99, 5), 100, 30);
+    assert_eq!(symbol_x(&rendered_buffer(&app, 100, 30), 0, 0, "J"), 64);
+}
+
+#[test]
+fn settings_edits_new_job_age_and_new_view_uses_publication_date() {
+    let mut recent = job("Recent Engineer", true, false);
+    recent.classified.observed.published_at = Some(Utc::now() - chrono::Duration::days(6));
+    let mut old = job("Old Engineer", false, false);
+    old.classified.observed.published_at = Some(Utc::now() - chrono::Duration::days(8));
+    let no_date = job("Unknown Date Engineer", false, false);
+    let mut app = App::new(config(), vec![recent, old, no_date]);
+
+    open_view(&mut app, 1);
+    assert_eq!(app.visible_jobs().count(), 1);
+    assert_eq!(
+        app.selected_job().unwrap().classified.observed.title,
+        "Recent Engineer"
+    );
+
+    open_view(&mut app, 7);
+    assert!(rendered(&app, 120, 24).contains("New job age  7 days"));
+    assert_eq!(app.handle_key(special(KeyCode::Enter)), AppCommand::None);
+    assert_eq!(app.input_mode(), InputMode::Setting);
+    app.handle_key(special(KeyCode::Backspace));
+    app.handle_key(key('1'));
+    app.handle_key(key('4'));
+    let mut filters = config().filters;
+    filters.new_job_max_age_days = 14;
+    assert_eq!(
+        app.handle_key(special(KeyCode::Enter)),
+        AppCommand::SaveFilters(filters)
+    );
+}
+
+#[test]
+fn settings_can_clear_title_filters_to_show_every_job_type() {
+    let mut configured = config();
+    configured.filters.include_title_patterns = vec!["engineer|developer".into()];
+    configured.filters.exclude_title_patterns = vec!["manager".into()];
+    let mut app = App::new(configured.clone(), vec![]);
+
+    open_view(&mut app, 7);
+    app.handle_key(special(KeyCode::Down));
+    app.handle_key(special(KeyCode::Down));
+    app.handle_key(special(KeyCode::Enter));
+    for _ in 0..app.setting_input().chars().count() {
+        app.handle_key(special(KeyCode::Backspace));
+    }
+    let mut expected = configured.filters;
+    expected.include_title_patterns.clear();
+
+    assert_eq!(
+        app.handle_key(special(KeyCode::Enter)),
+        AppCommand::SaveFilters(expected.clone())
+    );
+    app.apply_filters(expected);
+    assert!(rendered(&app, 120, 24).contains("Included titles  All titles"));
+}
+
+#[test]
+fn analytics_counts_description_skills_and_lists_matching_cached_jobs() {
+    let mut configured = config();
+    configured.analytics.skills = std::collections::BTreeMap::from([
+        ("AWS".into(), vec!["aws".into()]),
+        ("Go".into(), vec!["go".into(), "golang".into()]),
+    ]);
+    configured.analytics.minimum_cooccurrence = 1;
+    let mut cloud = job("Cloud Engineer", false, false);
+    cloud.classified.observed.description = "Build services in AWS and Go.".into();
+    let mut data = job("Data Engineer", false, false);
+    data.classified.observed.description = "Run data workloads on AWS.".into();
+    let mut legal = job("Legal Counsel", false, false);
+    legal.classified.observed.description = "Support ongoing contract work.".into();
+    let mut app = App::new(configured, vec![cloud, data, legal]);
+
+    open_view(&mut app, 6);
+    assert_eq!(
+        app.skill_stats()
+            .iter()
+            .map(|skill| (skill.name.as_str(), skill.job_count))
+            .collect::<Vec<_>>(),
+        vec![("AWS", 2), ("Go", 1)]
+    );
+    let screen = rendered(&app, 160, 24);
+    assert!(screen.contains("Observed skills · 2 skills · 3 jobs · 3/3 descriptions"));
+    assert!(screen.contains("AWS"));
+    assert!(screen.contains("2 jobs · 66%"));
+    assert!(screen.contains("Related skills · 1 · minimum 1 shared jobs"));
+    assert!(screen.contains("50.0% · 1 jobs"));
+    let coverage = app.analytics_coverage();
+    assert_eq!(coverage.descriptions, 3);
+    assert_eq!(coverage.employment_type, 3);
+    assert_eq!(coverage.work_mode, 0);
+    assert!(screen.contains("Cloud Engineer"));
+    assert!(screen.contains("Data Engineer"));
+    assert!(!screen.contains("Legal Counsel"));
+
+    app.handle_key(special(KeyCode::Down));
+    let details = normalized_interior(&rendered_buffer(&app, 120, 24));
+    assert!(details.contains("Observed in 1 of 3 descriptions"));
+    assert!(details.contains("(33%)."));
+    assert!(details.contains("Cloud Engineer"));
+    assert!(!details.contains("Legal Counsel"));
+}
+
+#[test]
+fn analytics_matching_jobs_are_bounded_and_open_with_keyboard_or_mouse() {
+    let mut configured = config();
+    configured.analytics.skills =
+        std::collections::BTreeMap::from([("Python".into(), vec!["python".into()])]);
+    let mut first = job("Backend Engineer", false, false);
+    first.classified.observed.description = "Build services with Python.".into();
+    first.classified.observed.job_url = "https://example.test/first".into();
+    let mut second = job("Data Engineer", false, false);
+    second.classified.observed.description = "Production Python pipelines.".into();
+    second.classified.observed.job_url = "https://example.test/second".into();
+    let mut app = App::new(configured, vec![first, second]);
+    open_view(&mut app, 6);
+
+    assert_eq!(app.handle_key(key('J')), AppCommand::None);
+    assert_eq!(
+        app.handle_key(special(KeyCode::Enter)),
+        AppCommand::OpenUrl("https://example.test/second".into())
+    );
+    for _ in 0..100 {
+        app.handle_key(key('J'));
+    }
+    assert_eq!(
+        app.handle_key(special(KeyCode::Enter)),
+        AppCommand::OpenUrl("https://example.test/second".into())
+    );
+
+    assert_eq!(
+        app.handle_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), 75, 17),
+            120,
+            24,
+        ),
+        AppCommand::None
+    );
+    assert_eq!(
+        app.handle_mouse(
+            mouse(MouseEventKind::Up(MouseButton::Left), 75, 17),
+            120,
+            24,
+        ),
+        AppCommand::OpenUrl("https://example.test/first".into())
+    );
+}
+
+#[test]
+fn overflowing_analytics_evidence_has_a_visible_scrollbar() {
+    let mut configured = config();
+    configured.analytics.skills =
+        std::collections::BTreeMap::from([("Python".into(), vec!["python".into()])]);
+    let jobs = (0..12)
+        .map(|index| {
+            let mut item = job(&format!("Python Engineer {index}"), false, false);
+            item.classified.observed.description = "Production Python services.".into();
+            item
+        })
+        .collect();
+    let mut app = App::new(configured, jobs);
+    open_view(&mut app, 6);
+
+    let buffer = rendered_buffer(&app, 120, 24);
+    assert!((16..23).any(|y| buffer.cell((119, y)).unwrap().symbol() == "█"));
+}
+
+#[test]
+fn reported_listing_views_show_their_totals() {
+    let mut configured = config_with_two_companies();
+    configured.analytics.skills =
+        std::collections::BTreeMap::from([("Python".into(), vec!["python".into()])]);
+    let mut first = job("Python Engineer", true, false);
+    first.classified.observed.description = "Build Python services.".into();
+    let second = job_for("beta", "Platform Engineer", false, false);
+    let mut app = App::new(configured, vec![first, second]);
+    app.replace_read_models(
+        vec![ScanReadModel {
+            run_id: "run-1".into(),
+            company_id: "acme".into(),
+            company_name: "Acme".into(),
+            completed_at: Utc::now(),
+            outcome: ScanOutcome::Complete,
+            observed_count: 2,
+            error_kind: None,
+            diagnostic: None,
+        }],
+        vec![SourceReadModel {
+            company_id: "acme".into(),
+            company_name: "Acme".into(),
+            enabled: true,
+            latest_attempted_at: None,
+            latest_successful_at: None,
+            health: SourceHealth::Healthy,
+            latest_error_kind: None,
+            diagnostic: None,
+        }],
+    );
+
+    assert!(rendered(&app, 120, 24).contains("Active jobs · 2"));
+    open_view(&mut app, 6);
+    let analytics = rendered(&app, 120, 24);
+    assert!(analytics.contains("Observed skills · 1 skill · 2 jobs"));
+    assert!(analytics.contains("Related skills · 0"));
+    assert!(analytics.contains("Evidence and matching jobs · 1"));
+    open_view(&mut app, 4);
+    assert!(rendered(&app, 120, 24).contains("Recent scans · 1"));
+    open_view(&mut app, 5);
+    assert!(rendered(&app, 120, 24).contains("Sources · 1"));
+    open_view(&mut app, 7);
+    assert!(rendered(&app, 120, 24).contains("Settings · 4"));
+}
+
+#[test]
+fn reported_list_scrollbar_reaches_the_end_with_the_last_row() {
+    let jobs = (0..12)
+        .map(|index| job(&format!("Engineer {index}"), false, false))
+        .collect();
+    let mut app = App::new(config(), jobs);
+    for _ in 0..11 {
+        app.handle_key(key('j'));
+    }
+
+    let buffer = rendered_buffer(&app, 79, 12);
+    let down = (1..11)
+        .find(|y| buffer.cell((78, *y)).unwrap().symbol() == "▼")
+        .unwrap();
+    assert_eq!(
+        (1..down)
+            .filter(|y| buffer.cell((78, *y)).unwrap().symbol() == "█")
+            .max(),
+        Some(down - 1)
+    );
+}
+
+#[test]
+fn reported_description_scroll_is_visible_and_stops_at_the_real_end() {
+    let mut long = job("Backend Engineer", false, false);
+    long.classified.observed.description = (0..30)
+        .map(|index| format!("Description line {index}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut app = App::new(config(), vec![long]);
+    for _ in 0..100 {
+        app.handle_key_with_width(key('J'), 100);
+    }
+
+    let buffer = rendered_buffer(&app, 100, 20);
+    assert!((1..18).any(|y| buffer.cell((99, y)).unwrap().symbol() == "█"));
+    assert!(normalized_interior(&buffer).contains("Description line 29"));
+    let at_end = app.detail_scroll();
+    app.handle_key_with_width(key('J'), 100);
+    assert_eq!(app.detail_scroll(), at_end);
+}
+
+#[test]
+fn reported_default_analytics_include_dotnet_without_matching_unrelated_text() {
+    let mut dotnet = job(".NET Engineer", false, false);
+    dotnet.classified.observed.description = "Build ASP.NET services with C# and dotnet.".into();
+    let mut unrelated = job("Writer", false, false);
+    unrelated.classified.observed.description = "Maintain the intranet documentation.".into();
+    let mut app = App::new(config(), vec![dotnet, unrelated]);
+
+    open_view(&mut app, 6);
+    let screen = rendered(&app, 120, 24);
+    assert!(screen.contains(".NET"));
+    assert!(screen.contains(".NET Engineer"));
+    assert!(!screen.contains("Writer"));
+}
+
+#[test]
+fn description_renders_markdown_structure_and_inline_emphasis() {
+    let mut markdown_job = job("Markdown Engineer", false, false);
+    markdown_job.classified.observed.description =
+        "## Role\n\nBuild **reliable** systems.\n\n- Ship `code`".into();
+    let app = App::new(config(), vec![markdown_job]);
+    let buffer = rendered_buffer(&app, 120, 24);
+    let screen: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
+
+    assert!(screen.contains("Role"));
+    assert!(screen.contains("• Ship code"));
+    assert!(!screen.contains("## Role"));
+    assert!(
+        buffer
+            .content()
+            .iter()
+            .any(|cell| cell.symbol() == "R" && cell.modifier.contains(Modifier::BOLD))
+    );
 }
 
 #[test]
@@ -659,11 +1104,11 @@ fn footer_keeps_total_active_count_when_the_loaded_view_is_a_subset() {
         ],
     );
 
-    app.handle_key(special(KeyCode::Right));
+    open_view(&mut app, 1);
     app.replace_jobs(vec![job("Platform Engineer", true, false)], 3);
     assert!(rendered(&app, 100, 25).contains("3 active jobs"));
 
-    app.handle_key(special(KeyCode::Right));
+    open_view(&mut app, 2);
     app.replace_jobs(vec![job("Applied Engineer", false, true)], 3);
     assert!(rendered(&app, 100, 25).contains("3 active jobs"));
 
@@ -795,12 +1240,7 @@ fn scans_and_sources_render_durable_semantic_states_at_all_breakpoints_and_theme
             }],
         );
 
-        for _ in 0..4 {
-            assert_eq!(
-                app.handle_key(special(KeyCode::Right)),
-                AppCommand::ReloadJobs
-            );
-        }
+        open_view(&mut app, 4);
         assert_eq!(app.view(), View::Scans);
         for width in [120, 80, 79] {
             let buffer = rendered_buffer(&app, width, 24);
@@ -819,22 +1259,28 @@ fn scans_and_sources_render_durable_semantic_states_at_all_breakpoints_and_theme
             );
         }
 
-        assert_eq!(
-            app.handle_key(special(KeyCode::Right)),
-            AppCommand::ReloadJobs
-        );
+        open_view(&mut app, 5);
         assert_eq!(app.view(), View::Sources);
         for width in [120, 80, 79] {
             let buffer = rendered_buffer(&app, width, 24);
             let screen: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
+            assert!(screen.contains("Health"));
+            assert!(screen.contains("Company"));
+            assert!(screen.contains("Adapter"));
             assert!(screen.contains("INCOMPLETE"));
-            assert!(screen.contains("Acme · enabled"));
-            assert!(screen.contains("last attempt 11 Aug 11:00"));
-            assert!(screen.contains("last success never"));
-            assert!(screen.contains("incomplete-results · unresolved location"));
+            assert!(screen.contains("Acme"));
+            assert!(screen.contains("Ashby"));
+            assert!(screen.contains("11 Aug 11:00"));
+            if width >= 120 {
+                assert!(screen.contains("State"));
+                assert!(screen.contains("Last success"));
+                assert!(screen.contains("Diagnostic"));
+                assert!(screen.contains("enabled"));
+                assert!(screen.contains("never"));
+            }
             let start_x = if width >= 120 { 22 } else { 0 };
-            let status_x = symbol_x(&buffer, 1, start_x, "⚠");
-            assert_eq!(buffer.cell((status_x, 1)).unwrap().fg, theme.warning);
+            let status_x = symbol_x(&buffer, 3, start_x, "I");
+            assert_eq!(buffer.cell((status_x, 3)).unwrap().fg, theme.warning);
         }
     }
 }
@@ -855,9 +1301,10 @@ fn configured_help_opens_an_overlay_with_fixed_and_contextual_controls() {
 
     app.handle_key(key('i'));
     let screen = rendered(&app, 79, 28);
-    assert!(screen.contains("←/→ views"));
-    assert!(screen.contains("↑/↓ or j/k select"));
+    assert!(screen.contains("Tab/Esc focus navigation"));
+    assert!(screen.contains("Inside a tab: ↑/↓ or j/k select"));
     assert!(screen.contains("J/K scroll details"));
+    assert!(screen.contains("Analytics: ↑/↓ skills; J/K matches"));
     assert!(screen.contains("s scan"));
     assert!(screen.contains("z search jobs"));
     assert!(screen.contains("v filter company/New/Applied"));
@@ -890,9 +1337,7 @@ fn operational_rows_remain_keyboard_reachable_when_the_view_exceeds_the_terminal
         })
         .collect();
     app.replace_read_models(vec![], sources);
-    for _ in 0..5 {
-        app.handle_key(special(KeyCode::Right));
-    }
+    open_view(&mut app, 5);
     for _ in 0..11 {
         app.handle_key(key('j'));
     }
@@ -934,9 +1379,7 @@ fn narrow_operational_details_recover_long_required_fields() {
         }],
     );
 
-    for _ in 0..4 {
-        app.handle_key(special(KeyCode::Right));
-    }
+    open_view(&mut app, 4);
     app.handle_key_with_width(special(KeyCode::Enter), 79);
     let scans = normalized_interior(&rendered_buffer(&app, 79, 20));
     assert!(scans.contains(company));
@@ -944,7 +1387,7 @@ fn narrow_operational_details_recover_long_required_fields() {
     assert!(scans.contains(diagnostic));
 
     app.handle_key(special(KeyCode::Esc));
-    app.handle_key(special(KeyCode::Right));
+    open_view(&mut app, 5);
     app.handle_key_with_width(special(KeyCode::Enter), 79);
     let sources = normalized_interior(&rendered_buffer(&app, 79, 20));
     assert!(sources.contains(company));
@@ -1000,9 +1443,7 @@ fn scan_selection_follows_identity_when_newer_rows_are_prepended() {
     };
     let mut app = App::new(config(), vec![]);
     app.replace_read_models(vec![scan("new"), scan("selected")], vec![]);
-    for _ in 0..4 {
-        app.handle_key(special(KeyCode::Right));
-    }
+    open_view(&mut app, 4);
     app.handle_key(key('j'));
 
     app.replace_read_models(vec![scan("newest"), scan("new"), scan("selected")], vec![]);

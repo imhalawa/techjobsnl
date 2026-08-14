@@ -32,7 +32,7 @@ fn ing_parses_complete_listings_and_details() {
     );
     assert_eq!(
         jobs[0].description,
-        "Build reliable platforms. Automate safely."
+        "Build reliable platforms.\n\n- Automate safely."
     );
     assert_eq!(
         jobs[0].published_at.unwrap().to_rfc3339(),

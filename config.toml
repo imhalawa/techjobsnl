@@ -9,9 +9,38 @@ user_agent = "job-watch/0.1 (+local personal job research)"
 
 [filters]
 countries = ["NL"]
-include_families = ["software", "platform", "sre", "data", "ml", "application-security"]
-include_title_patterns = []
+new_job_max_age_days = 7
+include_title_patterns = [
+    "(software|backend|front.?end|full.?stack|application|mobile|ios|android).*(engineer|developer)|(engineer|developer).*(software|backend|front.?end|full.?stack|application|mobile|ios|android)",
+    "platform engineer|devops|cloud engineer|infrastructure engineer|developer experience|release tooling",
+    "site reliability|\\bsre\\b|reliability engineer",
+    "data engineer|analytics engineer",
+    "machine learning engineer|\\bml engineer\\b|\\bai engineer\\b",
+    "application security|product security|security engineer",
+]
 exclude_title_patterns = ["manager", "director", "product manager", "sales engineer", "support"]
+
+[analytics]
+minimum_cooccurrence = 10
+
+[analytics.skills]
+AWS = ["aws", "amazon web services"]
+Azure = ["azure"]
+"CI/CD" = ["ci/cd", "continuous integration"]
+Docker = ["docker"]
+GCP = ["gcp", "google cloud"]
+Go = ["go", "golang"]
+Java = ["java"]
+Kafka = ["kafka"]
+Kotlin = ["kotlin"]
+Kubernetes = ["kubernetes", "k8s"]
+".NET" = [".net", "dotnet", "asp.net", "aspnet", "c#"]
+Python = ["python"]
+React = ["react", "reactjs", "react.js"]
+Rust = ["rust"]
+SQL = ["sql", "postgres", "postgresql"]
+Terraform = ["terraform"]
+TypeScript = ["typescript"]
 
 [ui]
 theme = "clean-dark"

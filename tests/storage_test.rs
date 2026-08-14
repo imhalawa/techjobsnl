@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, TimeZone, Utc};
 use job_watch::{
-    config::{CompanyConfig, SourceConfig},
+    config::{AnalyticsConfig, CompanyConfig, SourceConfig},
     domain::{ClassifiedJob, Eligibility, JobKey, ObservedJob, ScanFailure, SourceErrorKind},
     storage::{JobQuery, ScanOutcome, SourceHealth, Store},
 };
@@ -237,6 +237,46 @@ fn snapshots_ignore_raw_payload_churn_and_capture_changed_descriptions() {
         .query_row("SELECT COUNT(*) FROM job_snapshots", [], |row| row.get(0))
         .unwrap();
     assert_eq!(snapshot_count, 2);
+}
+
+#[test]
+fn analytics_facts_are_cached_by_content_and_matcher_version() {
+    let path = tempfile::NamedTempFile::new().unwrap();
+    let company = mollie_config();
+    let mut observed = job("1");
+    observed.observed.description = "Build services with Python.".into();
+    let mut store = Store::open(path.path()).unwrap();
+    store
+        .sync_companies(std::slice::from_ref(&company))
+        .unwrap();
+    store
+        .record_complete_scan("run-1", &company, &[observed], at(9), at(10))
+        .unwrap();
+    let jobs = store.list_jobs(JobQuery::active()).unwrap();
+
+    let first = AnalyticsConfig {
+        skills: std::collections::BTreeMap::from([("Python".into(), vec!["python".into()])]),
+        ..AnalyticsConfig::default()
+    };
+    let first_facts = store.analytics_facts(&jobs, &first).unwrap();
+    assert!(first_facts[&jobs[0].key].skills.contains_key("Python"));
+    store.analytics_facts(&jobs, &first).unwrap();
+
+    let mut renamed = first.clone();
+    renamed.skills =
+        std::collections::BTreeMap::from([("Python language".into(), vec!["python".into()])]);
+    let renamed_facts = store.analytics_facts(&jobs, &renamed).unwrap();
+    assert!(
+        renamed_facts[&jobs[0].key]
+            .skills
+            .contains_key("Python language")
+    );
+
+    let cache_rows: i64 = Connection::open(path.path())
+        .unwrap()
+        .query_row("SELECT COUNT(*) FROM job_analytics", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(cache_rows, 2);
 }
 
 #[test]

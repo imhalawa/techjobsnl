@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{ObservedJob, SourceErrorKind, SourceScan};
 
-use super::{JobSource, SourceError, http::send_text};
+use super::{JobSource, SourceError, http::send_text, json_ld::html_markdown};
 
 const ASHBY_BOARD_ENDPOINT: &str = "https://api.ashbyhq.com/posting-api/job-board";
 const REDIRECT_LIMIT: usize = 5;
@@ -87,6 +87,7 @@ struct AshbyJob {
     job_url: String,
     apply_url: String,
     description_plain: String,
+    description_html: Option<String>,
     #[serde(flatten)]
     extra: serde_json::Map<String, serde_json::Value>,
 }
@@ -198,6 +199,12 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
             job.id
         ))
     })?;
+    let description = job
+        .description_html
+        .as_deref()
+        .map(html_markdown)
+        .filter(|description| !description.is_empty())
+        .unwrap_or_else(|| job.description_plain.clone());
 
     Ok(ObservedJob {
         source_id: job.id,
@@ -209,7 +216,7 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
         countries,
         job_url: job.job_url,
         apply_url: job.apply_url,
-        description: job.description_plain,
+        description,
         raw_payload,
         published_at,
     })

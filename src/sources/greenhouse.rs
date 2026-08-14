@@ -7,7 +7,9 @@ use serde::Deserialize;
 use crate::domain::{ObservedJob, SourceScan};
 
 use super::{
-    JobSource, SourceError, country_code_for_location, http::send_text, json_ld::html_text,
+    JobSource, SourceError, country_code_for_location,
+    http::send_text,
+    json_ld::{html_markdown, html_text},
 };
 
 const BOARD_ENDPOINT: &str = "https://boards-api.greenhouse.io/v1/boards";
@@ -187,7 +189,7 @@ fn observed_job(
         push_unique(&mut countries, country.to_owned());
     }
 
-    let description = html_text(&html_text(&job.content));
+    let description = html_markdown(&html_text(&job.content));
     if description.is_empty() {
         return Err(SourceError::schema(format!(
             "Greenhouse job {id} for {company_id} has an empty description"

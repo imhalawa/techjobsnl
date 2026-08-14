@@ -64,7 +64,7 @@ fn getnoticed_parses_exact_two_page_snapshot_and_full_details() {
     );
     assert_eq!(
         jobs[0].description,
-        "Build reliable banking platforms. Automate safely."
+        "Build reliable banking platforms.\n\n- Automate safely."
     );
     assert_eq!(
         jobs[0].published_at.unwrap().to_rfc3339(),

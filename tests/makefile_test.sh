@@ -13,8 +13,11 @@ case "$output" in
 esac
 
 target_dir=$(env -u CARGO_TARGET_DIR make --no-print-directory -s \
-    --eval 'print-target-dir:;@printf "%s\n" "$(CARGO_TARGET_DIR)"' \
-    print-target-dir)
+    -f Makefile -f - print-target-dir <<'MAKEFILE'
+print-target-dir:
+	@printf '%s\n' '$(CARGO_TARGET_DIR)'
+MAKEFILE
+)
 case "$target_dir" in
     /mnt/*)
         printf '%s\n' "Cargo target directory must not use the mounted Windows filesystem" >&2

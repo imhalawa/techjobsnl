@@ -12,7 +12,7 @@ use crate::domain::{ObservedJob, SourceErrorKind, SourceScan};
 use super::{
     JobSource, SourceError,
     http::send_text,
-    json_ld::{html_text, job_posting_value, parse_job_posting},
+    json_ld::{html_markdown, job_posting_value, parse_job_posting},
 };
 
 const OFFICIAL_HOST: &str = "www.werkenbijabnamro.nl";
@@ -290,7 +290,7 @@ fn observed_job(
             )
         })?
         .with_timezone(&Utc);
-    let description = html_text(&posting.description);
+    let description = html_markdown(&posting.description);
     if description.is_empty() {
         return Err(schema(
             company_id,

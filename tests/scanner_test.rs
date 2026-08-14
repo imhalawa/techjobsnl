@@ -35,6 +35,46 @@ fn scan_service_run_future_is_send() {
     assert_send(scan_service.run("send-check", tx));
 }
 
+#[tokio::test]
+async fn updated_filter_allows_non_engineering_jobs_on_the_next_scan() {
+    let configured = company("filters");
+    let store = store_for(std::slice::from_ref(&configured));
+    let mut design_job = observed("designer", "Amsterdam", &["NL"]);
+    design_job.title = "Product Designer".into();
+    let scan_service = service(
+        vec![Arc::new(CompleteSource {
+            company_id: configured.id.clone(),
+            observations: vec![design_job],
+        })],
+        vec![configured],
+        Arc::clone(&store),
+    );
+    let (tx, _rx) = mpsc::unbounded_channel();
+
+    scan_service.run("filtered", tx.clone()).await;
+    assert!(
+        store
+            .lock()
+            .unwrap()
+            .list_jobs(JobQuery::active())
+            .unwrap()
+            .is_empty()
+    );
+
+    let mut all_titles = filters();
+    all_titles.include_title_patterns.clear();
+    scan_service.update_filter(EligibilityFilter::new(&all_titles).unwrap());
+    scan_service.run("all-titles", tx).await;
+
+    assert_eq!(
+        store.lock().unwrap().list_jobs(JobQuery::active()).unwrap()[0]
+            .classified
+            .observed
+            .title,
+        "Product Designer"
+    );
+}
+
 #[async_trait::async_trait]
 impl JobSource for CompleteSource {
     fn company_id(&self) -> &str {
@@ -891,8 +931,8 @@ fn company(id: &str) -> CompanyConfig {
 fn filters() -> FiltersConfig {
     FiltersConfig {
         countries: vec!["NL".into()],
-        include_families: vec!["software".into()],
-        include_title_patterns: Vec::new(),
+        new_job_max_age_days: 7,
+        include_title_patterns: vec!["software engineer".into()],
         exclude_title_patterns: Vec::new(),
     }
 }

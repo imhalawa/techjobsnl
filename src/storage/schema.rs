@@ -70,6 +70,17 @@ pub(super) fn migrate(connection: &Connection) -> Result<()> {
             PRIMARY KEY (company_id, source_id, content_hash),
             FOREIGN KEY (company_id, source_id) REFERENCES jobs(company_id, source_id)
         );
+
+        CREATE TABLE IF NOT EXISTS job_analytics (
+            company_id TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            extractor_version TEXT NOT NULL,
+            facts_json TEXT NOT NULL,
+            PRIMARY KEY (company_id, source_id, content_hash, extractor_version),
+            FOREIGN KEY (company_id, source_id, content_hash)
+                REFERENCES job_snapshots(company_id, source_id, content_hash)
+        );
         "#,
     )
 }

@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::domain::{ObservedJob, SourceScan};
 
-use super::{JobSource, SourceError, http::send_text, json_ld::html_text};
+use super::{JobSource, SourceError, http::send_text, json_ld::html_markdown};
 
 pub struct RecruiteeSource {
     company_id: String,
@@ -118,7 +118,10 @@ fn observed_job(
         push_unique(&mut countries, location.country_code.trim().to_uppercase());
     }
 
-    let description = html_text(&format!("{} {}", offer.description, offer.requirements));
+    let description = html_markdown(&format!(
+        "{}<br><br>{}",
+        offer.description, offer.requirements
+    ));
     if description.is_empty() {
         return Err(SourceError::schema(format!(
             "Recruitee offer {id} for {company_id} has an empty description"

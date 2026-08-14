@@ -1,3 +1,4 @@
+use regex::Regex;
 use scraper::{Html, Selector};
 use serde::Deserialize;
 
@@ -115,6 +116,52 @@ pub fn html_text(html: &str) -> String {
         .join(" ")
 }
 
+pub fn html_markdown(html: &str) -> String {
+    let mut markdown = html.to_owned();
+    markdown = Regex::new(r#"(?is)<\s*a[^>]*href\s*=\s*["']([^"']+)["'][^>]*>(.*?)</\s*a\s*>"#)
+        .expect("static HTML link pattern must be valid")
+        .replace_all(&markdown, "$2 ($1)")
+        .into_owned();
+    for (pattern, replacement) in [
+        (r"(?is)<\s*br\s*/?\s*>", "\n"),
+        (r"(?is)<\s*h[1-6](?:\s[^>]*)?>", "\n## "),
+        (r"(?is)</\s*h[1-6]\s*>", "\n\n"),
+        (r"(?is)<\s*li(?:\s[^>]*)?>", "\n- "),
+        (r"(?is)</\s*li\s*>", ""),
+        (r"(?is)</\s*(?:ul|ol)\s*>", "\n\n"),
+        (r"(?is)<\s*p(?:\s[^>]*)?>", "\n"),
+        (r"(?is)</\s*p\s*>", "\n\n"),
+        (r"(?is)<\s*(?:strong|b)(?:\s[^>]*)?>", "**"),
+        (r"(?is)</\s*(?:strong|b)\s*>", "**"),
+        (r"(?is)<\s*(?:em|i)(?:\s[^>]*)?>", "*"),
+        (r"(?is)</\s*(?:em|i)\s*>", "*"),
+        (r"(?is)<\s*code(?:\s[^>]*)?>", "`"),
+        (r"(?is)</\s*code\s*>", "`"),
+    ] {
+        markdown = Regex::new(pattern)
+            .expect("static HTML pattern must be valid")
+            .replace_all(&markdown, replacement)
+            .into_owned();
+    }
+
+    let text = Html::parse_fragment(&markdown)
+        .root_element()
+        .text()
+        .collect::<String>();
+    let mut lines = Vec::new();
+    for raw_line in text.lines() {
+        let line = raw_line.split_whitespace().collect::<Vec<_>>().join(" ");
+        if line.is_empty() {
+            if lines.last().is_some_and(|line: &String| !line.is_empty()) {
+                lines.push(String::new());
+            }
+        } else {
+            lines.push(line);
+        }
+    }
+    lines.join("\n").trim().to_owned()
+}
+
 fn find_job_posting(value: &serde_json::Value) -> Option<&serde_json::Value> {
     match value {
         serde_json::Value::Object(object) => {
@@ -176,4 +223,19 @@ where
         .filter(|value| !value.is_empty())
         .collect::<Vec<_>>();
     Ok((!values.is_empty()).then(|| values.join(" / ")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::html_markdown;
+
+    #[test]
+    fn html_markdown_preserves_basic_document_structure() {
+        assert_eq!(
+            html_markdown(
+                "<h2>Role</h2><p>Build <strong>reliable</strong> systems.</p><ul><li>Ship <code>code</code></li></ul><p><a href=\"https://example.test\">Details</a></p>"
+            ),
+            "## Role\n\nBuild **reliable** systems.\n\n- Ship `code`\n\nDetails (https://example.test)"
+        );
+    }
 }

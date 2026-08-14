@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
     time::Duration,
 };
 
@@ -28,7 +28,7 @@ pub struct RunSummary {
 
 pub struct ScanService {
     sources: Vec<Arc<dyn JobSource>>,
-    filter: EligibilityFilter,
+    filter: RwLock<EligibilityFilter>,
     companies: HashMap<String, CompanyConfig>,
     store: Arc<Mutex<Store>>,
     scan_config: ScanConfig,
@@ -44,7 +44,7 @@ impl ScanService {
     ) -> Self {
         Self {
             sources,
-            filter,
+            filter: RwLock::new(filter),
             companies: companies
                 .into_iter()
                 .map(|company| (company.id.clone(), company))
@@ -52,6 +52,13 @@ impl ScanService {
             store,
             scan_config,
         }
+    }
+
+    pub fn update_filter(&self, filter: EligibilityFilter) {
+        *self
+            .filter
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = filter;
     }
 
     pub async fn run(
@@ -75,7 +82,12 @@ impl ScanService {
             company_count: scheduled_sources.len(),
         });
 
-        let filter = Arc::new(self.filter.clone());
+        let filter = Arc::new(
+            self.filter
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone(),
+        );
         let timeout_seconds = self.scan_config.timeout_seconds;
         let retry_count = self.scan_config.retry_count;
         let mut company_scans = Vec::with_capacity(scheduled_sources.len());

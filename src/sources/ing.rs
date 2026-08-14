@@ -11,7 +11,7 @@ use crate::domain::{ObservedJob, SourceScan};
 use super::{
     JobSource, SourceError,
     http::send_text,
-    json_ld::{html_text, parse_job_posting},
+    json_ld::{html_markdown, parse_job_posting},
 };
 
 pub struct IngSource {
@@ -272,7 +272,7 @@ fn observed_job(company_id: &str, card: IngCard, detail: &str) -> Result<Observe
         .filter(|title| !title.is_empty())
         .ok_or_else(|| schema(company_id, format!("detail {source_id} has an empty title")))?
         .to_owned();
-    let description = html_text(&posting.description);
+    let description = html_markdown(&posting.description);
     if description.is_empty() {
         return Err(schema(
             company_id,

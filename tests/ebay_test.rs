@@ -35,7 +35,7 @@ fn parses_exact_listing_total_and_full_official_details() {
     assert_eq!(jobs[0].apply_url, "https://apply.example.test/R100");
     assert_eq!(
         jobs[0].description,
-        "Build reliable marketplace services. Work with product teams."
+        "Build reliable marketplace services.\n\nWork with product teams."
     );
     assert_eq!(
         jobs[0].published_at.unwrap().to_rfc3339(),

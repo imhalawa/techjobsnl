@@ -11,7 +11,7 @@ use crate::domain::{ObservedJob, SourceErrorKind, SourceScan};
 use super::{
     JobSource, SourceError, country_code_for_location,
     http::send_text,
-    json_ld::{html_text, job_posting_value, parse_job_posting},
+    json_ld::{html_markdown, html_text, job_posting_value, parse_job_posting},
 };
 
 const PAGE_SIZE: usize = 10;
@@ -315,7 +315,7 @@ fn observed_job(
         .filter(|title| !title.is_empty())
         .ok_or_else(|| schema(company_id, format!("detail {detail_id} has no title")))?
         .to_owned();
-    let description = html_text(&html_text(&posting.description));
+    let description = html_markdown(&html_text(&posting.description));
     if description.is_empty() {
         return Err(schema(
             company_id,

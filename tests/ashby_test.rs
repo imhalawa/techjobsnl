@@ -68,7 +68,7 @@ fn parses_and_filters_sanitized_airwallex_board() {
         .collect::<Vec<_>>();
     assert!(results[0].eligible);
     assert!(results[1].eligible);
-    assert_eq!(results[2].reason, "outside-netherlands");
+    assert_eq!(results[2].reason, "outside-configured-countries");
 }
 
 #[test]

@@ -1,4 +1,5 @@
 use std::{
+    env,
     error::Error,
     fs,
     io::{self, Write},
@@ -9,10 +10,13 @@ use std::{
 };
 
 use chrono::Utc;
-use crossterm::event::{Event, EventStream};
+use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture, Event, EventStream},
+    execute,
+};
 use futures_util::StreamExt;
 use job_watch::{
-    config::{Config, SourceConfig},
+    config::{Config, FiltersConfig, SourceConfig},
     domain::ScanEvent,
     filter::EligibilityFilter,
     scanner::ScanService,
@@ -27,6 +31,8 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
+
+const DEFAULT_CONFIG: &str = include_str!("../config.toml");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Platform {
@@ -70,14 +76,24 @@ const LINUX_CLIPBOARD: &[CommandSpec] = &[
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let config_path = user_config_path()?;
+    ensure_default_config(&config_path)?;
     let Startup {
         mut app,
         store,
         scan_service,
-    } = initialize(&std::env::current_dir()?)?;
+        ..
+    } = initialize(&config_path)?;
     let mut terminal = ratatui::init();
-    let result = run(&mut terminal, &mut app, store, scan_service).await;
-    finish_with_restore(result, ratatui::restore)
+    if let Err(source) = execute!(io::stdout(), EnableMouseCapture) {
+        ratatui::restore();
+        return Err(source.into());
+    }
+    let result = run(&mut terminal, &mut app, store, scan_service, config_path).await;
+    finish_with_restore(result, || {
+        let _ = execute!(io::stdout(), DisableMouseCapture);
+        ratatui::restore();
+    })
 }
 
 struct Startup {
@@ -86,8 +102,8 @@ struct Startup {
     scan_service: Arc<ScanService>,
 }
 
-fn initialize(working_directory: &Path) -> Result<Startup> {
-    let config_path = std::path::absolute(working_directory.join("config.toml"))?;
+fn initialize(config_path: &Path) -> Result<Startup> {
+    let config_path = std::path::absolute(config_path)?;
     let config = Config::load(&config_path).map_err(|source| {
         std::io::Error::other(format!(
             "could not initialize from configuration {}: {source}",
@@ -97,7 +113,7 @@ fn initialize(working_directory: &Path) -> Result<Startup> {
     let database_path = database_path(
         config_path
             .parent()
-            .expect("config.toml always has its working-directory parent"),
+            .expect("config.toml always has a user-config parent"),
         &config.database_path,
     );
     if let Some(parent) = database_path.parent() {
@@ -122,15 +138,13 @@ fn initialize(working_directory: &Path) -> Result<Startup> {
             config_path.display()
         ))
     })?);
-    let (jobs, scans, sources) = {
+    let (jobs, facts, scans, sources) = {
         let store = store.lock().unwrap();
-        (
-            store.list_jobs(JobQuery::active())?,
-            store.recent_scans()?,
-            store.source_health()?,
-        )
+        let jobs = store.list_jobs(JobQuery::active())?;
+        let facts = store.analytics_facts(&jobs, &config.analytics)?;
+        (jobs, facts, store.recent_scans()?, store.source_health()?)
     };
-    let mut app = App::new(config, jobs);
+    let mut app = App::new_with_facts(config, jobs, facts);
     app.replace_read_models(scans, sources);
     Ok(Startup {
         app,
@@ -148,10 +162,63 @@ fn database_path(working_directory: &Path, configured_path: &str) -> PathBuf {
     }
 }
 
+fn user_config_path() -> Result<PathBuf> {
+    let home = env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
+    let xdg = env::var_os("XDG_CONFIG_HOME").map(PathBuf::from);
+    let appdata = env::var_os("APPDATA").map(PathBuf::from);
+    Ok(config_path_for(
+        current_platform(),
+        home.as_deref(),
+        xdg.as_deref(),
+        appdata.as_deref(),
+    )?)
+}
+
+fn config_path_for(
+    platform: Platform,
+    home: Option<&Path>,
+    xdg: Option<&Path>,
+    appdata: Option<&Path>,
+) -> io::Result<PathBuf> {
+    let base = match platform {
+        Platform::Windows => appdata
+            .map(Path::to_path_buf)
+            .or_else(|| home.map(|home| home.join("AppData/Roaming"))),
+        Platform::Macos => home.map(|home| home.join("Library/Application Support")),
+        Platform::Linux | Platform::Wsl => xdg
+            .map(Path::to_path_buf)
+            .or_else(|| home.map(|home| home.join(".config"))),
+    }
+    .ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "user config directory is unavailable",
+        )
+    })?;
+    Ok(base.join("job-watch/config.toml"))
+}
+
+fn ensure_default_config(path: &Path) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::other("config path has no parent directory"))?;
+    fs::create_dir_all(parent)?;
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+    {
+        Ok(mut file) => file.write_all(DEFAULT_CONFIG.as_bytes()),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CommandEffect {
     Continue,
     StartScan,
+    FiltersChanged,
     Quit,
 }
 
@@ -160,6 +227,7 @@ async fn run(
     app: &mut App,
     store: Arc<Mutex<Store>>,
     scan_service: Arc<ScanService>,
+    config_path: PathBuf,
 ) -> Result<()> {
     let mut events = EventStream::new();
     let (scan_tx, mut scan_rx) = mpsc::unbounded_channel();
@@ -171,17 +239,27 @@ async fn run(
             event = events.next() => {
                 let Some(event) = event else { return Ok(()) };
                 let event = event?;
-                if let Event::Key(key) = event {
-                    let width = terminal.size()?.width;
-                    let command = app.handle_key_with_width(key, width);
+                let size = terminal.size()?;
+                let command = match event {
+                    Event::Key(key) => Some(app.handle_key_with_width(key, size.width)),
+                    Event::Mouse(mouse) => Some(app.handle_mouse(mouse, size.width, size.height)),
+                    Event::FocusLost => {
+                        app.clear_mouse_state();
+                        None
+                    }
+                    _ => None,
+                };
+                if let Some(command) = command {
                     let mut open_job_url = open_url;
                     let mut copy_job_url = copy_url;
+                    let mut save_filters = |filters| save_filters(&config_path, &filters);
                     match execute_command(
                         command,
                         &store,
                         app,
                         &mut open_job_url,
                         &mut copy_job_url,
+                        &mut save_filters,
                     )? {
                         CommandEffect::StartScan => {
                             start_scan(
@@ -189,6 +267,11 @@ async fn run(
                                 Arc::clone(&scan_service),
                                 scan_tx.clone(),
                             );
+                        }
+                        CommandEffect::FiltersChanged => {
+                            scan_service.update_filter(EligibilityFilter::new(
+                                &app.config().filters,
+                            )?);
                         }
                         CommandEffect::Quit => {
                             abort_scan(&mut active_scan).await;
@@ -332,18 +415,21 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
 fn reload_jobs(store: &Arc<Mutex<Store>>, app: &mut App) -> rusqlite::Result<()> {
     let query = match app.view() {
         View::Active => JobQuery::active(),
-        View::New => JobQuery::new(),
+        View::New => JobQuery::active(),
+        View::Analytics => JobQuery::active(),
         View::Applied => JobQuery::applied(),
         View::History => JobQuery::history(),
-        View::Scans | View::Sources => JobQuery::all(),
+        View::Scans | View::Sources | View::Settings => JobQuery::all(),
     };
+    let analytics_config = app.config().analytics.clone();
     let store = store.lock().unwrap();
     let jobs = store.list_jobs(query)?;
+    let facts = store.analytics_facts(&jobs, &analytics_config)?;
     let active_job_count = store.list_jobs(JobQuery::active())?.len();
     let scans = store.recent_scans()?;
     let sources = store.source_health()?;
     drop(store);
-    app.replace_jobs(jobs, active_job_count);
+    app.replace_jobs_with_facts(jobs, active_job_count, facts);
     app.replace_read_models(scans, sources);
     Ok(())
 }
@@ -354,6 +440,7 @@ fn execute_command(
     app: &mut App,
     open_url: &mut impl FnMut(&str) -> Result<()>,
     copy_url: &mut impl FnMut(&str) -> Result<()>,
+    save_filters: &mut impl FnMut(FiltersConfig) -> Result<()>,
 ) -> Result<CommandEffect> {
     match command {
         AppCommand::ToggleApplied(key) => {
@@ -369,6 +456,11 @@ fn execute_command(
             copy_url(&url)?;
             Ok(CommandEffect::Continue)
         }
+        AppCommand::SaveFilters(filters) => {
+            save_filters(filters.clone())?;
+            app.apply_filters(filters);
+            Ok(CommandEffect::FiltersChanged)
+        }
         AppCommand::StartScan => Ok(CommandEffect::StartScan),
         AppCommand::ReloadJobs => {
             reload_jobs(store, app)?;
@@ -377,6 +469,39 @@ fn execute_command(
         AppCommand::Quit => Ok(CommandEffect::Quit),
         AppCommand::None => Ok(CommandEffect::Continue),
     }
+}
+
+fn save_filters(config_path: &Path, values: &FiltersConfig) -> Result<()> {
+    values.validate()?;
+    let contents = fs::read_to_string(config_path)?;
+    let mut document: toml::Value = toml::from_str(&contents)?;
+    let filters = document
+        .get_mut("filters")
+        .and_then(toml::Value::as_table_mut)
+        .ok_or_else(|| io::Error::other("configuration has no [filters] table"))?;
+    filters.insert("countries".into(), toml_strings(&values.countries));
+    filters.insert(
+        "new_job_max_age_days".into(),
+        toml::Value::Integer(i64::from(values.new_job_max_age_days)),
+    );
+    filters.insert(
+        "include_title_patterns".into(),
+        toml_strings(&values.include_title_patterns),
+    );
+    filters.insert(
+        "exclude_title_patterns".into(),
+        toml_strings(&values.exclude_title_patterns),
+    );
+    let updated = toml::to_string_pretty(&document)?;
+    toml::from_str::<Config>(&updated)?.validate()?;
+    let temporary_path = config_path.with_extension("toml.tmp");
+    fs::write(&temporary_path, updated)?;
+    fs::rename(&temporary_path, config_path)?;
+    Ok(())
+}
+
+fn toml_strings(values: &[String]) -> toml::Value {
+    toml::Value::Array(values.iter().cloned().map(toml::Value::String).collect())
 }
 
 fn current_platform() -> Platform {
@@ -527,8 +652,8 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use job_watch::{
         config::{
-            CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig, SourceConfig,
-            UiConfig,
+            AnalyticsConfig, CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig,
+            SourceConfig, UiConfig,
         },
         domain::{
             ClassifiedJob, Eligibility, JobKey, ObservedJob, ScanEvent, ScanFailure,
@@ -544,10 +669,57 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::{
-        CommandEffect, Platform, abort_scan, browser_command, build_sources, copy_url_with,
-        execute_command, finish_scan, finish_with_restore, handle_runtime_scan_event, initialize,
-        start_scan,
+        CommandEffect, Platform, abort_scan, browser_command, build_sources, config_path_for,
+        copy_url_with, ensure_default_config, execute_command, finish_scan, finish_with_restore,
+        handle_runtime_scan_event, initialize, save_filters, start_scan,
     };
+
+    #[test]
+    fn config_uses_each_platforms_user_config_directory() {
+        let home = std::path::Path::new("/users/alex");
+        let xdg = std::path::Path::new("/custom-config");
+        let appdata = std::path::Path::new("C:/Users/Alex/AppData/Roaming");
+
+        assert_eq!(
+            config_path_for(Platform::Linux, Some(home), Some(xdg), None).unwrap(),
+            xdg.join("job-watch/config.toml")
+        );
+        assert_eq!(
+            config_path_for(Platform::Macos, Some(home), None, None).unwrap(),
+            home.join("Library/Application Support/job-watch/config.toml")
+        );
+        assert_eq!(
+            config_path_for(Platform::Windows, Some(home), None, Some(appdata)).unwrap(),
+            appdata.join("job-watch/config.toml")
+        );
+    }
+
+    #[test]
+    fn first_start_creates_default_config_without_overwriting_it_later() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("job-watch/config.toml");
+
+        ensure_default_config(&path).unwrap();
+        assert!(Config::load(&path).is_ok());
+        std::fs::write(&path, "user changes").unwrap();
+        ensure_default_config(&path).unwrap();
+
+        assert_eq!(std::fs::read_to_string(path).unwrap(), "user changes");
+    }
+
+    #[test]
+    fn settings_save_filters_to_the_existing_config() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        std::fs::write(&path, include_str!("../config.toml")).unwrap();
+        let mut filters = Config::load(&path).unwrap().filters;
+        filters.new_job_max_age_days = 14;
+        filters.include_title_patterns.clear();
+
+        save_filters(&path, &filters).unwrap();
+
+        assert_eq!(Config::load(path).unwrap().filters, filters);
+    }
 
     #[test]
     fn production_config_keeps_disabled_companies_unschedulable() {
@@ -785,8 +957,8 @@ mod tests {
             companies: vec![company()],
             filters: FiltersConfig {
                 countries: vec!["NL".into()],
-                include_families: vec!["software".into()],
-                include_title_patterns: vec![],
+                new_job_max_age_days: 7,
+                include_title_patterns: vec!["software engineer".into()],
                 exclude_title_patterns: vec![],
             },
             scan: ScanConfig {
@@ -795,6 +967,7 @@ mod tests {
                 retry_count: 0,
                 user_agent: "job-watch-test".into(),
             },
+            analytics: AnalyticsConfig::default(),
             ui: UiConfig {
                 theme: "clean-dark".into(),
                 unicode_icons: false,
@@ -874,6 +1047,7 @@ mod tests {
         let mut app = App::new(config(), jobs);
         let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
         let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
+        let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
 
         let effect = execute_command(
             AppCommand::ToggleApplied(JobKey::new("acme", "job-1")),
@@ -881,6 +1055,7 @@ mod tests {
             &mut app,
             &mut opened,
             &mut copied,
+            &mut saved,
         )
         .unwrap();
 
@@ -958,6 +1133,7 @@ mod tests {
         let mut app = App::new(config(), jobs);
         let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
         let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
+        let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
         let restored = std::cell::Cell::new(false);
         let result = execute_command(
             AppCommand::ToggleApplied(JobKey::new("acme", "missing")),
@@ -965,6 +1141,7 @@ mod tests {
             &mut app,
             &mut opened,
             &mut copied,
+            &mut saved,
         )
         .map(|_| ());
 
@@ -981,19 +1158,16 @@ mod tests {
     }
 
     #[test]
-    fn startup_reports_the_absolute_working_directory_config_path() {
+    fn startup_reports_the_absolute_config_path() {
         let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
 
-        let error = match initialize(directory.path()) {
+        let error = match initialize(&path) {
             Ok(_) => panic!("startup unexpectedly succeeded without config.toml"),
             Err(error) => error,
         };
 
-        assert!(
-            error
-                .to_string()
-                .contains(&directory.path().join("config.toml").display().to_string())
-        );
+        assert!(error.to_string().contains(&path.display().to_string()));
     }
 
     #[test]
@@ -1003,7 +1177,7 @@ mod tests {
             include_str!("../config.toml").replace("schema_version = 1", "schema_version = 2");
         std::fs::write(directory.path().join("config.toml"), config).unwrap();
 
-        let error = match initialize(directory.path()) {
+        let error = match initialize(&directory.path().join("config.toml")) {
             Ok(_) => panic!("startup unexpectedly accepted an invalid configuration"),
             Err(error) => error,
         };
@@ -1014,21 +1188,19 @@ mod tests {
     }
 
     #[test]
-    fn startup_config_derived_failure_reports_the_absolute_config_path() {
+    fn startup_filter_failure_reports_the_absolute_config_path() {
         let directory = tempfile::tempdir().unwrap();
-        let config = include_str!("../config.toml").replace(
-            "include_families = [\"software\", \"platform\", \"sre\", \"data\", \"ml\", \"application-security\"]",
-            "include_families = [\"unknown-family\"]",
-        );
+        let config = include_str!("../config.toml")
+            .replace("new_job_max_age_days = 7", "new_job_max_age_days = 0");
         std::fs::write(directory.path().join("config.toml"), config).unwrap();
 
-        let error = match initialize(directory.path()) {
-            Ok(_) => panic!("startup unexpectedly accepted an unknown filter family"),
+        let error = match initialize(&directory.path().join("config.toml")) {
+            Ok(_) => panic!("startup unexpectedly accepted an invalid new-job age"),
             Err(error) => error,
         };
         let diagnostic = error.to_string();
 
-        assert!(diagnostic.contains("unknown included family"));
+        assert!(diagnostic.contains("filters.new_job_max_age_days"));
         assert!(diagnostic.contains(&directory.path().join("config.toml").display().to_string()));
     }
 
@@ -1042,7 +1214,7 @@ mod tests {
         .unwrap();
         std::fs::write(directory.path().join(".data"), "not a directory").unwrap();
 
-        let error = match initialize(directory.path()) {
+        let error = match initialize(&directory.path().join("config.toml")) {
             Ok(_) => panic!("startup unexpectedly created a database below a file"),
             Err(error) => error,
         };
@@ -1068,7 +1240,7 @@ mod tests {
         .unwrap();
         std::fs::create_dir_all(directory.path().join(".data/job-watch.sqlite3")).unwrap();
 
-        let error = match initialize(directory.path()) {
+        let error = match initialize(&directory.path().join("config.toml")) {
             Ok(_) => panic!("startup unexpectedly opened a directory as a database"),
             Err(error) => error,
         };
@@ -1093,7 +1265,7 @@ mod tests {
         )
         .unwrap();
 
-        let startup = initialize(directory.path()).unwrap();
+        let startup = initialize(&directory.path().join("config.toml")).unwrap();
         assert!(directory.path().join(".data").is_dir());
         let company = startup.app.config().companies[0].clone();
         let at = Utc.with_ymd_and_hms(2026, 8, 12, 10, 0, 0).unwrap();
@@ -1117,7 +1289,7 @@ mod tests {
             .unwrap();
         drop(startup);
 
-        let startup = initialize(directory.path()).unwrap();
+        let startup = initialize(&directory.path().join("config.toml")).unwrap();
         let stored = startup.app.selected_job().unwrap();
         assert_eq!(stored.key, JobKey::new("mollie", "stored"));
         assert!(stored.is_new, "startup must not perform an implicit scan");
@@ -1177,6 +1349,7 @@ mod tests {
             copied_url = Some(url.to_owned());
             Ok(())
         };
+        let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
 
         let effect = execute_command(
             AppCommand::CopyUrl("https://example.test/job".into()),
@@ -1184,6 +1357,7 @@ mod tests {
             &mut app,
             &mut opened,
             &mut copied,
+            &mut saved,
         )
         .unwrap();
 

@@ -215,7 +215,7 @@ fn parses_complete_recruitee_offers() {
     );
     assert_eq!(
         jobs[0].description,
-        "Build the housing platform. Work closely with product."
+        "Build the housing platform.\n\nWork closely with product."
     );
     assert_eq!(jobs[0].job_url, "https://jobs.funda.nl/o/backend-engineer");
     assert_eq!(

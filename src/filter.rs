@@ -8,27 +8,6 @@ use crate::{
     domain::{Eligibility, ObservedJob},
 };
 
-const FAMILY_PATTERNS: [(&str, &str); 6] = [
-    (
-        "software",
-        r"(software|backend|front.?end|full.?stack|application|mobile|ios|android).*(engineer|developer)|(engineer|developer).*(software|backend|front.?end|full.?stack|application|mobile|ios|android)",
-    ),
-    (
-        "platform",
-        r"platform engineer|devops|cloud engineer|infrastructure engineer|developer experience|release tooling",
-    ),
-    ("sre", r"site reliability|\bsre\b|reliability engineer"),
-    ("data", r"data engineer|analytics engineer"),
-    (
-        "ml",
-        r"machine learning engineer|\bml engineer\b|\bai engineer\b",
-    ),
-    (
-        "application-security",
-        r"application security|product security|security engineer",
-    ),
-];
-
 #[derive(Debug, Clone)]
 pub struct EligibilityFilter {
     countries: HashSet<String>,
@@ -38,27 +17,11 @@ pub struct EligibilityFilter {
 
 impl EligibilityFilter {
     pub fn new(filters: &FiltersConfig) -> Result<Self, FilterError> {
-        for country in &filters.countries {
-            if country != "NL" {
-                return Err(FilterError::UnsupportedCountry(country.clone()));
-            }
-        }
-
-        let mut include_patterns = Vec::new();
-
-        for family in &filters.include_families {
-            let Some((_, pattern)) = FAMILY_PATTERNS
-                .iter()
-                .find(|(known_family, _)| family == known_family)
-            else {
-                return Err(FilterError::UnknownFamily(family.clone()));
-            };
-            include_patterns.push(compile_pattern("family", pattern)?);
-        }
-
-        for pattern in &filters.include_title_patterns {
-            include_patterns.push(compile_pattern("include title", pattern)?);
-        }
+        let include_patterns = filters
+            .include_title_patterns
+            .iter()
+            .map(|pattern| compile_pattern("include title", pattern))
+            .collect::<Result<_, _>>()?;
 
         let exclude_patterns = filters
             .exclude_title_patterns
@@ -86,7 +49,7 @@ impl EligibilityFilter {
         {
             return Ok(Eligibility {
                 eligible: false,
-                reason: "outside-netherlands".into(),
+                reason: "outside-configured-countries".into(),
             });
         }
 
@@ -101,10 +64,11 @@ impl EligibilityFilter {
             });
         }
 
-        if !self
-            .include_patterns
-            .iter()
-            .any(|pattern| pattern.is_match(&job.title))
+        if !self.include_patterns.is_empty()
+            && !self
+                .include_patterns
+                .iter()
+                .any(|pattern| pattern.is_match(&job.title))
         {
             return Ok(Eligibility {
                 eligible: false,
@@ -159,10 +123,6 @@ fn resolved_countries<'a>(
 pub enum FilterError {
     #[error("unresolved location labels: {0:?}")]
     UnresolvedLocation(Vec<String>),
-    #[error("unsupported filter country: {0}")]
-    UnsupportedCountry(String),
-    #[error("unknown included family: {0}")]
-    UnknownFamily(String),
     #[error("invalid {kind} pattern `{pattern}`: {message}")]
     InvalidPattern {
         kind: &'static str,

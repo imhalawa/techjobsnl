@@ -7,7 +7,7 @@ use serde::Deserialize;
 use crate::domain::{ObservedJob, SourceScan};
 
 use super::{
-    JobSource, SourceError, country_code_for_location, http::send_text, json_ld::html_text,
+    JobSource, SourceError, country_code_for_location, http::send_text, json_ld::html_markdown,
 };
 
 const PAGE_SIZE: usize = 100;
@@ -208,7 +208,7 @@ fn observed_job(
     required(&job.title, "title", company_id)?;
     required(&job.apply_url, "apply URL", company_id)?;
     required(&job.full_location, "location", company_id)?;
-    let description = html_text(&job.description);
+    let description = html_markdown(&job.description);
     if description.is_empty() {
         return Err(SourceError::schema(format!(
             "Jibe job {} for {company_id} has an empty description",

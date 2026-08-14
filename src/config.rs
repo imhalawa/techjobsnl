@@ -1,6 +1,11 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    path::Path,
+};
 
 use ratatui::style::Color;
+use regex::RegexBuilder;
 use reqwest::Url;
 use serde::Deserialize;
 use thiserror::Error;
@@ -12,6 +17,8 @@ pub struct Config {
     pub companies: Vec<CompanyConfig>,
     pub filters: FiltersConfig,
     pub scan: ScanConfig,
+    #[serde(default)]
+    pub analytics: AnalyticsConfig,
     pub ui: UiConfig,
     pub keybindings: KeybindingsConfig,
 }
@@ -48,10 +55,8 @@ impl Config {
                 "must be greater than zero",
             ));
         }
-
-        for (index, country) in self.filters.countries.iter().enumerate() {
-            validate_country(country, format!("filters.countries[{index}]"))?;
-        }
+        self.filters.validate()?;
+        self.analytics.validate()?;
 
         let mut company_ids = std::collections::HashSet::new();
         for (index, company) in self.companies.iter().enumerate() {
@@ -169,6 +174,43 @@ pub enum SourceConfig {
     },
 }
 
+impl SourceConfig {
+    pub fn strategy_name(&self) -> &'static str {
+        match self {
+            Self::Ashby { .. } => "Ashby",
+            Self::Greenhouse { .. } => "Greenhouse",
+            Self::Jibe { .. } => "Jibe",
+            Self::Ebay { .. } => "eBay",
+            Self::Recruitee { .. } => "Recruitee",
+            Self::Bol { .. } => "bol.com",
+            Self::Rabobank { .. } => "Rabobank API",
+            Self::Eneco { .. } => "Eneco HTML",
+            Self::AlbertHeijn { .. } => "Albert Heijn API",
+            Self::Ing { .. } => "ING HTML",
+            Self::Getnoticed { .. } => "Getnoticed",
+            Self::PagedHtml { .. } => "Paged HTML",
+            Self::Unsupported { .. } => "Unsupported",
+        }
+    }
+
+    pub fn reference(&self) -> &str {
+        match self {
+            Self::Ashby { board } | Self::Greenhouse { board, .. } => board,
+            Self::Jibe { base_url, .. }
+            | Self::Recruitee { base_url }
+            | Self::Bol { base_url }
+            | Self::Rabobank { base_url, .. }
+            | Self::AlbertHeijn { base_url }
+            | Self::Getnoticed { base_url, .. } => base_url,
+            Self::Ebay { listing_url }
+            | Self::Eneco { listing_url }
+            | Self::Ing { listing_url }
+            | Self::PagedHtml { listing_url, .. } => listing_url,
+            Self::Unsupported { reason } => reason,
+        }
+    }
+}
+
 fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigError> {
     let path = |field: &str| format!("companies[{index}].source.{field}");
     match &company.source {
@@ -270,12 +312,131 @@ fn validate_https_url(value: &str, path: String) -> Result<(), ConfigError> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct FiltersConfig {
     pub countries: Vec<String>,
-    pub include_families: Vec<String>,
+    #[serde(default = "default_new_job_max_age_days")]
+    pub new_job_max_age_days: u32,
     pub include_title_patterns: Vec<String>,
     pub exclude_title_patterns: Vec<String>,
+}
+
+impl FiltersConfig {
+    pub fn validate(&self) -> Result<(), ConfigError> {
+        if self.new_job_max_age_days == 0 {
+            return Err(ConfigError::invalid(
+                "filters.new_job_max_age_days",
+                "must be greater than zero",
+            ));
+        }
+        if self.countries.is_empty() {
+            return Err(ConfigError::invalid(
+                "filters.countries",
+                "must contain at least one country",
+            ));
+        }
+        for (index, country) in self.countries.iter().enumerate() {
+            validate_country(country, format!("filters.countries[{index}]"))?;
+        }
+        for (field, patterns) in [
+            ("include_title_patterns", &self.include_title_patterns),
+            ("exclude_title_patterns", &self.exclude_title_patterns),
+        ] {
+            for (index, pattern) in patterns.iter().enumerate() {
+                RegexBuilder::new(pattern)
+                    .case_insensitive(true)
+                    .build()
+                    .map_err(|error| {
+                        ConfigError::invalid(
+                            format!("filters.{field}[{index}]"),
+                            format!("must be a valid regular expression: {error}"),
+                        )
+                    })?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn default_new_job_max_age_days() -> u32 {
+    7
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct AnalyticsConfig {
+    #[serde(default = "default_skill_aliases")]
+    pub skills: BTreeMap<String, Vec<String>>,
+    #[serde(default = "default_minimum_cooccurrence")]
+    pub minimum_cooccurrence: usize,
+}
+
+impl Default for AnalyticsConfig {
+    fn default() -> Self {
+        Self {
+            skills: default_skill_aliases(),
+            minimum_cooccurrence: default_minimum_cooccurrence(),
+        }
+    }
+}
+
+impl AnalyticsConfig {
+    fn validate(&self) -> Result<(), ConfigError> {
+        if self.minimum_cooccurrence == 0 {
+            return Err(ConfigError::invalid(
+                "analytics.minimum_cooccurrence",
+                "must be greater than zero",
+            ));
+        }
+        for (skill, aliases) in &self.skills {
+            if skill.trim().is_empty() {
+                return Err(ConfigError::invalid(
+                    "analytics.skills",
+                    "skill names must not be empty",
+                ));
+            }
+            if aliases.is_empty() || aliases.iter().any(|alias| alias.trim().is_empty()) {
+                return Err(ConfigError::invalid(
+                    format!("analytics.skills.{skill}"),
+                    "must contain non-empty aliases",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn default_minimum_cooccurrence() -> usize {
+    10
+}
+
+fn default_skill_aliases() -> BTreeMap<String, Vec<String>> {
+    [
+        ("AWS", &["aws", "amazon web services"][..]),
+        ("Azure", &["azure"]),
+        ("CI/CD", &["ci/cd", "continuous integration"]),
+        ("Docker", &["docker"]),
+        ("GCP", &["gcp", "google cloud"]),
+        ("Go", &["go", "golang"]),
+        ("Java", &["java"]),
+        ("Kafka", &["kafka"]),
+        ("Kotlin", &["kotlin"]),
+        ("Kubernetes", &["kubernetes", "k8s"]),
+        (".NET", &[".net", "dotnet", "asp.net", "aspnet", "c#"]),
+        ("Python", &["python"]),
+        ("React", &["react", "reactjs", "react.js"]),
+        ("Rust", &["rust"]),
+        ("SQL", &["sql", "postgres", "postgresql"]),
+        ("Terraform", &["terraform"]),
+        ("TypeScript", &["typescript"]),
+    ]
+    .into_iter()
+    .map(|(skill, aliases)| {
+        (
+            skill.to_owned(),
+            aliases.iter().map(|alias| (*alias).to_owned()).collect(),
+        )
+    })
+    .collect()
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -1,12 +1,17 @@
-use std::{collections::HashSet, fmt::Write as _, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write as _,
+    path::Path,
+};
 
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, Result, Row, Transaction, params, types::Type};
+use rusqlite::{Connection, OptionalExtension, Result, Row, Transaction, params, types::Type};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    config::CompanyConfig,
+    analytics::{self, JobFacts},
+    config::{AnalyticsConfig, CompanyConfig},
     domain::{
         ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanFailure, SourceErrorKind,
     },
@@ -231,6 +236,59 @@ impl Store {
         statement
             .query_map([], job_record_from_row)?
             .collect::<Result<Vec<_>>>()
+    }
+
+    pub fn analytics_facts(
+        &self,
+        jobs: &[JobRecord],
+        config: &AnalyticsConfig,
+    ) -> Result<HashMap<JobKey, JobFacts>> {
+        let extractor_version = analytics::cache_version(config);
+        let mut select = self.connection.prepare(
+            "SELECT j.content_hash, a.facts_json
+             FROM jobs j
+             LEFT JOIN job_analytics a ON
+                a.company_id = j.company_id AND
+                a.source_id = j.source_id AND
+                a.content_hash = j.content_hash AND
+                a.extractor_version = ?3
+             WHERE j.company_id = ?1 AND j.source_id = ?2",
+        )?;
+        let mut insert = self.connection.prepare(
+            "INSERT OR IGNORE INTO job_analytics (
+                company_id, source_id, content_hash, extractor_version, facts_json
+             ) VALUES (?1, ?2, ?3, ?4, ?5)",
+        )?;
+        let mut facts_by_job = HashMap::with_capacity(jobs.len());
+        for job in jobs {
+            let stored = select
+                .query_row(
+                    params![job.key.company_id, job.key.source_id, extractor_version],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+                )
+                .optional()?;
+            let Some((content_hash, cached)) = stored else {
+                continue;
+            };
+            let facts = match cached {
+                Some(cached) => serde_json::from_str(&cached).map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(1, Type::Text, Box::new(error))
+                })?,
+                None => {
+                    let facts = analytics::extract(job, &config.skills);
+                    insert.execute(params![
+                        job.key.company_id,
+                        job.key.source_id,
+                        content_hash,
+                        extractor_version,
+                        json_text(&facts),
+                    ])?;
+                    facts
+                }
+            };
+            facts_by_job.insert(job.key.clone(), facts);
+        }
+        Ok(facts_by_job)
     }
 
     pub fn recent_scans(&self) -> Result<Vec<ScanReadModel>> {

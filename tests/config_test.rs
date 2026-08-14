@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use job_watch::config::{
-    CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig, SourceConfig,
-    ThemeOverrides, UiConfig,
+    AnalyticsConfig, CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig,
+    SourceConfig, ThemeOverrides, UiConfig,
 };
 
 fn valid_config() -> Config {
@@ -20,7 +20,7 @@ fn valid_config() -> Config {
         }],
         filters: FiltersConfig {
             countries: vec!["NL".into()],
-            include_families: vec![],
+            new_job_max_age_days: 7,
             include_title_patterns: vec![],
             exclude_title_patterns: vec![],
         },
@@ -30,6 +30,7 @@ fn valid_config() -> Config {
             retry_count: 0,
             user_agent: "job-watch-test".into(),
         },
+        analytics: AnalyticsConfig::default(),
         ui: UiConfig {
             theme: "clean-dark".into(),
             unicode_icons: true,
@@ -77,7 +78,7 @@ retry_count = 2
 user_agent = "job-watch-test"
 [filters]
 countries = ["NL"]
-include_families = ["software", "platform"]
+new_job_max_age_days = 7
 include_title_patterns = []
 exclude_title_patterns = ["manager"]
 [ui]
@@ -111,6 +112,7 @@ board = "mollie"
         config.companies[0].source,
         SourceConfig::Ashby { .. }
     ));
+    assert!(config.analytics.skills.contains_key("Kubernetes"));
 }
 
 #[test]
@@ -141,7 +143,7 @@ retry_count = 2
 user_agent = "job-watch-test"
 [filters]
 countries = ["NL"]
-include_families = []
+new_job_max_age_days = 7
 include_title_patterns = []
 exclude_title_patterns = []
 [ui]
@@ -190,7 +192,7 @@ retry_count = 2
 user_agent = "job-watch-test"
 [filters]
 countries = ["NL"]
-include_families = []
+new_job_max_age_days = 7
 include_title_patterns = []
 exclude_title_patterns = []
 [ui]
@@ -236,6 +238,45 @@ fn rejects_action_bindings_that_are_not_exactly_one_character() {
         assert!(error.to_string().contains("keybindings.scan"));
         assert!(error.to_string().contains("exactly one character"));
     }
+}
+
+#[test]
+fn rejects_empty_countries_and_invalid_title_patterns() {
+    let mut config = valid_config();
+    config.filters.countries.clear();
+    assert!(
+        config
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("filters.countries")
+    );
+
+    let mut config = valid_config();
+    config.filters.include_title_patterns = vec!["(".into()];
+    let error = config.validate().unwrap_err().to_string();
+    assert!(error.contains("filters.include_title_patterns[0]"));
+    assert!(error.contains("valid regular expression"));
+}
+
+#[test]
+fn rejects_empty_analytics_aliases() {
+    let mut config = valid_config();
+    config.analytics.skills.insert("Rust".into(), vec![]);
+
+    let error = config.validate().unwrap_err().to_string();
+    assert!(error.contains("analytics.skills.Rust"));
+    assert!(error.contains("non-empty aliases"));
+}
+
+#[test]
+fn rejects_zero_analytics_cooccurrence_volume() {
+    let mut config = valid_config();
+    config.analytics.minimum_cooccurrence = 0;
+
+    let error = config.validate().unwrap_err().to_string();
+    assert!(error.contains("analytics.minimum_cooccurrence"));
+    assert!(error.contains("greater than zero"));
 }
 
 #[test]
