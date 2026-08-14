@@ -78,6 +78,7 @@ const LINUX_CLIPBOARD: &[CommandSpec] = &[
 async fn main() -> Result<()> {
     let config_path = user_config_path()?;
     ensure_default_config(&config_path)?;
+    sync_default_companies(&config_path)?;
     let Startup {
         mut app,
         store,
@@ -233,6 +234,44 @@ fn ensure_default_config(path: &Path) -> io::Result<()> {
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Ok(()),
         Err(error) => Err(error),
     }
+}
+
+fn sync_default_companies(path: &Path) -> Result<()> {
+    let mut config: toml::Value = toml::from_str(&fs::read_to_string(path)?)?;
+    let defaults: toml::Value = toml::from_str(DEFAULT_CONFIG)?;
+    let default_companies = defaults
+        .get("companies")
+        .and_then(toml::Value::as_array)
+        .ok_or_else(|| io::Error::other("built-in config has no company catalog"))?;
+    let default_ids = default_companies
+        .iter()
+        .filter_map(|company| company.get("id").and_then(toml::Value::as_str))
+        .collect::<std::collections::HashSet<_>>();
+    let current_companies = config
+        .get("companies")
+        .and_then(toml::Value::as_array)
+        .ok_or_else(|| io::Error::other("user config has no company catalog"))?;
+    let mut companies = default_companies.clone();
+    companies.extend(
+        current_companies
+            .iter()
+            .filter(|company| {
+                company
+                    .get("id")
+                    .and_then(toml::Value::as_str)
+                    .is_none_or(|id| !default_ids.contains(id))
+            })
+            .cloned(),
+    );
+
+    if current_companies == &companies {
+        return Ok(());
+    }
+    config["companies"] = toml::Value::Array(companies);
+    let temporary_path = path.with_extension("toml.tmp");
+    fs::write(&temporary_path, toml::to_string_pretty(&config)?)?;
+    fs::rename(temporary_path, path)?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -725,7 +764,7 @@ mod tests {
     use super::{
         CommandEffect, Platform, abort_scan, browser_command, build_sources, config_path_for,
         copy_url_with, ensure_default_config, execute_command, finish_scan, finish_with_restore,
-        handle_runtime_scan_event, initialize, save_filters, start_scan,
+        handle_runtime_scan_event, initialize, save_filters, start_scan, sync_default_companies,
     };
 
     #[test]
@@ -759,6 +798,53 @@ mod tests {
         ensure_default_config(&path).unwrap();
 
         assert_eq!(std::fs::read_to_string(path).unwrap(), "user changes");
+    }
+
+    #[test]
+    fn startup_refreshes_the_company_catalog_without_losing_user_configuration() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        let mut old: toml::Value = toml::from_str(include_str!("../config.toml")).unwrap();
+        old["filters"]["new_job_max_age_days"] = toml::Value::Integer(14);
+        let companies = old["companies"].as_array_mut().unwrap();
+        companies.truncate(15);
+        for company in companies.iter_mut() {
+            company.as_table_mut().unwrap().remove("industry");
+            company.as_table_mut().unwrap().remove("scale");
+        }
+        companies[0]["enabled"] = toml::Value::Boolean(false);
+        let mut custom = companies[0].clone();
+        custom["id"] = toml::Value::String("custom-company".into());
+        custom["name"] = toml::Value::String("Custom Company".into());
+        companies.push(custom);
+        std::fs::write(&path, toml::to_string(&old).unwrap()).unwrap();
+
+        sync_default_companies(&path).unwrap();
+
+        let migrated = Config::load(&path).unwrap();
+        assert_eq!(migrated.filters.new_job_max_age_days, 14);
+        assert_eq!(migrated.companies.len(), 21);
+        assert!(
+            migrated
+                .companies
+                .iter()
+                .take(20)
+                .all(|company| company.industry != "Unknown")
+        );
+        assert!(
+            migrated
+                .companies
+                .iter()
+                .any(|company| company.id == "custom-company")
+        );
+        assert!(
+            migrated
+                .companies
+                .iter()
+                .find(|company| company.id == "mollie")
+                .unwrap()
+                .enabled
+        );
     }
 
     #[test]
