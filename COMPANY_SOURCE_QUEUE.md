@@ -13,7 +13,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 5. [ ] **Optiver** — blocked · the official API declared 31 Amsterdam jobs on 2026-08-14, but declared `componentID 16321` returned HTTP 404 from its first-party detail URL, so an exact complete scan cannot currently succeed.
 6. [x] **IMC Trading** — shipped · Greenhouse (`imc`).
 7. [x] **Flow Traders** — shipped · Greenhouse (`flowtraders`).
-8. [ ] **Maven Securities** — blocked/needs research · official careers content exists; no stable complete first-party feed confirmed.
+8. [x] **Maven Securities** — shipped · official careers page embeds a complete Greenhouse board (`mavensecuritiesholdingltd`).
 9. [ ] **Stripe** — blocked/needs research · Greenhouse is compatible, but the latest live check returned no Netherlands roles.
 10. [x] **bunq** — shipped · Recruitee.
 11. [x] **Finom** — shipped · Lever (`pnlfin`).

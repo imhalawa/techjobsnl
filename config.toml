@@ -294,6 +294,17 @@ board = "flowtraders"
 country_filter = "NL"
 
 [[companies]]
+id = "maven-securities"
+name = "Maven Securities"
+industry = "Proprietary trading, Market making, Financial services"
+scale = "200+ · Medium or large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "mavensecuritiesholdingltd"
+country_filter = "NL"
+
+[[companies]]
 id = "bunq"
 name = "bunq"
 industry = "Fintech, Banking, Payments"
