@@ -142,6 +142,10 @@ pub enum SourceConfig {
     Bol {
         base_url: String,
     },
+    Rabobank {
+        base_url: String,
+        country: String,
+    },
     Ing {
         listing_url: String,
     },
@@ -180,6 +184,10 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
         SourceConfig::Recruitee { base_url } | SourceConfig::Bol { base_url } => {
             validate_https_url(base_url, path("base_url"))?;
             Ok(())
+        }
+        SourceConfig::Rabobank { base_url, country } => {
+            validate_https_url(base_url, path("base_url"))?;
+            validate_country(country, path("country"))
         }
         SourceConfig::Getnoticed {
             base_url,

@@ -345,6 +345,10 @@ fn rejects_empty_source_fields() {
         SourceConfig::Bol {
             base_url: " ".into(),
         },
+        SourceConfig::Rabobank {
+            base_url: "https://rabobank.jobs".into(),
+            country: " ".into(),
+        },
         SourceConfig::Ing {
             listing_url: "".into(),
         },
@@ -392,6 +396,10 @@ fn rejects_non_https_source_urls() {
         },
         SourceConfig::Bol {
             base_url: "http://careers.bol.com".into(),
+        },
+        SourceConfig::Rabobank {
+            base_url: "http://rabobank.jobs".into(),
+            country: "nl".into(),
         },
         SourceConfig::Ing {
             listing_url: "http://careers.ing.com/en/search-jobs".into(),

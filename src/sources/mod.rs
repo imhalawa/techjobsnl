@@ -7,6 +7,7 @@ pub mod http;
 pub mod ing;
 pub mod jibe;
 pub mod json_ld;
+pub mod rabobank;
 pub mod recruitee;
 
 use std::time::Duration;

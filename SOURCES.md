@@ -59,8 +59,10 @@
 
 ## Rabobank
 
-- Official source limitation: on 2026-08-12, normal-user-agent direct GETs to the official listing/search pages, page 2, a vacancy detail, `robots.txt`, sitemaps, WordPress REST API, and feeds all returned HTTP 403 with an AkamaiNetStorage-branded unavailable page. No complete official unattended source was available.
-- Policy: Rabobank remains configured as disabled and unsupported. Re-enable it only when a complete official unattended source is accessible and passes source-contract fixtures plus live completeness verification; do not add browser impersonation or bypass the edge protection.
+- Sponsor: Rabobank identifies the brand as a trade name of `Coöperatieve Rabobank U.A.` with KvK `30046259`: <https://www.rabobank.com/conditions>. The current IND work register lists the same entity and KvK number: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.
+- Hiring entity: vacancies identify only `Rabobank`, not the employment-contract entity or KvK number. Mapping a Netherlands vacancy to `Coöperatieve Rabobank U.A.` is a strong inference, not vacancy-level proof; confirm the contract entity before relying on sponsor status.
+- Official source: <https://rabobank.jobs/api/v1/jobs/> plus <https://rabobank.jobs/api/sitemap/>. The adapter paginates the complete global API, requires an exact stable total and unique IDs, matches every API ID to its canonical Dutch sitemap URL, then keeps Netherlands vacancies.
+- Live discovery: 145 complete global jobs and 81 Netherlands jobs on 2026-08-14. Counts are volatile and are not hardcoded in the smoke test.
 
 ## Airwallex
 

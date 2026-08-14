@@ -1,0 +1,35 @@
+{
+  "hits": {
+    "total": { "value": 2, "relation": "eq" },
+    "hits": [
+      {
+        "_id": "JR_00150001",
+        "_source": {
+          "job_id": "JR_00150001",
+          "job_title": "Senior Software Engineer",
+          "city": "Utrecht",
+          "country": [{ "code": "nl", "label_nl": "Nederland" }],
+          "date_start": 1786646400000,
+          "job_description_plain": "Build reliable banking software.",
+          "status": "open",
+          "contract_type": [{ "code": "fulltime", "label_nl": "Fulltime" }],
+          "job_branch": [{ "code": "it", "label_nl": "IT" }]
+        }
+      },
+      {
+        "_id": "JR_00150002",
+        "_source": {
+          "job_id": "JR_00150002",
+          "job_title": "Data Engineer",
+          "city": "Amsterdam",
+          "country": [{ "code": "nl", "label_nl": "Nederland" }],
+          "date_start": 1786646400000,
+          "job_description_plain": "Build governed data pipelines.",
+          "status": "open",
+          "contract_type": [{ "code": "fulltime", "label_nl": "Fulltime" }],
+          "job_branch": [{ "code": "data", "label_nl": "Data & Analytics" }]
+        }
+      }
+    ]
+  }
+}

@@ -16,7 +16,9 @@ use job_watch::{
     domain::ScanEvent,
     filter::EligibilityFilter,
     scanner::ScanService,
-    sources::{JobSource, ashby, bol, ebay, getnoticed, greenhouse, ing, jibe, recruitee},
+    sources::{
+        JobSource, ashby, bol, ebay, getnoticed, greenhouse, ing, jibe, rabobank, recruitee,
+    },
     storage::{JobQuery, Store},
     ui::{App, AppCommand, View, render},
 };
@@ -286,6 +288,9 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     base_url,
                     client.clone(),
                 ))),
+                SourceConfig::Rabobank { base_url, country } => Ok(Arc::new(
+                    rabobank::RabobankSource::new(&company.id, base_url, country, client.clone()),
+                )),
                 SourceConfig::Ing { listing_url } => Ok(Arc::new(ing::IngSource::new(
                     &company.id,
                     listing_url,
@@ -639,11 +644,11 @@ mod tests {
         ));
 
         assert_eq!(rabobank.len(), 1);
-        assert!(!rabobank[0].enabled);
+        assert!(rabobank[0].enabled);
         assert!(matches!(
             &rabobank[0].source,
-            SourceConfig::Unsupported { reason }
-                if reason == "official sources reject unattended access (HTTP 403)"
+            SourceConfig::Rabobank { base_url, country }
+                if base_url == "https://rabobank.jobs" && country == "NL"
         ));
 
         assert_eq!(eneco.len(), 1);
@@ -704,6 +709,7 @@ mod tests {
                 "adyen",
                 "funda",
                 "bol",
+                "rabobank",
                 "ing",
                 "abn-amro",
                 "datasnipper",

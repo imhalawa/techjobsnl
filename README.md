@@ -67,8 +67,6 @@ The live smoke tests check Mollie's, Airwallex's, DataSnipper's, Adyen's, Databr
 
 ## Company onboarding
 
-Rabobank is tracked but disabled. On 2026-08-12, its official Akamai edge returned HTTP 403 for normal unattended requests, and no complete official unattended source was available. Re-enable it only when such a source is accessible and passes source-contract fixtures plus live completeness verification; do not bypass the edge protection.
-
 Eneco is tracked but disabled. Its official careers source was complete on 2026-08-12, but its postings name only `Eneco` as hiring organization, so the legal employer cannot be matched safely to an IND-recognised sponsor. Re-enable it only when an official vacancy or employment document names the legal entity and its KvK number matches a current IND sponsor.
 
 Albert Heijn Tech is tracked but disabled. Its native official filtered source was complete on 2026-08-13 with 10 Tech/Data Science jobs, but each vacancy names only `Albert Heijn` as hiring organization. Re-enable it only when an official vacancy, recruiter, or employment document names the legal entity and its KvK number matches a current IND-recognised sponsor.

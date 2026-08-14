@@ -90,10 +90,11 @@ base_url = "https://careers.bol.com"
 [[companies]]
 id = "rabobank"
 name = "Rabobank"
-enabled = false
+enabled = true
 [companies.source]
-strategy = "unsupported"
-reason = "official sources reject unattended access (HTTP 403)"
+strategy = "rabobank"
+base_url = "https://rabobank.jobs"
+country = "NL"
 
 [[companies]]
 id = "eneco"
