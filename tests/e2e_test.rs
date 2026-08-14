@@ -159,6 +159,7 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
             "ANWB",
             "PostNL",
             "TomTom",
+            "Amazon / AWS",
         ]
     );
 

@@ -602,3 +602,13 @@ enabled = true
 strategy = "lever"
 api_url = "https://api.eu.lever.co/v0/postings/tomtom"
 country_filter = "NL"
+
+[[companies]]
+id = "amazon"
+name = "Amazon / AWS"
+industry = "E-commerce, Cloud computing, Digital advertising, Logistics, Streaming media, Consumer technology"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "amazon"
+search_url = "https://www.amazon.jobs/en/search.json?normalized_country_code%5B%5D=NLD&offset=0&result_limit=100"

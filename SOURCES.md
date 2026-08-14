@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Amazon / AWS
+
+- Official source: <https://www.amazon.jobs/en/search?country=NLD>. Its JSON API at <https://www.amazon.jobs/en/search.json?normalized_country_code%5B%5D=NLD&offset=0&result_limit=100> declares the exact Netherlands total. The adapter follows every result page and validates unique feed IDs, public job IDs, official paths, Netherlands locations, dates, full descriptions, and Amazon-owned application URLs.
+- Amazon reported 1,576,000 full-time and part-time employees at year-end 2025: <https://ir.aboutamazon.com/news-release/news-release-details/2026/Amazon-com-Announces-Fourth-Quarter-Results/>. The configured `2,000+` band follows the app's EU large-company classification.
+- The Netherlands board covers Amazon, AWS, advertising, media, logistics, devices, and other Amazon group employers. The configured industries describe that mixed board rather than every individual legal entity.
+- Language and relocation conditions vary by vacancy. The API exposes the hiring company name, but it does not prove visa sponsorship; confirm the contract entity and sponsorship before relying on recognised-sponsor status.
+
 ## PostNL
 
 - Official source: <https://vacatures-website.postnl.nl/vacatures-widget/api/vacanciesoverview?isProfessional=true&distance=-1&page=1>. The adapter follows every declared page, verifies the exact total and unique IDs, fetches every official detail, and accepts only professional roles with matching Netherlands-widget locations and official job/application URLs.
