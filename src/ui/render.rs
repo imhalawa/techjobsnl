@@ -1732,7 +1732,11 @@ fn render_navigation(frame: &mut Frame, app: &App, area: Rect) {
             Borders::ALL,
         ))
         .style(Style::new().fg(theme.primary_text).bg(theme.background))
-        .highlight_style(Style::new().bg(theme.selected_row))
+        .highlight_style(
+            Style::new()
+                .bg(theme.selected_row)
+                .add_modifier(Modifier::BOLD),
+        )
         .highlight_symbol("› ");
     let mut state = ListState::default();
     state.select(Some(app.navigation_index()));
@@ -1916,16 +1920,28 @@ fn render_details(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
         || Text::from("No jobs in this view."),
         |job| {
             let observed = &job.classified.observed;
-            let mut context = vec![app.company_name(&job.key.company_id).to_owned()];
-            if !observed.locations.is_empty() {
-                context.push(observed.locations.join(", "));
-            }
-            if let Some(department) = &observed.department {
-                context.push(department.clone());
+            let mut context = vec![Span::styled(
+                app.company_name(&job.key.company_id).to_owned(),
+                Style::new().fg(theme.new).add_modifier(Modifier::BOLD),
+            )];
+            for value in [
+                (!observed.locations.is_empty()).then(|| observed.locations.join(", ")),
+                observed.department.clone(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                context.push(Span::styled(" · ", Style::new().fg(theme.muted_text)));
+                context.push(Span::styled(value, Style::new().fg(theme.muted_text)));
             }
             let mut lines = vec![
-                Line::styled(observed.title.as_str(), Style::new().fg(theme.primary_text)),
-                Line::styled(context.join(" · "), Style::new().fg(theme.muted_text)),
+                Line::styled(
+                    observed.title.as_str(),
+                    Style::new()
+                        .fg(theme.primary_text)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Line::from(context),
                 Line::from(""),
             ];
             let mut status = vec![

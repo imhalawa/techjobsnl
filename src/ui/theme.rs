@@ -21,18 +21,18 @@ pub struct Theme {
 impl Theme {
     pub const fn clean_dark() -> Self {
         Self {
-            background: Color::Black,
-            focused_border: Color::Cyan,
-            unfocused_border: Color::DarkGray,
-            hovered_row: Color::Rgb(22, 34, 43),
-            selected_row: Color::DarkGray,
-            primary_text: Color::White,
-            muted_text: Color::Gray,
-            open: Color::Green,
-            new: Color::LightCyan,
-            applied: Color::LightMagenta,
-            warning: Color::Yellow,
-            error: Color::LightRed,
+            background: Color::Rgb(7, 17, 31),
+            focused_border: Color::Rgb(66, 200, 210),
+            unfocused_border: Color::Rgb(35, 62, 82),
+            hovered_row: Color::Rgb(15, 35, 55),
+            selected_row: Color::Rgb(28, 49, 70),
+            primary_text: Color::Rgb(224, 232, 240),
+            muted_text: Color::Rgb(126, 148, 166),
+            open: Color::Rgb(86, 211, 130),
+            new: Color::Rgb(66, 200, 210),
+            applied: Color::Rgb(188, 132, 246),
+            warning: Color::Rgb(245, 183, 65),
+            error: Color::Rgb(255, 105, 97),
         }
     }
 
