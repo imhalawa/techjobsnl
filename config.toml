@@ -439,3 +439,23 @@ enabled = true
 strategy = "greenhouse"
 board = "testendouble"
 country_filter = "NL"
+
+[[companies]]
+id = "silverflow"
+name = "Silverflow"
+industry = "Fintech, Payments infrastructure, B2B SaaS"
+scale = "50–249 · Medium-sized company"
+enabled = true
+[companies.source]
+strategy = "personio"
+base_url = "https://silverflow.jobs.personio.com"
+
+[[companies]]
+id = "ohpen"
+name = "Ohpen"
+industry = "Fintech, Banking software, B2B SaaS"
+scale = "200+ · Medium or large company"
+enabled = true
+[companies.source]
+strategy = "personio"
+base_url = "https://ohpen.jobs.personio.com"
