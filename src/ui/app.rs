@@ -153,6 +153,8 @@ pub enum Setting {
     Countries,
     IncludedTitles,
     ExcludedTitles,
+    AdvancedFilters,
+    SimpleSettings,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -234,6 +236,8 @@ pub struct App {
     help_visible: bool,
     setting_input: String,
     setting_error: Option<String>,
+    editing_setting: Option<Setting>,
+    advanced_settings: bool,
     job_list_width: Option<u16>,
     divider_dragging: bool,
     scan_progress: ScanProgress,
@@ -300,6 +304,8 @@ impl App {
             help_visible: false,
             setting_input: String::new(),
             setting_error: None,
+            editing_setting: None,
+            advanced_settings: false,
             job_list_width: None,
             divider_dragging: false,
             scan_progress: ScanProgress::default(),
@@ -1049,7 +1055,22 @@ impl App {
     }
 
     pub fn setting(&self) -> Setting {
-        SETTINGS[self.selected_index.min(SETTINGS.len() - 1)]
+        self.editing_setting.unwrap_or_else(|| {
+            let settings = self.settings();
+            settings[self.selected_index.min(settings.len() - 1)]
+        })
+    }
+
+    pub fn advanced_settings(&self) -> bool {
+        self.advanced_settings
+    }
+
+    fn settings(&self) -> &'static [Setting] {
+        if self.advanced_settings {
+            &ADVANCED_SETTINGS
+        } else {
+            &SETTINGS
+        }
     }
 
     pub fn setting_error(&self) -> Option<&str> {
@@ -1544,8 +1565,15 @@ impl App {
                     area.contains((column, row).into())
                         .then_some(MouseTarget::Setting(self.selected_index))
                 } else {
-                    item_at(column, row, area, 2, SETTINGS.len(), self.selected_index)
-                        .map(MouseTarget::Setting)
+                    item_at(
+                        column,
+                        row,
+                        area,
+                        1,
+                        self.settings().len(),
+                        self.selected_index,
+                    )
+                    .map(MouseTarget::Setting)
                 }
             }
             View::Scans | View::Sources => {
@@ -2042,7 +2070,7 @@ impl App {
                 LibraryTab::Roles => self.library.roles.len(),
                 LibraryTab::Companies => self.library.companies.len(),
             },
-            View::Settings => SETTINGS.len(),
+            View::Settings => self.settings().len(),
             _ => self.visible_jobs().count(),
         }
     }
@@ -2076,6 +2104,7 @@ impl App {
             KeyCode::Esc => {
                 self.setting_input.clear();
                 self.setting_error = None;
+                self.editing_setting = None;
                 self.input_mode = InputMode::Normal;
             }
             KeyCode::Backspace => {
@@ -2108,6 +2137,7 @@ impl App {
                     Setting::ExcludedTitles => {
                         filters.exclude_title_patterns = split_setting(&self.setting_input, ';');
                     }
+                    Setting::AdvancedFilters | Setting::SimpleSettings => unreachable!(),
                 }
                 if let Err(error) = filters.validate() {
                     self.setting_error = Some(error.to_string());
@@ -2115,6 +2145,7 @@ impl App {
                 }
                 self.input_mode = InputMode::Normal;
                 self.setting_error = None;
+                self.editing_setting = None;
                 return AppCommand::SaveFilters(filters);
             }
             _ => {}
@@ -2123,11 +2154,37 @@ impl App {
     }
 
     fn start_setting_edit(&mut self) {
-        self.setting_input = match self.setting() {
+        let setting = self.setting();
+        match setting {
+            Setting::AdvancedFilters => {
+                self.advanced_settings = true;
+                self.selected_index = 0;
+                return;
+            }
+            Setting::SimpleSettings => {
+                self.advanced_settings = false;
+                self.selected_index = 0;
+                return;
+            }
+            Setting::IncludedTitles if !self.advanced_settings => {
+                self.advanced_settings = true;
+                self.selected_index = 1;
+                return;
+            }
+            Setting::ExcludedTitles if !self.advanced_settings => {
+                self.advanced_settings = true;
+                self.selected_index = 2;
+                return;
+            }
+            _ => {}
+        }
+        self.editing_setting = Some(setting);
+        self.setting_input = match setting {
             Setting::NewJobAge => self.config.filters.new_job_max_age_days.to_string(),
             Setting::Countries => self.config.filters.countries.join(", "),
             Setting::IncludedTitles => self.config.filters.include_title_patterns.join("; "),
             Setting::ExcludedTitles => self.config.filters.exclude_title_patterns.join("; "),
+            Setting::AdvancedFilters | Setting::SimpleSettings => unreachable!(),
         };
         self.setting_error = None;
         self.input_mode = InputMode::Setting;
@@ -2460,9 +2517,16 @@ const LIBRARY_TABS: [LibraryTab; 5] = [
     LibraryTab::Companies,
 ];
 
-const SETTINGS: [Setting; 4] = [
+const SETTINGS: [Setting; 5] = [
     Setting::NewJobAge,
     Setting::Countries,
+    Setting::IncludedTitles,
+    Setting::ExcludedTitles,
+    Setting::AdvancedFilters,
+];
+
+const ADVANCED_SETTINGS: [Setting; 3] = [
+    Setting::SimpleSettings,
     Setting::IncludedTitles,
     Setting::ExcludedTitles,
 ];

@@ -576,7 +576,9 @@ fn settings_edits_new_job_age_and_new_view_uses_publication_date() {
     );
 
     open_view(&mut app, 8);
-    assert!(rendered(&app, 120, 24).contains("New job age  7 days"));
+    let settings = rendered(&app, 120, 24);
+    assert!(settings.contains("New jobs"));
+    assert!(settings.contains("Last 7 days"));
     assert_eq!(app.handle_key(special(KeyCode::Enter)), AppCommand::None);
     assert_eq!(app.input_mode(), InputMode::Setting);
     app.handle_key(special(KeyCode::Backspace));
@@ -601,6 +603,8 @@ fn settings_can_clear_title_filters_to_show_every_job_type() {
     app.handle_key(special(KeyCode::Down));
     app.handle_key(special(KeyCode::Down));
     app.handle_key(special(KeyCode::Enter));
+    assert!(rendered(&app, 120, 24).contains("Advanced title rules"));
+    app.handle_key(special(KeyCode::Enter));
     for _ in 0..app.setting_input().chars().count() {
         app.handle_key(special(KeyCode::Backspace));
     }
@@ -612,7 +616,42 @@ fn settings_can_clear_title_filters_to_show_every_job_type() {
         AppCommand::SaveFilters(expected.clone())
     );
     app.apply_filters(expected);
-    assert!(rendered(&app, 120, 24).contains("Included titles  All titles"));
+    app.handle_key(special(KeyCode::Up));
+    app.handle_key(special(KeyCode::Enter));
+    let settings = rendered(&app, 120, 24);
+    assert!(settings.contains("Job types"));
+    assert!(settings.contains("All job types"));
+}
+
+#[test]
+fn simple_settings_hide_regex_and_use_everyday_language() {
+    let mut configured = config();
+    configured.filters.include_title_patterns = vec![
+        "software engineer".into(),
+        "platform engineer".into(),
+        "data engineer".into(),
+        "machine learning engineer".into(),
+        "security engineer".into(),
+    ];
+    configured.filters.exclude_title_patterns = vec![
+        "manager".into(),
+        "director".into(),
+        "product manager".into(),
+        "sales engineer".into(),
+        "support".into(),
+    ];
+    let mut app = App::new(configured, vec![]);
+    open_view(&mut app, 8);
+
+    let settings = normalized_interior(&rendered_buffer(&app, 120, 24));
+    assert!(settings.contains("New jobs Last 7 days"));
+    assert!(settings.contains("Locations Netherlands"));
+    assert!(settings.contains("Job types Software, Platform, Data, AI, Security"));
+    assert!(
+        settings.contains("Hide jobs Manager, Director, Product manager, Sales engineer, Support")
+    );
+    assert!(!settings.contains("regex"));
+    assert!(!settings.contains("patterns"));
 }
 
 #[test]
@@ -827,7 +866,7 @@ fn reported_listing_views_show_their_totals() {
     open_view(&mut app, 5);
     assert!(rendered(&app, 120, 24).contains("Sources · 1"));
     open_view(&mut app, 8);
-    assert!(rendered(&app, 120, 24).contains("Settings · 4"));
+    assert!(rendered(&app, 120, 24).contains("Settings · 5"));
 }
 
 #[test]

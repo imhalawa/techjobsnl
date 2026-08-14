@@ -2020,19 +2020,20 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
     let theme = app.theme();
     if app.input_mode() == InputMode::Setting {
         let (title, hint) = match app.setting() {
-            Setting::NewJobAge => ("Edit new job age", "Enter a positive number of days."),
+            Setting::NewJobAge => ("How recent?", "Enter a positive number of days."),
             Setting::Countries => (
-                "Edit countries",
-                "Use two-letter country codes separated by commas, for example NL, DE.",
+                "Where?",
+                "Enter countries separated by commas, for example NL, DE.",
             ),
             Setting::IncludedTitles => (
-                "Edit included titles",
+                "Advanced · jobs to include",
                 "Separate regular expressions with ; or leave empty to include every job title.",
             ),
             Setting::ExcludedTitles => (
-                "Edit excluded titles",
+                "Advanced · jobs to hide",
                 "Separate regular expressions with ; or leave empty to exclude no job titles.",
             ),
+            Setting::AdvancedFilters | Setting::SimpleSettings => unreachable!(),
         };
         let mut lines = vec![
             Line::styled(
@@ -2066,49 +2067,65 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
     }
 
     let filters = &app.config().filters;
-    let included = if filters.include_title_patterns.is_empty() {
-        "All titles".to_owned()
+    let (title, items) = if app.advanced_settings() {
+        (
+            "Advanced title rules · 3 · Enter to change",
+            vec![
+                setting_item(app, 0, "Simple settings", "Back".to_owned()),
+                setting_item(
+                    app,
+                    1,
+                    "Include rules",
+                    rule_count(filters.include_title_patterns.len()),
+                ),
+                setting_item(
+                    app,
+                    2,
+                    "Hide rules",
+                    rule_count(filters.exclude_title_patterns.len()),
+                ),
+            ],
+        )
     } else {
-        format!("{} patterns", filters.include_title_patterns.len())
+        (
+            "Settings · 5 · Enter to change",
+            vec![
+                setting_item(
+                    app,
+                    0,
+                    "New jobs",
+                    format!("Last {} days", filters.new_job_max_age_days),
+                ),
+                setting_item(
+                    app,
+                    1,
+                    "Locations",
+                    filters
+                        .countries
+                        .iter()
+                        .map(|country| country_name(country))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ),
+                setting_item(
+                    app,
+                    2,
+                    "Job types",
+                    job_type_summary(&filters.include_title_patterns),
+                ),
+                setting_item(
+                    app,
+                    3,
+                    "Hide jobs",
+                    hidden_title_summary(&filters.exclude_title_patterns),
+                ),
+                setting_item(app, 4, "Advanced", "Custom title rules".to_owned()),
+            ],
+        )
     };
-    let excluded = if filters.exclude_title_patterns.is_empty() {
-        "None".to_owned()
-    } else {
-        format!("{} patterns", filters.exclude_title_patterns.len())
-    };
-    let items = vec![
-        setting_item(
-            app,
-            0,
-            "New job age",
-            format!("{} days", filters.new_job_max_age_days),
-            "Controls which published jobs appear in New.",
-        ),
-        setting_item(
-            app,
-            1,
-            "Countries",
-            filters.countries.join(", "),
-            "Only jobs in these countries are eligible.",
-        ),
-        setting_item(
-            app,
-            2,
-            "Included titles",
-            included,
-            "Clear this setting to include engineering and non-engineering jobs.",
-        ),
-        setting_item(
-            app,
-            3,
-            "Excluded titles",
-            excluded,
-            "Matching titles remain hidden; clear this setting to exclude none.",
-        ),
-    ];
     let list = List::new(items)
         .block(panel(
-            "Settings · 4 · Enter to edit",
+            title,
             if app.focus() == Focus::Content {
                 theme.focused_border
             } else {
@@ -2126,28 +2143,104 @@ fn render_settings(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
         frame,
         app,
         area,
-        4,
+        if app.advanced_settings() { 3 } else { 5 },
         state.offset(),
-        usize::from(area.height.saturating_sub(2) / 2).max(1),
+        usize::from(area.height.saturating_sub(2)).max(1),
     );
 }
 
-fn setting_item(
-    app: &App,
-    index: usize,
-    label: &'static str,
-    value: String,
-    help: &'static str,
-) -> ListItem<'static> {
+fn setting_item(app: &App, index: usize, label: &'static str, value: String) -> ListItem<'static> {
     let theme = app.theme();
-    ListItem::new(vec![
-        Line::from(vec![
-            Span::styled(format!("{label}  "), Style::new().fg(theme.primary_text)),
-            Span::styled(value, Style::new().fg(theme.new)),
-        ]),
-        Line::styled(format!("  {help}"), Style::new().fg(theme.muted_text)),
-    ])
+    ListItem::new(Line::from(vec![
+        Span::styled(format!("{label:<14}"), Style::new().fg(theme.primary_text)),
+        Span::styled(value, Style::new().fg(theme.new)),
+    ]))
     .style(mouse_style(app, MouseTarget::Setting(index)))
+}
+
+fn rule_count(count: usize) -> String {
+    match count {
+        0 => "None".to_owned(),
+        1 => "1 regex rule".to_owned(),
+        count => format!("{count} regex rules"),
+    }
+}
+
+fn country_name(code: &str) -> String {
+    match code.to_ascii_uppercase().as_str() {
+        "NL" => "Netherlands".to_owned(),
+        "BE" => "Belgium".to_owned(),
+        "DE" => "Germany".to_owned(),
+        "FR" => "France".to_owned(),
+        "GB" | "UK" => "United Kingdom".to_owned(),
+        "IE" => "Ireland".to_owned(),
+        "ES" => "Spain".to_owned(),
+        "PT" => "Portugal".to_owned(),
+        "IT" => "Italy".to_owned(),
+        "CH" => "Switzerland".to_owned(),
+        "AT" => "Austria".to_owned(),
+        "PL" => "Poland".to_owned(),
+        "DK" => "Denmark".to_owned(),
+        "SE" => "Sweden".to_owned(),
+        "NO" => "Norway".to_owned(),
+        "FI" => "Finland".to_owned(),
+        _ => code.to_owned(),
+    }
+}
+
+fn job_type_summary(patterns: &[String]) -> String {
+    if patterns.is_empty() {
+        return "All job types".to_owned();
+    }
+    let rules = patterns.join("|").to_ascii_lowercase();
+    let groups = [
+        (
+            "Software",
+            ["software", "backend", "front", "full", "mobile"].as_slice(),
+        ),
+        (
+            "Platform",
+            ["platform", "devops", "cloud", "reliability", "sre"].as_slice(),
+        ),
+        ("Data", ["data engineer", "analytics engineer"].as_slice()),
+        (
+            "AI",
+            ["machine learning", "ml engineer", "ai engineer"].as_slice(),
+        ),
+        ("Security", ["security"].as_slice()),
+    ]
+    .into_iter()
+    .filter(|(_, words)| words.iter().any(|word| rules.contains(word)))
+    .map(|(label, _)| label)
+    .collect::<Vec<_>>();
+    if groups.is_empty() {
+        "Custom rules".to_owned()
+    } else {
+        groups.join(", ")
+    }
+}
+
+fn hidden_title_summary(patterns: &[String]) -> String {
+    if patterns.is_empty() {
+        return "Nothing".to_owned();
+    }
+    if patterns.iter().any(|pattern| {
+        pattern
+            .chars()
+            .any(|character| !character.is_alphanumeric() && character != ' ' && character != '-')
+    }) {
+        return "Custom rules".to_owned();
+    }
+    patterns
+        .iter()
+        .map(|pattern| {
+            let mut characters = pattern.chars();
+            characters.next().map_or_else(String::new, |first| {
+                first.to_uppercase().collect::<String>() + characters.as_str()
+            })
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn metadata_line(
@@ -2447,7 +2540,17 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             actions.push(format!("{} quit", keys.quit));
         }
         actions
-    } else if matches!(app.view(), View::Scans | View::Sources | View::Settings) {
+    } else if app.view() == View::Settings {
+        let mut actions = vec![
+            "↑/↓ settings".to_owned(),
+            "Enter change".to_owned(),
+            "Tab navigation".to_owned(),
+        ];
+        if area.width >= 80 {
+            actions.push(format!("{} quit", keys.quit));
+        }
+        actions
+    } else if matches!(app.view(), View::Scans | View::Sources) {
         let mut actions = vec![format!("{} scan", keys.scan), "Tab navigation".to_owned()];
         if area.width >= 80 {
             actions.push(format!("{} quit", keys.quit));
