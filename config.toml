@@ -107,6 +107,17 @@ board = "workatbackbase"
 country_filter = "NL"
 
 [[companies]]
+id = "da-vinci"
+name = "Da Vinci"
+industry = "Proprietary trading, Market making, Financial services"
+scale = "200+ · Medium or large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "davinciderivatives"
+country_filter = "NL"
+
+[[companies]]
 id = "funda"
 name = "Funda"
 industry = "Real estate, Marketplace, Advertising"

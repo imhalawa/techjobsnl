@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Da Vinci
+
+- Official source: <https://boards-api.greenhouse.io/v1/boards/davinciderivatives/jobs?content=true>. The Greenhouse payload declares its complete global total; the configured country filter keeps only vacancies with an explicit Netherlands office.
+- Careers ownership: Da Vinci's official site describes the Amsterdam trading firm and links its careers flow: <https://davincitrading.com/about-us/>.
+- Scale: Da Vinci's company-managed LinkedIn profile reports more than 200 employees; treat this as an approximate band rather than an audited headcount: <https://www.linkedin.com/company/da-vinci-trading>.
+- Hiring entity: the board names the Da Vinci brand, not the legal employer for each contract. Confirm the employment entity before relying on any sponsor status.
+
 ## Backbase
 
 - Official source: <https://boards-api.greenhouse.io/v1/boards/workatbackbase/jobs?content=true>. The Greenhouse payload declares its complete global total; the configured country filter keeps only vacancies with an explicit Netherlands office.

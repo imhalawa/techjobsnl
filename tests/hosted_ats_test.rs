@@ -329,6 +329,15 @@ async fn backbase_live_returns_complete_unique_netherlands_jobs() {
 
 #[tokio::test]
 #[ignore = "live external source"]
+async fn da_vinci_live_returns_complete_unique_netherlands_jobs() {
+    let source = GreenhouseSource::new("da-vinci", "davinciderivatives", live_client())
+        .with_country_filter(Some("NL"));
+    let jobs = complete_jobs(source.scan().await.unwrap());
+    assert_live_jobs("Da Vinci", &jobs);
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
 async fn jibe_live_returns_complete_unique_jobs() {
     let client = live_client();
     let source = JibeSource::new(
