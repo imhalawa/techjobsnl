@@ -466,16 +466,21 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
     let rows = report.stacks.iter().map(|stack| {
         Row::new(vec![
             Cell::from(if stack.saved { "★" } else { " " }),
-            Cell::from(stack.key.label()),
+            Cell::from(stack.path_label()),
             Cell::from(format_demand(&stack.metric)),
-            Cell::from(format!("{:+}", stack.metric.delta_count)),
+            Cell::from(stack.company_count.to_string()),
+            Cell::from(format!(
+                "{}.{:02}×",
+                stack.association_bps / 100,
+                stack.association_bps % 100
+            )),
             Cell::from(format_delta(&stack.metric)),
             Cell::from(stack.metric.momentum.as_str()),
             Cell::from(stack.metric.confidence.as_str()),
         ])
     });
     let title = format!(
-        "Common stacks · {} · minimum {} jobs",
+        "Skill graph · {} paths · minimum {} jobs · strong links",
         report.stacks.len(),
         app.config().analytics.minimum_cooccurrence
     );
@@ -486,13 +491,14 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Fill(2),
             Constraint::Length(11),
             Constraint::Length(7),
+            Constraint::Length(7),
             Constraint::Length(8),
             Constraint::Length(12),
             Constraint::Length(5),
         ],
     )
     .header(table_header([
-        "", "Stack", "Demand", "Δ jobs", "Δ share", "Momentum", "Conf",
+        "", "Path", "Demand", "Firms", "Link", "Δ share", "Momentum", "Conf",
     ]))
     .block(panel(
         &title,
@@ -504,12 +510,56 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
     .highlight_symbol("› ");
     let mut state = TableState::default().with_selected(app.selected_index());
     frame.render_stateful_widget(table, sections[0], &mut state);
-    let metrics = report
-        .stacks
-        .iter()
-        .map(|stack| &stack.metric)
-        .collect::<Vec<_>>();
-    render_metric_chart(frame, app, sections[1], "Stack demand", &metrics);
+    let Some(stack) = report.stacks.get(app.selected_index()) else {
+        frame.render_widget(
+            Paragraph::new("No evidence-backed paths for these filters.")
+                .block(panel(
+                    "Selected stack graph",
+                    app.theme().unfocused_border,
+                    app.theme().background,
+                    Borders::ALL,
+                ))
+                .style(Style::new().fg(app.theme().muted_text)),
+            sections[1],
+        );
+        return;
+    };
+    let mut path = Vec::new();
+    for (index, skill) in stack.path.iter().enumerate() {
+        if index > 0 {
+            path.push(Span::styled(
+                " ── ",
+                Style::new().fg(app.theme().muted_text),
+            ));
+        }
+        path.push(Span::styled(
+            format!("● {skill}"),
+            Style::new().fg(app.theme().focused_border),
+        ));
+    }
+    let association = format!(
+        "{}.{:02}× association · {} jobs · {} firms · {}",
+        stack.association_bps / 100,
+        stack.association_bps % 100,
+        stack.metric.current_count,
+        stack.company_count,
+        stack.metric.momentum.as_str()
+    );
+    frame.render_widget(
+        Paragraph::new(Text::from(vec![
+            Line::from(path),
+            Line::from(""),
+            Line::from(association),
+        ]))
+        .block(panel(
+            "Selected stack graph",
+            app.theme().unfocused_border,
+            app.theme().background,
+            Borders::ALL,
+        ))
+        .wrap(Wrap { trim: false }),
+        sections[1],
+    );
 }
 
 fn render_market_trends(frame: &mut Frame, app: &App, area: Rect) {

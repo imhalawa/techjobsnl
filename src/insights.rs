@@ -134,8 +134,17 @@ impl StackKey {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StackTrend {
     pub key: StackKey,
+    pub path: Vec<String>,
     pub metric: MetricRow,
+    pub company_count: usize,
+    pub association_bps: usize,
     pub saved: bool,
+}
+
+impl StackTrend {
+    pub fn path_label(&self) -> String {
+        self.path.join(" — ")
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -236,6 +245,7 @@ impl AnalyticsWork {
             .retain(|item| item.demand_count >= self.minimum_skill_occurrence);
         report.hard_skills.truncate(self.maximum_skills);
         report.soft_skills.truncate(self.maximum_skills);
+        report.stacks.truncate(self.maximum_skills);
         report.recommendations.truncate(self.maximum_skills);
         AnalyticsResult {
             revision: self.revision,
@@ -578,36 +588,48 @@ fn stack_trends(
     library: &LibraryState,
     minimum_support: usize,
 ) -> Vec<StackTrend> {
-    let current_counts = stack_counts(current, facts);
-    let period_counts = stack_counts(period, facts);
-    let previous_counts = stack_counts(previous, facts);
-    let mut supported = current_counts
+    let graph = StackGraph::build(current, facts);
+    let mut supported = graph
+        .candidates
         .iter()
-        .filter(|(_, count)| **count >= minimum_support)
-        .map(|(stack, count)| (stack.clone(), *count))
+        .filter(|(_, candidate)| candidate.support >= minimum_support)
+        .filter_map(|(key, candidate)| {
+            graph
+                .strongest_path(key, minimum_support)
+                .map(|(path, association_bps)| (key.clone(), path, association_bps, candidate))
+        })
         .collect::<Vec<_>>();
-    let all_supported = supported.clone();
-    supported.retain(|(stack, count)| {
-        !all_supported.iter().any(|(larger, larger_count)| {
-            larger.0.len() > stack.0.len()
-                && larger_count == count
-                && stack.0.iter().all(|skill| larger.0.contains(skill))
+    let supported_keys = supported
+        .iter()
+        .map(|(key, _, _, candidate)| (key.clone(), candidate.support))
+        .collect::<Vec<_>>();
+    supported.retain(|(key, _, _, candidate)| {
+        !supported_keys.iter().any(|(larger, larger_support)| {
+            larger.0.len() > key.0.len()
+                && *larger_support == candidate.support
+                && key.0.iter().all(|skill| larger.0.contains(skill))
         })
     });
     let mut rows = supported
         .into_iter()
-        .map(|(key, current_count)| StackTrend {
-            metric: metric(
-                &key.label(),
-                current_count,
-                current.len(),
-                period_counts.get(&key).copied().unwrap_or(0),
-                period.len(),
-                previous_counts.get(&key).copied().unwrap_or(0),
-                previous.len(),
-            ),
-            saved: library.stacks.contains(&key.0),
-            key,
+        .map(|(key, path, association_bps, candidate)| {
+            let path_label = path.join(" — ");
+            StackTrend {
+                metric: metric(
+                    &path_label,
+                    candidate.support,
+                    current.len(),
+                    count_stack(period, facts, &key),
+                    period.len(),
+                    count_stack(previous, facts, &key),
+                    previous.len(),
+                ),
+                company_count: candidate.companies.len(),
+                association_bps,
+                saved: library.stacks.contains(&key.0),
+                key,
+                path,
+            }
         })
         .collect::<Vec<_>>();
     rows.sort_by(|left, right| {
@@ -615,55 +637,177 @@ fn stack_trends(
             .metric
             .current_count
             .cmp(&left.metric.current_count)
+            .then_with(|| right.company_count.cmp(&left.company_count))
+            .then_with(|| right.association_bps.cmp(&left.association_bps))
             .then_with(|| left.key.cmp(&right.key))
     });
     rows
 }
 
-fn stack_counts(
-    jobs: &[&JobRecord],
-    facts: &HashMap<JobKey, JobFacts>,
-) -> BTreeMap<StackKey, usize> {
-    let individual = jobs
-        .iter()
-        .flat_map(|job| {
+const MIN_STACK_ASSOCIATION_BPS: usize = 150;
+
+#[derive(Default)]
+struct StackCandidate {
+    support: usize,
+    companies: HashSet<String>,
+}
+
+#[derive(Default)]
+struct StackGraph {
+    job_count: usize,
+    nodes: HashMap<String, usize>,
+    edges: BTreeMap<(String, String), usize>,
+    candidates: BTreeMap<StackKey, StackCandidate>,
+}
+
+impl StackGraph {
+    fn build(jobs: &[&JobRecord], facts: &HashMap<JobKey, JobFacts>) -> Self {
+        let mut graph = Self {
+            job_count: jobs.len(),
+            ..Self::default()
+        };
+        for job in jobs {
+            let Some(job_facts) = facts.get(&job.key) else {
+                continue;
+            };
+            for (name, evidence) in &job_facts.skills {
+                if evidence.kind == SkillKind::Hard {
+                    *graph.nodes.entry(name.clone()).or_default() += 1;
+                }
+            }
+        }
+        for job in jobs {
+            let Some(job_facts) = facts.get(&job.key) else {
+                continue;
+            };
+            let mut skills = job_facts
+                .skills
+                .iter()
+                .filter(|(_, evidence)| evidence.kind == SkillKind::Hard)
+                .map(|(name, _)| name.clone())
+                .collect::<Vec<_>>();
+            skills.sort_by(|left, right| {
+                graph
+                    .nodes
+                    .get(right)
+                    .cmp(&graph.nodes.get(left))
+                    .then_with(|| left.cmp(right))
+            });
+            // ponytail: cap dense postings at 12 skills; raise only if real data loses useful paths.
+            skills.truncate(12);
+            skills.sort();
+            combinations(&skills, 2, 0, &mut Vec::new(), &mut |items| {
+                if supports_stack(job_facts, items) {
+                    *graph
+                        .edges
+                        .entry(edge_key(&items[0], &items[1]))
+                        .or_default() += 1;
+                }
+            });
+            for size in 3..=5.min(skills.len()) {
+                combinations(&skills, size, 0, &mut Vec::new(), &mut |items| {
+                    if supports_stack(job_facts, items) {
+                        let candidate = graph
+                            .candidates
+                            .entry(StackKey(items.to_vec()))
+                            .or_default();
+                        candidate.support += 1;
+                        candidate.companies.insert(job.key.company_id.clone());
+                    }
+                });
+            }
+        }
+        graph
+    }
+
+    fn strongest_path(
+        &self,
+        key: &StackKey,
+        minimum_support: usize,
+    ) -> Option<(Vec<String>, usize)> {
+        let mut best: Option<(usize, usize, Vec<String>)> = None;
+        permutations(&key.0, &mut Vec::new(), &mut |path| {
+            let reversed = path.iter().rev().cloned().collect::<Vec<_>>();
+            if path > reversed.as_slice() {
+                return;
+            }
+            let strengths = path
+                .windows(2)
+                .filter_map(|pair| self.edge_association_bps(&pair[0], &pair[1], minimum_support))
+                .collect::<Vec<_>>();
+            if strengths.len() + 1 != path.len() {
+                return;
+            }
+            let minimum = strengths.iter().copied().min().unwrap_or_default();
+            let total = strengths.iter().sum();
+            let replace = best
+                .as_ref()
+                .is_none_or(|(best_minimum, best_total, best_path)| {
+                    minimum > *best_minimum
+                        || minimum == *best_minimum && total > *best_total
+                        || minimum == *best_minimum && total == *best_total && path < best_path
+                });
+            if replace {
+                best = Some((minimum, total, path.to_vec()));
+            }
+        });
+        best.map(|(minimum, _, path)| (path, minimum))
+    }
+
+    fn edge_association_bps(
+        &self,
+        left: &str,
+        right: &str,
+        minimum_support: usize,
+    ) -> Option<usize> {
+        let support = self.edges.get(&edge_key(left, right)).copied()?;
+        if support < minimum_support {
+            return None;
+        }
+        let denominator = self.nodes.get(left)? * self.nodes.get(right)?;
+        let association = support * self.job_count * 100 / denominator;
+        (association >= MIN_STACK_ASSOCIATION_BPS).then_some(association)
+    }
+}
+
+fn edge_key(left: &str, right: &str) -> (String, String) {
+    if left <= right {
+        (left.to_owned(), right.to_owned())
+    } else {
+        (right.to_owned(), left.to_owned())
+    }
+}
+
+pub(crate) fn supports_stack(facts: &JobFacts, skills: &[String]) -> bool {
+    skills.iter().all(|skill| facts.skills.contains_key(skill))
+        && !skills.iter().enumerate().any(|(index, left)| {
+            skills[index + 1..]
+                .iter()
+                .any(|right| skills_are_alternatives(facts, left, right))
+        })
+}
+
+fn skills_are_alternatives(facts: &JobFacts, left: &str, right: &str) -> bool {
+    let Some(left) = facts.skills.get(left) else {
+        return false;
+    };
+    let Some(right) = facts.skills.get(right) else {
+        return false;
+    };
+    left.context == right.context
+        && [" or ", "one of", "at least one", "either"]
+            .iter()
+            .any(|marker| left.context.to_lowercase().contains(marker))
+}
+
+fn count_stack(jobs: &[&JobRecord], facts: &HashMap<JobKey, JobFacts>, key: &StackKey) -> usize {
+    jobs.iter()
+        .filter(|job| {
             facts
                 .get(&job.key)
-                .into_iter()
-                .flat_map(|value| value.skills.iter())
+                .is_some_and(|facts| supports_stack(facts, &key.0))
         })
-        .filter(|(_, evidence)| evidence.kind == SkillKind::Hard)
-        .fold(HashMap::<String, usize>::new(), |mut counts, (name, _)| {
-            *counts.entry(name.clone()).or_default() += 1;
-            counts
-        });
-    let mut counts = BTreeMap::new();
-    for job in jobs {
-        let Some(job_facts) = facts.get(&job.key) else {
-            continue;
-        };
-        let mut skills = job_facts
-            .skills
-            .iter()
-            .filter(|(_, evidence)| evidence.kind == SkillKind::Hard)
-            .map(|(name, _)| name.clone())
-            .collect::<Vec<_>>();
-        skills.sort_by(|left, right| {
-            individual
-                .get(right)
-                .cmp(&individual.get(left))
-                .then_with(|| left.cmp(right))
-        });
-        // ponytail: cap dense postings at 12 skills; raise only if real data loses useful stacks.
-        skills.truncate(12);
-        skills.sort();
-        for size in 2..=5.min(skills.len()) {
-            combinations(&skills, size, 0, &mut Vec::new(), &mut |items| {
-                *counts.entry(StackKey(items.to_vec())).or_default() += 1;
-            });
-        }
-    }
-    counts
+        .count()
 }
 
 fn combinations(
@@ -673,6 +817,9 @@ fn combinations(
     chosen: &mut Vec<String>,
     visit: &mut impl FnMut(&[String]),
 ) {
+    if items.len() < size || chosen.len() > size {
+        return;
+    }
     if chosen.len() == size {
         visit(chosen);
         return;
@@ -681,6 +828,20 @@ fn combinations(
         chosen.push(items[index].clone());
         combinations(items, size, index + 1, chosen, visit);
         chosen.pop();
+    }
+}
+
+fn permutations(items: &[String], chosen: &mut Vec<String>, visit: &mut impl FnMut(&[String])) {
+    if chosen.len() == items.len() {
+        visit(chosen);
+        return;
+    }
+    for item in items {
+        if !chosen.contains(item) {
+            chosen.push(item.clone());
+            permutations(items, chosen, visit);
+            chosen.pop();
+        }
     }
 }
 
@@ -864,7 +1025,7 @@ mod tests {
                     if index < 8 {
                         "Python AWS Docker communication skills"
                     } else {
-                        "Java AWS"
+                        "Java GCP"
                     },
                 )
             })
@@ -873,7 +1034,7 @@ mod tests {
             job(
                 index,
                 now - Duration::days(40),
-                if index < 15 { "Python AWS" } else { "Java AWS" },
+                if index < 15 { "Python AWS" } else { "Java GCP" },
             )
         }));
         let facts = jobs
@@ -913,8 +1074,12 @@ mod tests {
         assert_eq!(python.metric.previous_count, 3);
         assert_eq!(python.metric.momentum, Momentum::Rising);
         assert!(report.stacks.iter().any(|stack| {
-            stack.key.0 == ["AWS", "Docker", "Python"] && stack.metric.current_count == 8
+            stack.key.0 == ["AWS", "Docker", "Python"]
+                && stack.metric.current_count == 8
+                && stack.path.len() == 3
+                && stack.company_count == 1
         }));
+        assert!(report.stacks.iter().all(|stack| stack.key.0.len() >= 3));
         assert!(
             report
                 .recommendations
@@ -922,5 +1087,35 @@ mod tests {
                 .all(|recommendation| recommendation.skill != "Python")
         );
         assert_eq!(report.roles[0].name, "Backend");
+    }
+
+    #[test]
+    fn alternative_skill_lists_do_not_form_graph_paths() {
+        let now = Utc.with_ymd_and_hms(2026, 8, 14, 12, 0, 0).unwrap();
+        let jobs = (0..3)
+            .map(|index| {
+                job(
+                    index,
+                    now - Duration::days(1),
+                    "Experience with Java, Python, or Go.",
+                )
+            })
+            .collect::<Vec<_>>();
+        let facts = jobs
+            .iter()
+            .map(|job| (job.key.clone(), analytics::extract(job)))
+            .collect::<HashMap<_, _>>();
+
+        let report = AnalyticsReport::build(
+            &jobs,
+            &facts,
+            &[],
+            &AnalyticsFilters::default(),
+            &LibraryState::default(),
+            now,
+            3,
+        );
+
+        assert!(report.stacks.is_empty());
     }
 }

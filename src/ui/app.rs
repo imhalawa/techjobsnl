@@ -535,11 +535,7 @@ impl App {
                     return facts.skills.contains_key(skill);
                 }
                 if let Some(stack) = selected_stack {
-                    return stack
-                        .key
-                        .0
-                        .iter()
-                        .all(|skill| facts.skills.contains_key(skill));
+                    return insights::supports_stack(facts, &stack.key.0);
                 }
                 let Some(metric) = &selected_market else {
                     return false;
