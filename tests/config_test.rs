@@ -369,6 +369,11 @@ fn parses_and_validates_every_source_strategy() {
             "mollie",
         ),
         (
+            "strategy = \"microsoft\"\nsearch_url = \"https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com&query=&location=Netherlands&start=0&hl=en\"",
+            true,
+            "microsoft",
+        ),
+        (
             "strategy = \"unsupported\"\nreason = \"official source blocks unattended requests\"",
             false,
             "mollie",
@@ -444,6 +449,9 @@ fn rejects_empty_source_fields() {
             offset_parameter: "limitstart".into(),
             page_size: 20,
         },
+        SourceConfig::Microsoft {
+            search_url: " ".into(),
+        },
         SourceConfig::Unsupported { reason: " ".into() },
     ];
 
@@ -495,6 +503,9 @@ fn rejects_non_https_source_urls() {
             listing_url: "http://www.exact.com/careers/vacancies".into(),
             offset_parameter: "limitstart".into(),
             page_size: 20,
+        },
+        SourceConfig::Microsoft {
+            search_url: "http://apply.careers.microsoft.com/api/pcsx/search".into(),
         },
     ];
 

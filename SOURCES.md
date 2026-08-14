@@ -1,5 +1,14 @@
 # Source and sponsor evidence
 
+## Microsoft
+
+- Official source: <https://apply.careers.microsoft.com/careers?location=Netherlands&hl=en>. Its first-party search API at <https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com&query=&location=Netherlands&start=0&hl=en> declares an exact total and exposes fixed 10-row pagination. The adapter verifies every declared page, unique Eightfold and Microsoft job IDs, matching detail records, official URLs, dates, descriptions, and explicit Netherlands locations before accepting a complete scan.
+- Live discovery: the API declared 26 search results on 2026-08-14. All 26 details matched; 24 had explicit Netherlands locations and two Brussels-only search false positives were excluded. The count is volatile and is not hardcoded in the smoke test.
+- Microsoft Careers reports 220,000 employees: <https://careers.microsoft.com/v2/global/en/locations/amsterdam.html>. The configured `2,000+` band follows the app's EU large-company classification.
+- The configured industries follow Microsoft's own description of its software, cloud, AI, devices, gaming, and advertising businesses: <https://www.microsoft.com/investor/reports/ar25/index.html>.
+- The careers API is English, but language and work-authorisation requirements vary by vacancy. Microsoft's university FAQ says visa sponsorship exists, while its Netherlands internship rules require the right to work for some programmes: <https://careers.microsoft.com/v2/global/en/universityinternship> and <https://careers.microsoft.com/v2/global/en/internship_eligibility>. Confirm sponsorship on the specific role.
+- The API identifies the Microsoft brand, not the legal contract entity for each vacancy. Confirm that entity before relying on recognised-sponsor status.
+
 ## Amazon / AWS
 
 - Official source: <https://www.amazon.jobs/en/search?country=NLD>. Its JSON API at <https://www.amazon.jobs/en/search.json?normalized_country_code%5B%5D=NLD&offset=0&result_limit=100> declares the exact Netherlands total. The adapter follows every result page and validates unique feed IDs, public job IDs, official paths, Netherlands locations, dates, full descriptions, and Amazon-owned application URLs.

@@ -213,6 +213,9 @@ pub enum SourceConfig {
     Uber {
         api_url: String,
     },
+    Microsoft {
+        search_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -260,6 +263,7 @@ impl SourceConfig {
             Self::Postnl { .. } => "PostNL paged API",
             Self::Amazon { .. } => "Amazon Jobs API",
             Self::Uber { .. } => "Uber Oracle HCM API",
+            Self::Microsoft { .. } => "Microsoft Careers API",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -302,6 +306,7 @@ impl SourceConfig {
             Self::Postnl { api_url } => api_url,
             Self::Amazon { search_url } => search_url,
             Self::Uber { api_url } => api_url,
+            Self::Microsoft { search_url } => search_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -481,6 +486,18 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("api_url"),
                     "must be the official Uber Oracle HCM API",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Microsoft { search_url } => {
+            validate_https_url(search_url, path("search_url"))?;
+            if search_url
+                != "https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com&query=&location=Netherlands&start=0&hl=en"
+            {
+                return Err(ConfigError::invalid(
+                    path("search_url"),
+                    "must be the exact official Microsoft Netherlands search API",
                 ));
             }
             Ok(())
