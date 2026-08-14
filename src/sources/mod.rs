@@ -16,6 +16,7 @@ pub mod ing;
 pub mod jibe;
 pub mod json_ld;
 pub mod lever;
+pub mod microsoft;
 pub mod ns;
 pub mod personio;
 pub mod postnl;

@@ -622,3 +622,13 @@ enabled = true
 [companies.source]
 strategy = "amazon"
 search_url = "https://www.amazon.jobs/en/search.json?normalized_country_code%5B%5D=NLD&offset=0&result_limit=100"
+
+[[companies]]
+id = "microsoft"
+name = "Microsoft"
+industry = "Software, Cloud computing, Artificial intelligence, Gaming, Devices, Digital advertising"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "microsoft"
+search_url = "https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com&query=&location=Netherlands&start=0&hl=en"

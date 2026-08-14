@@ -161,6 +161,7 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
             "PostNL",
             "TomTom",
             "Amazon / AWS",
+            "Microsoft",
         ]
     );
 
