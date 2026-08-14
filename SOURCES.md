@@ -1,5 +1,11 @@
 # Source and sponsor evidence
 
+## Keylane
+
+- Official source: <https://apply.workable.com/keylane/>. Its cursor-paginated Workable API exposes the complete public board and job details; the configured filter keeps only jobs explicitly located in the Netherlands.
+- Keylane's official careers site reports 1,100+ employees: <https://careers.keylane.com/about-us/>.
+- The board identifies the Keylane brand, not the legal employer for every contract. Confirm the employment entity before relying on sponsor status.
+
 ## Finom
 
 - Official source: <https://api.eu.lever.co/v0/postings/pnlfin?mode=json>. Finom's official careers page links the `pnlfin` Lever tenant. The endpoint returns the complete public board in one response; the configured country filter keeps only explicit Amsterdam or Netherlands postings.

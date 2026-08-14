@@ -155,6 +155,10 @@ pub enum SourceConfig {
         api_url: String,
         country_filter: Option<String>,
     },
+    Workable {
+        account: String,
+        country_filter: Option<String>,
+    },
     Yuki {
         feed_url: String,
     },
@@ -201,6 +205,7 @@ impl SourceConfig {
             Self::Recruitee { .. } => "Recruitee",
             Self::Personio { .. } => "Personio XML Feed",
             Self::Lever { .. } => "Lever",
+            Self::Workable { .. } => "Workable",
             Self::Yuki { .. } => "Teamtailor JSON Feed",
             Self::Bol { .. } => "bol.com",
             Self::Coolblue { .. } => "Coolblue HTML",
@@ -217,6 +222,7 @@ impl SourceConfig {
     pub fn reference(&self) -> &str {
         match self {
             Self::Lever { api_url, .. } => api_url,
+            Self::Workable { account, .. } => account,
             Self::Ashby { board } | Self::Greenhouse { board, .. } => board,
             Self::Jibe { base_url, .. }
             | Self::Recruitee { base_url }
@@ -257,6 +263,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
             country_filter,
         } => {
             validate_https_url(api_url, path("api_url"))?;
+            if let Some(country) = country_filter {
+                validate_country(country, path("country_filter"))?;
+            }
+            Ok(())
+        }
+        SourceConfig::Workable {
+            account,
+            country_filter,
+        } => {
+            validate_non_empty(account, path("account"))?;
             if let Some(country) = country_filter {
                 validate_country(country, path("country_filter"))?;
             }
