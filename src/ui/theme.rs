@@ -93,11 +93,11 @@ impl IconSet {
     pub const fn unicode() -> Self {
         Self {
             open: "●",
-            new: "✦",
-            applied: "✓",
-            history: "◷",
-            scanning: "↻",
-            source_failure: "⚠",
+            new: "◆",
+            applied: "✔",
+            history: "◉",
+            scanning: "⟳",
+            source_failure: "▲",
         }
     }
 

@@ -1174,7 +1174,7 @@ fn scan_events_update_progress_and_health_without_moving_selection() {
         .collect();
     assert!(scanning.contains("SCANNING 0/1"));
     assert!(!scanning.contains("acme scanning"));
-    let scanning_x = symbol_x(&scanning_buffer, 29, 0, "↻");
+    let scanning_x = symbol_x(&scanning_buffer, 29, 0, "⟳");
     assert_eq!(
         scanning_buffer.cell((scanning_x, 29)).unwrap().fg,
         Theme::clean_dark().warning
@@ -1198,7 +1198,7 @@ fn scan_events_update_progress_and_health_without_moving_selection() {
     });
     let failed_buffer = rendered_buffer(&app, 140, 30);
     assert!(row(&failed_buffer, 29).contains("FAILED 1"));
-    let failed_x = symbol_x(&failed_buffer, 29, 0, "⚠");
+    let failed_x = symbol_x(&failed_buffer, 29, 0, "▲");
     assert_eq!(
         failed_buffer.cell((failed_x, 29)).unwrap().fg,
         Theme::clean_dark().error
@@ -1233,7 +1233,7 @@ fn renderer_uses_the_specified_responsive_job_layouts_and_status_icons() {
             && narrow.contains("Active jobs")
             && !narrow.contains("Job details")
     );
-    assert!(wide.contains("● OPEN") && wide.contains("✦") && wide.contains("✓"));
+    assert!(wide.contains("● OPEN") && wide.contains("◆") && wide.contains("✔"));
 }
 
 #[test]
@@ -1404,9 +1404,9 @@ fn navigation_renders_history_scan_and_source_failure_status_icons() {
     let app = App::new(config(), vec![]);
 
     let screen = rendered(&app, 140, 40);
-    assert!(screen.contains("◷ History"));
-    assert!(screen.contains("↻ Scans"));
-    assert!(screen.contains("⚠ Sources"));
+    assert!(screen.contains("◉ History"));
+    assert!(screen.contains("⟳ Scans"));
+    assert!(screen.contains("▲ Sources"));
 }
 
 #[test]
@@ -1429,16 +1429,16 @@ fn production_job_buffers_preserve_geometry_styles_and_truth_at_all_breakpoints_
             let open_x = symbol_x(&buffer, 1, list_x, "●");
             assert_eq!(buffer.cell((open_x, 1)).unwrap().fg, theme.open);
             assert_eq!(buffer.cell((open_x, 1)).unwrap().bg, theme.selected_row);
-            let new_x = symbol_x(&buffer, 1, open_x + 1, "✦");
-            let applied_x = symbol_x(&buffer, 1, new_x + 1, "✓");
+            let new_x = symbol_x(&buffer, 1, open_x + 1, "◆");
+            let applied_x = symbol_x(&buffer, 1, new_x + 1, "✔");
             assert_eq!(buffer.cell((new_x, 1)).unwrap().fg, theme.new);
             assert_eq!(buffer.cell((applied_x, 1)).unwrap().fg, theme.applied);
 
             match width {
                 120 => {
                     assert!(screen.contains("● Active"));
-                    assert!(screen.contains("✦ New"));
-                    assert!(screen.contains("✓ Applied"));
+                    assert!(screen.contains("◆ New"));
+                    assert!(screen.contains("✔ Applied"));
                     assert_eq!(buffer.cell((18, 0)).unwrap().fg, theme.unfocused_border);
                     assert_eq!(buffer.cell((40, 0)).unwrap().fg, theme.focused_border);
                     assert_eq!(buffer.cell((100, 0)).unwrap().fg, theme.unfocused_border);
@@ -1522,7 +1522,7 @@ fn scans_and_sources_render_durable_semantic_states_at_all_breakpoints_and_theme
             assert!(screen.contains("0 observed"));
             assert!(screen.contains("timeout · timed out"));
             let start_x = if width >= 120 { 22 } else { 0 };
-            let status_x = symbol_x(&buffer, 1, start_x, "⚠");
+            let status_x = symbol_x(&buffer, 1, start_x, "▲");
             assert_eq!(buffer.cell((status_x, 1)).unwrap().fg, theme.error);
             assert_eq!(
                 buffer.cell((25.max(start_x), 0)).unwrap().fg,
@@ -1778,7 +1778,7 @@ fn lifecycle_details_show_closed_reopened_and_applied_dates() {
     let closed_screen = rendered(&app, 120, 24);
     assert!(closed_screen.contains("Closed"));
     assert!(closed_screen.contains("11 Aug 2026 10:00 UTC"));
-    assert!(closed_screen.contains("✓ YES · 11 Aug 2026 09:00 UTC"));
+    assert!(closed_screen.contains("✔ YES · 11 Aug 2026 09:00 UTC"));
 
     app.handle_key(key('j'));
     let reopened_screen = rendered(&app, 120, 24);
