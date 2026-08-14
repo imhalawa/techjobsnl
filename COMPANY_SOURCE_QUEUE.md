@@ -23,7 +23,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 15. [x] **TomTom** — shipped · Lever (`tomtom`); the official careers API exposes the same complete 32-role board.
 16. [x] **Checkout.com** — shipped · Ashby.
 17. [ ] **Wise** — blocked/needs research · no current NL role; main careers source is Attrax and the small Greenhouse board is not proved complete.
-18. [ ] **Revolut** — blocked/needs research · official custom careers source had no Netherlands location and no reusable feed.
+18. [ ] **Revolut** — blocked (2026-08-14) · the official careers board now lists Netherlands roles, but both the board and its first-party Next.js data endpoint return Cloudflare HTTP 403 to automated clients; no complete source can be live-verified yet.
 19. [ ] **Klarna** — blocked/needs research · live Amsterdam roles use unsupported Deel Jobs.
 20. [x] **Fourthline** — shipped · Greenhouse (`fourthline`).
 21. [ ] **flatexDEGIRO** — blocked/needs research · official custom careers site has Amsterdam roles; no complete supported endpoint proved.
