@@ -186,6 +186,9 @@ pub enum SourceConfig {
     Eneco {
         listing_url: String,
     },
+    Exact {
+        listing_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -224,6 +227,7 @@ impl SourceConfig {
             Self::Coolblue { .. } => "Coolblue HTML",
             Self::Rabobank { .. } => "Rabobank API",
             Self::Eneco { .. } => "Eneco HTML",
+            Self::Exact { .. } => "Exact HTML + JSON-LD",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -255,6 +259,7 @@ impl SourceConfig {
             }
             | Self::Coolblue { listing_url }
             | Self::Eneco { listing_url }
+            | Self::Exact { listing_url }
             | Self::Ing { listing_url }
             | Self::PagedHtml { listing_url, .. } => listing_url,
             Self::Unsupported { reason } => reason,
@@ -348,6 +353,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
             validate_country(country, path("country"))
         }
         SourceConfig::Eneco { listing_url } => validate_https_url(listing_url, path("listing_url")),
+        SourceConfig::Exact { listing_url } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            if listing_url != "https://www.exact.com/careers/vacancies" {
+                return Err(ConfigError::invalid(
+                    path("listing_url"),
+                    "must be the official Exact vacancy URL",
+                ));
+            }
+            Ok(())
+        }
         SourceConfig::AlbertHeijn { base_url } => validate_https_url(base_url, path("base_url")),
         SourceConfig::Getnoticed {
             base_url,
