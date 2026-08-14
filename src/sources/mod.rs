@@ -1,5 +1,6 @@
 pub mod afas;
 pub mod albert_heijn;
+pub mod amazon;
 pub mod anwb;
 pub mod ashby;
 pub mod bol;

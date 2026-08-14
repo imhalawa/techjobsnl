@@ -207,6 +207,9 @@ pub enum SourceConfig {
     Postnl {
         api_url: String,
     },
+    Amazon {
+        search_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -252,6 +255,7 @@ impl SourceConfig {
             Self::Chipsoft { .. } => "ChipSoft HTML",
             Self::Anwb { .. } => "ANWB JSON + JSON-LD",
             Self::Postnl { .. } => "PostNL paged API",
+            Self::Amazon { .. } => "Amazon Jobs API",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -292,6 +296,7 @@ impl SourceConfig {
             | Self::PagedHtml { listing_url, .. } => listing_url,
             Self::Anwb { feed_url } => feed_url,
             Self::Postnl { api_url } => api_url,
+            Self::Amazon { search_url } => search_url,
             Self::Unsupported { reason } => reason,
         }
     }
@@ -449,6 +454,18 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("api_url"),
                     "must be the official PostNL vacancy API",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Amazon { search_url } => {
+            validate_https_url(search_url, path("search_url"))?;
+            if search_url
+                != "https://www.amazon.jobs/en/search.json?normalized_country_code%5B%5D=NLD&offset=0&result_limit=100"
+            {
+                return Err(ConfigError::invalid(
+                    path("search_url"),
+                    "must be the exact official Amazon Netherlands search API",
                 ));
             }
             Ok(())

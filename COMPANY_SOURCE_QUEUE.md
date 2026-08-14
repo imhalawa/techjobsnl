@@ -52,7 +52,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 41. [x] **STX Group** — shipped · Greenhouse (`stxgroup`).
 42. [ ] **OTC Flow** — blocked/needs research · first-party careers links to unsupported BambooHR.
 43. [ ] **Vitol** — blocked/needs research · complete SmartRecruiters feed had no Netherlands role.
-44. [ ] **Amazon / AWS** — blocked/needs research · official proprietary platform has NL roles; no complete reusable feed proved.
+44. [x] **Amazon / AWS** — shipped · official Amazon Jobs API with exact Netherlands pagination and full descriptions.
 45. [ ] **Google** — blocked/needs research · official proprietary search has Netherlands results; no complete reusable feed proved.
 46. [ ] **Microsoft** — blocked/needs research · official proprietary platform has Amsterdam roles; no complete reusable feed proved.
 47. [ ] **Meta** — blocked/needs research · public/login-gated interface did not safely expose a current Netherlands vacancy.
