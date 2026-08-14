@@ -551,3 +551,13 @@ enabled = true
 [companies.source]
 strategy = "afas"
 listing_url = "https://www.werkenbijafas.nl/alle-vacatures"
+
+[[companies]]
+id = "ns"
+name = "NS"
+industry = "Public transport, Mobility, Retail, Travel technology"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "ns"
+listing_url = "https://www.werkenbijns.nl/vacatures"

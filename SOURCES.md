@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## NS
+
+- Official source: <https://www.werkenbijns.nl/vacatures>. Every page publishes an exact result range and stable total; the adapter verifies all pages, unique official vacancy IDs, matching JobPosting details, official application links, and explicit Netherlands evidence before accepting the scan.
+- NS reports more than 20,000 colleagues: <https://www.ns.nl/en/about-ns>. The configured `2,000+` band follows the app's EU large-company classification.
+- Current technical roles include .NET/C# work, but language and sponsorship conditions vary by vacancy. Check the vacancy before applying.
+- The board identifies the NS brand, not the legal contract entity for every role. Confirm that entity before relying on recognised-sponsor status.
+
 ## AFAS Software
 
 - Official source: <https://www.werkenbijafas.nl/alle-vacatures>. The board declares a complete one-page result with a 75-vacancy capacity; the adapter verifies that state, deduplicates stable official job links, reads each JobPosting detail, and keeps only explicit Netherlands locations.

@@ -13,6 +13,7 @@ pub mod ing;
 pub mod jibe;
 pub mod json_ld;
 pub mod lever;
+pub mod ns;
 pub mod personio;
 pub mod rabobank;
 pub mod recruitee;

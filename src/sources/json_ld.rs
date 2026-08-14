@@ -195,9 +195,10 @@ where
         Many(Vec<T>),
     }
 
-    Ok(match OneOrMany::deserialize(deserializer)? {
-        OneOrMany::One(value) => vec![value],
-        OneOrMany::Many(values) => values,
+    Ok(match Option::<OneOrMany<T>>::deserialize(deserializer)? {
+        Some(OneOrMany::One(value)) => vec![value],
+        Some(OneOrMany::Many(values)) => values,
+        None => Vec::new(),
     })
 }
 
