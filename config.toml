@@ -571,3 +571,13 @@ enabled = true
 [companies.source]
 strategy = "chipsoft"
 listing_url = "https://www.chipsoft.com/nl-NL/werken-bij/vacatures"
+
+[[companies]]
+id = "anwb"
+name = "ANWB"
+industry = "Mobility services, Insurance, Travel, Retail, Energy"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "anwb"
+feed_url = "https://www.werkenbijanwb.nl/fuse/vacancies.json"
