@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    sync::Arc,
+};
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -212,8 +215,8 @@ pub struct AnalyticsReport {
 #[derive(Debug, Clone)]
 pub struct AnalyticsWork {
     revision: u64,
-    jobs: Vec<JobRecord>,
-    facts: HashMap<JobKey, JobFacts>,
+    jobs: Arc<Vec<JobRecord>>,
+    facts: Arc<HashMap<JobKey, JobFacts>>,
     scans: Vec<ScanReadModel>,
     filters: AnalyticsFilters,
     library: LibraryState,
@@ -231,8 +234,8 @@ pub struct AnalyticsResult {
 impl AnalyticsWork {
     pub(crate) fn new(
         revision: u64,
-        jobs: Vec<JobRecord>,
-        facts: HashMap<JobKey, JobFacts>,
+        jobs: Arc<Vec<JobRecord>>,
+        facts: Arc<HashMap<JobKey, JobFacts>>,
         scans: Vec<ScanReadModel>,
         filters: AnalyticsFilters,
         library: LibraryState,

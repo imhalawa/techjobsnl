@@ -1675,6 +1675,14 @@ fn idle_footer_uses_durable_enabled_source_health() {
 }
 
 #[test]
+fn background_reload_has_a_visible_loading_indicator() {
+    let mut app = App::new(config(), vec![]);
+    app.set_data_loading(true);
+
+    assert!(row(&rendered_buffer(&app, 100, 20), 19).contains("LOADING"));
+}
+
+#[test]
 fn scan_selection_follows_identity_when_newer_rows_are_prepended() {
     let at = Utc.with_ymd_and_hms(2026, 8, 11, 11, 0, 0).unwrap();
     let scan = |run_id: &str| ScanReadModel {

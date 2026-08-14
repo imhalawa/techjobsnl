@@ -1,6 +1,7 @@
 use std::{
     cell::Cell,
     collections::HashMap,
+    sync::Arc,
     time::{Duration as StdDuration, Instant},
 };
 
@@ -195,10 +196,10 @@ struct ScanProgress {
 
 pub struct App {
     config: Config,
-    jobs: Vec<JobRecord>,
+    jobs: Arc<Vec<JobRecord>>,
     scans: Vec<ScanReadModel>,
     sources: Vec<SourceReadModel>,
-    job_facts: HashMap<JobKey, JobFacts>,
+    job_facts: Arc<HashMap<JobKey, JobFacts>>,
     theme: Theme,
     icons: IconSet,
     view: View,
@@ -221,6 +222,7 @@ pub struct App {
     analytics_report_revision: Option<u64>,
     analytics_in_flight: bool,
     analytics_error: Option<String>,
+    data_loading: bool,
     evidence_index: usize,
     active_job_count: usize,
     company_filter: Option<String>,
@@ -260,10 +262,10 @@ impl App {
         let active_job_count = jobs.iter().filter(|job| job.source_open).count();
         Self {
             config,
-            jobs,
+            jobs: Arc::new(jobs),
             scans: Vec::new(),
             sources: Vec::new(),
-            job_facts,
+            job_facts: Arc::new(job_facts),
             theme,
             icons,
             view: View::Active,
@@ -286,6 +288,7 @@ impl App {
             analytics_report_revision: None,
             analytics_in_flight: false,
             analytics_error: None,
+            data_loading: false,
             evidence_index: 0,
             active_job_count,
             company_filter: None,
@@ -318,12 +321,12 @@ impl App {
         job_facts: HashMap<JobKey, JobFacts>,
     ) {
         self.invalidate_analytics();
-        self.job_facts = job_facts;
+        self.job_facts = Arc::new(job_facts);
         if matches!(
             self.view,
             View::Scans | View::Sources | View::Analytics | View::Library | View::Settings
         ) {
-            self.jobs = jobs;
+            self.jobs = Arc::new(jobs);
             self.active_job_count = active_job_count;
             if self.view == View::Analytics {
                 self.hard_skill_index = self.hard_skill_index.min(
@@ -348,7 +351,7 @@ impl App {
             .then(|| self.selected_job().map(|job| job.key.clone()))
             .flatten();
         let fallback_index = self.selected_index;
-        self.jobs = jobs;
+        self.jobs = Arc::new(jobs);
         self.active_job_count = active_job_count;
         self.selected_index = selected_key
             .as_ref()
@@ -426,6 +429,14 @@ impl App {
 
     pub fn analytics_error(&self) -> Option<&str> {
         self.analytics_error.as_deref()
+    }
+
+    pub fn set_data_loading(&mut self, loading: bool) {
+        self.data_loading = loading;
+    }
+
+    pub fn data_loading(&self) -> bool {
+        self.data_loading
     }
 
     pub fn emerging_discovery_work(&self) -> Option<EmergingDiscoveryWork> {
@@ -1444,7 +1455,9 @@ impl App {
     }
 
     pub fn footer_status(&self) -> String {
-        if self.scan_progress.active {
+        if self.data_loading {
+            "LOADING".to_owned()
+        } else if self.scan_progress.active {
             format!(
                 "SCANNING {}/{}",
                 self.scan_progress.finished, self.scan_progress.company_count

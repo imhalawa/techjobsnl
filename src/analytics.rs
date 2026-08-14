@@ -4,7 +4,7 @@ use std::{
     fs,
     io::{Read, Write},
     process::{Command, Stdio},
-    sync::LazyLock,
+    sync::{Arc, LazyLock},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -245,7 +245,7 @@ pub struct SkillSuggestion {
 pub struct EmergingDiscoveryWork {
     cache_key: String,
     config: AnalyticsConfig,
-    jobs: Vec<JobRecord>,
+    jobs: Arc<Vec<JobRecord>>,
 }
 
 #[derive(Debug, Clone)]
@@ -256,7 +256,7 @@ pub struct EmergingDiscoveryResult {
 }
 
 impl EmergingDiscoveryWork {
-    pub fn new(config: AnalyticsConfig, jobs: Vec<JobRecord>) -> Option<Self> {
+    pub fn new(config: AnalyticsConfig, jobs: Arc<Vec<JobRecord>>) -> Option<Self> {
         let cache_key = emerging_discovery_key(&config, &jobs)?;
         Some(Self {
             cache_key,

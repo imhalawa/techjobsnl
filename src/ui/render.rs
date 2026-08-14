@@ -222,7 +222,9 @@ fn render_analytics_filters(frame: &mut Frame, app: &App, area: Rect) {
         );
         return;
     };
-    let refresh = if app.analytics_refreshing() {
+    let refresh = if app.data_loading() {
+        "Loading data… · "
+    } else if app.analytics_refreshing() {
         "Refreshing… · "
     } else {
         ""
@@ -2399,7 +2401,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         (app.icons().source_failure, theme.error)
     } else if status.starts_with("INCOMPLETE") {
         (app.icons().source_failure, theme.warning)
-    } else if status.starts_with("SCANNING") {
+    } else if status.starts_with("SCANNING") || status == "LOADING" {
         (app.icons().scanning, theme.warning)
     } else {
         (app.icons().open, theme.open)

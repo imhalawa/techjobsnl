@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     env,
     error::Error,
     fs,
@@ -17,17 +17,17 @@ use crossterm::{
 };
 use futures_util::StreamExt;
 use job_watch::{
-    analytics::EmergingDiscoveryResult,
+    analytics::{JobFacts, SkillSuggestion},
     config::{Config, FiltersConfig, SourceConfig},
-    domain::ScanEvent,
+    domain::{JobKey, JobRecord, ScanEvent},
     filter::EligibilityFilter,
-    insights::AnalyticsResult,
+    insights::{AnalyticsFilters, AnalyticsResult, LibraryState},
     scanner::ScanService,
     sources::{
         JobSource, albert_heijn, ashby, bol, coolblue, ebay, eneco, getnoticed, greenhouse, ing,
         jibe, personio, rabobank, recruitee, yuki,
     },
-    storage::{JobQuery, Store},
+    storage::{JobQuery, ScanReadModel, SourceReadModel, Store},
     ui::{App, AppCommand, View, render},
 };
 use tokio::sync::mpsc;
@@ -282,7 +282,20 @@ enum CommandEffect {
     Continue,
     StartScan,
     FiltersChanged,
+    ReloadJobs,
     Quit,
+}
+
+struct ReloadData {
+    jobs: Vec<JobRecord>,
+    facts: HashMap<JobKey, JobFacts>,
+    active_job_count: usize,
+    scans: Vec<ScanReadModel>,
+    sources: Vec<SourceReadModel>,
+    analytics_filters: AnalyticsFilters,
+    library: LibraryState,
+    analytics_scans: Vec<ScanReadModel>,
+    skill_suggestions: Vec<SkillSuggestion>,
 }
 
 async fn run(
@@ -297,12 +310,33 @@ async fn run(
     let (analytics_tx, mut analytics_rx) =
         mpsc::unbounded_channel::<std::result::Result<AnalyticsResult, String>>();
     let (discovery_tx, mut discovery_rx) =
-        mpsc::unbounded_channel::<std::result::Result<Option<EmergingDiscoveryResult>, String>>();
+        mpsc::unbounded_channel::<std::result::Result<Option<Vec<SkillSuggestion>>, String>>();
+    let (reload_tx, mut reload_rx) =
+        mpsc::unbounded_channel::<std::result::Result<ReloadData, String>>();
     let mut active_scan = None;
     let mut active_discovery = false;
+    let mut reload_in_flight = false;
+    let mut reload_requested = false;
     let mut attempted_discoveries = HashSet::new();
 
     loop {
+        if reload_requested && !reload_in_flight {
+            reload_requested = false;
+            reload_in_flight = true;
+            let reload_tx = reload_tx.clone();
+            let store = Arc::clone(&store);
+            let query = job_query(app.view());
+            let analytics_config = app.config().analytics.clone();
+            tokio::spawn(async move {
+                let result = tokio::task::spawn_blocking(move || {
+                    load_jobs(&store, query, &analytics_config).map_err(|error| error.to_string())
+                })
+                .await
+                .map_err(|error| format!("reload worker failed: {error}"))
+                .and_then(|result| result);
+                let _ = reload_tx.send(result);
+            });
+        }
         if let Some(work) = app.start_analytics_work() {
             let analytics_tx = analytics_tx.clone();
             tokio::spawn(async move {
@@ -315,17 +349,36 @@ async fn run(
         if !active_discovery
             && let Some(work) = app.emerging_discovery_work()
             && attempted_discoveries.insert(work.cache_key().to_owned())
-            && !store
-                .lock()
-                .unwrap()
-                .has_analytics_discovery(work.cache_key())?
         {
             active_discovery = true;
             let discovery_tx = discovery_tx.clone();
+            let store = Arc::clone(&store);
             tokio::spawn(async move {
-                let result = tokio::task::spawn_blocking(move || work.compute())
+                let result =
+                    tokio::task::spawn_blocking(move || -> std::result::Result<_, String> {
+                        if store
+                            .lock()
+                            .unwrap()
+                            .has_analytics_discovery(work.cache_key())
+                            .map_err(|error| error.to_string())?
+                        {
+                            return Ok(None);
+                        }
+                        let Some(result) = work.compute() else {
+                            return Ok(None);
+                        };
+                        let store = store.lock().unwrap();
+                        store
+                            .save_emerging_discovery(&result)
+                            .map_err(|error| error.to_string())?;
+                        store
+                            .skill_suggestions()
+                            .map(Some)
+                            .map_err(|error| error.to_string())
+                    })
                     .await
-                    .map_err(|error| format!("analytics discovery worker failed: {error}"));
+                    .map_err(|error| format!("analytics discovery worker failed: {error}"))
+                    .and_then(|result| result);
                 let _ = discovery_tx.send(result);
             });
         }
@@ -368,6 +421,10 @@ async fn run(
                                 &app.config().filters,
                             )?);
                         }
+                        CommandEffect::ReloadJobs => {
+                            reload_requested = true;
+                            app.set_data_loading(true);
+                        }
                         CommandEffect::Quit => {
                             abort_scan(&mut active_scan).await;
                             break;
@@ -377,7 +434,10 @@ async fn run(
                 }
             }
             Some(event) = scan_rx.recv() => {
-                handle_runtime_scan_event(event, &store, app)?;
+                if handle_runtime_scan_event(event, app) {
+                    reload_requested = true;
+                    app.set_data_loading(true);
+                }
             }
             Some(result) = analytics_rx.recv() => {
                 match result {
@@ -387,28 +447,30 @@ async fn run(
             }
             Some(result) = discovery_rx.recv() => {
                 active_discovery = false;
-                if let Ok(Some(result)) = result {
-                    let store = store.lock().unwrap();
-                    store.save_emerging_discovery(&result)?;
-                    app.replace_skill_suggestions(store.skill_suggestions()?);
+                if let Ok(Some(suggestions)) = result {
+                    app.replace_skill_suggestions(suggestions);
+                }
+            }
+            Some(result) = reload_rx.recv() => {
+                reload_in_flight = false;
+                if !reload_requested {
+                    apply_reload(app, result.map_err(io::Error::other)?);
+                    app.set_data_loading(false);
                 }
             }
             scan_result = async {
                 active_scan.as_mut().expect("guarded by select branch").await
             }, if active_scan.is_some() => {
                 finish_scan(&mut active_scan, scan_result)?;
-                reload_jobs(&store, app)?;
+                reload_requested = true;
+                app.set_data_loading(true);
             }
         }
     }
     Ok(())
 }
 
-fn handle_runtime_scan_event(
-    event: ScanEvent,
-    store: &Arc<Mutex<Store>>,
-    app: &mut App,
-) -> rusqlite::Result<()> {
+fn handle_runtime_scan_event(event: ScanEvent, app: &mut App) -> bool {
     let company_finished = matches!(
         &event,
         ScanEvent::CompanyCompleted { .. }
@@ -416,10 +478,7 @@ fn handle_runtime_scan_event(
             | ScanEvent::CompanyIncomplete { .. }
     );
     app.handle_scan_event(event);
-    if company_finished {
-        reload_jobs(store, app)?;
-    }
-    Ok(())
+    company_finished
 }
 
 fn scan_service(config: &Config, store: Arc<Mutex<Store>>) -> Result<ScanService> {
@@ -534,8 +593,8 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
         .collect()
 }
 
-fn reload_jobs(store: &Arc<Mutex<Store>>, app: &mut App) -> rusqlite::Result<()> {
-    let query = match app.view() {
+fn job_query(view: View) -> JobQuery {
+    match view {
         View::Active => JobQuery::active(),
         View::New => JobQuery::active(),
         View::Analytics => JobQuery::analytics(),
@@ -543,23 +602,36 @@ fn reload_jobs(store: &Arc<Mutex<Store>>, app: &mut App) -> rusqlite::Result<()>
         View::Applied => JobQuery::applied(),
         View::History => JobQuery::history(),
         View::Scans | View::Sources | View::Settings => JobQuery::all(),
-    };
-    let analytics_config = app.config().analytics.clone();
+    }
+}
+
+fn load_jobs(
+    store: &Arc<Mutex<Store>>,
+    query: JobQuery,
+    analytics_config: &job_watch::config::AnalyticsConfig,
+) -> rusqlite::Result<ReloadData> {
     let store = store.lock().unwrap();
     let jobs = store.list_jobs(query)?;
-    let facts = store.analytics_facts(&jobs, &analytics_config)?;
-    let active_job_count = store.list_jobs(JobQuery::active())?.len();
-    let scans = store.recent_scans()?;
-    let sources = store.source_health()?;
+    let facts = store.analytics_facts(&jobs, analytics_config)?;
     let (analytics_filters, library) = store.analytics_state()?;
-    let analytics_scans = store.analytics_scans()?;
-    let skill_suggestions = store.skill_suggestions()?;
-    drop(store);
-    app.replace_jobs_with_facts(jobs, active_job_count, facts);
-    app.replace_read_models(scans, sources);
-    app.replace_analytics_state(analytics_filters, library, analytics_scans);
-    app.replace_skill_suggestions(skill_suggestions);
-    Ok(())
+    Ok(ReloadData {
+        jobs,
+        facts,
+        active_job_count: store.list_jobs(JobQuery::active())?.len(),
+        scans: store.recent_scans()?,
+        sources: store.source_health()?,
+        analytics_filters,
+        library,
+        analytics_scans: store.analytics_scans()?,
+        skill_suggestions: store.skill_suggestions()?,
+    })
+}
+
+fn apply_reload(app: &mut App, data: ReloadData) {
+    app.replace_jobs_with_facts(data.jobs, data.active_job_count, data.facts);
+    app.replace_read_models(data.scans, data.sources);
+    app.replace_analytics_state(data.analytics_filters, data.library, data.analytics_scans);
+    app.replace_skill_suggestions(data.skill_suggestions);
 }
 
 fn execute_command(
@@ -573,8 +645,7 @@ fn execute_command(
     match command {
         AppCommand::ToggleApplied(key) => {
             store.lock().unwrap().toggle_applied(&key, Utc::now())?;
-            reload_jobs(store, app)?;
-            Ok(CommandEffect::Continue)
+            Ok(CommandEffect::ReloadJobs)
         }
         AppCommand::OpenUrl(url) => {
             open_url(&url)?;
@@ -601,14 +672,10 @@ fn execute_command(
                 .lock()
                 .unwrap()
                 .review_skill_suggestion(&name, status)?;
-            reload_jobs(store, app)?;
-            Ok(CommandEffect::Continue)
+            Ok(CommandEffect::ReloadJobs)
         }
         AppCommand::StartScan => Ok(CommandEffect::StartScan),
-        AppCommand::ReloadJobs => {
-            reload_jobs(store, app)?;
-            Ok(CommandEffect::Continue)
-        }
+        AppCommand::ReloadJobs => Ok(CommandEffect::ReloadJobs),
         AppCommand::Quit => Ok(CommandEffect::Quit),
         AppCommand::None => Ok(CommandEffect::Continue),
     }
@@ -788,8 +855,9 @@ fn finish_with_restore<T>(result: Result<T>, restore: impl FnOnce()) -> Result<T
 mod tests {
     use std::{
         collections::HashMap,
-        sync::{Arc, Mutex},
-        time::Duration,
+        sync::{Arc, Barrier, Mutex},
+        thread,
+        time::{Duration, Instant},
     };
 
     use chrono::{TimeZone, Utc};
@@ -812,9 +880,10 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::{
-        CommandEffect, Platform, abort_scan, browser_command, build_sources, config_path_for,
-        copy_url_with, ensure_default_config, execute_command, finish_scan, finish_with_restore,
-        handle_runtime_scan_event, initialize, save_filters, start_scan, sync_default_companies,
+        CommandEffect, Platform, abort_scan, apply_reload, browser_command, build_sources,
+        config_path_for, copy_url_with, ensure_default_config, execute_command, finish_scan,
+        finish_with_restore, handle_runtime_scan_event, initialize, load_jobs, save_filters,
+        start_scan, sync_default_companies,
     };
 
     #[test]
@@ -1356,7 +1425,7 @@ mod tests {
     }
 
     #[test]
-    fn applied_command_persists_and_reloads_the_real_store() {
+    fn applied_command_persists_and_requests_a_background_reload() {
         let store = store_with_job();
         let jobs = store.lock().unwrap().list_jobs(JobQuery::active()).unwrap();
         let mut app = App::new(config(), jobs);
@@ -1374,8 +1443,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(effect, CommandEffect::Continue);
-        assert!(app.selected_job().unwrap().applied_at.is_some());
+        assert_eq!(effect, CommandEffect::ReloadJobs);
+        assert!(app.selected_job().unwrap().applied_at.is_none());
         assert_eq!(
             store
                 .lock()
@@ -1385,6 +1454,44 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn reload_command_does_not_wait_for_the_store_on_the_ui_thread() {
+        let store = store_with_job();
+        let jobs = store.lock().unwrap().list_jobs(JobQuery::active()).unwrap();
+        let mut app = App::new(config(), jobs);
+        let barrier = Arc::new(Barrier::new(2));
+        let held_store = Arc::clone(&store);
+        let held_barrier = Arc::clone(&barrier);
+        let holder = thread::spawn(move || {
+            let _guard = held_store.lock().unwrap();
+            held_barrier.wait();
+            thread::sleep(Duration::from_millis(200));
+        });
+        barrier.wait();
+        let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
+        let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
+        let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
+
+        let started = Instant::now();
+        let effect = execute_command(
+            AppCommand::ReloadJobs,
+            &store,
+            &mut app,
+            &mut opened,
+            &mut copied,
+            &mut saved,
+        )
+        .unwrap();
+        let elapsed = started.elapsed();
+        holder.join().unwrap();
+
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "reload blocked the UI thread for {elapsed:?}"
+        );
+        assert_eq!(effect, CommandEffect::ReloadJobs);
     }
 
     #[tokio::test]
@@ -1631,16 +1738,16 @@ mod tests {
             )
             .unwrap();
 
-        handle_runtime_scan_event(
+        assert!(handle_runtime_scan_event(
             ScanEvent::CompanyFailed {
                 company_id: "acme".into(),
                 kind: SourceErrorKind::Transport,
                 diagnostic: "connection reset".into(),
             },
-            &store,
             &mut app,
-        )
-        .unwrap();
+        ));
+        let data = load_jobs(&store, JobQuery::all(), &config().analytics).unwrap();
+        apply_reload(&mut app, data);
 
         assert_eq!(app.scans().len(), 2);
         assert_eq!(app.scans()[0].company_name, "Acme");
