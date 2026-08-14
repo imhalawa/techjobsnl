@@ -56,7 +56,7 @@ One checkbox is one delivery task. A task is complete only after its source is i
 45. [ ] **Google** — blocked/needs research · official proprietary search has Netherlands results; no complete reusable feed proved.
 46. [ ] **Microsoft** — blocked/needs research · official proprietary platform has Amsterdam roles; no complete reusable feed proved.
 47. [ ] **Meta** — blocked/needs research · public/login-gated interface did not safely expose a current Netherlands vacancy.
-48. [ ] **PostNL** — ready/next · official API exposes 77 professional jobs across 8 pages with complete detail endpoints.
+48. [x] **PostNL** — shipped · official paginated vacancy API with complete detail validation.
 49. [ ] **PGGM** — blocked/needs research · official custom source has current .NET roles; no reusable complete feed proved.
 50. [x] **NS** — shipped · NS custom/Hamilton feed.
 51. [ ] **Achmea** — blocked/needs research · live roles use a Hamilton/custom feed; compatibility with the NS implementation needs proof.
