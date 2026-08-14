@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Klarna
+
+- Official source: <https://jobs.deel.com/klarna>. The server-rendered board publishes a complete ordered ItemList. The adapter validates every unique official URL, fetches every listed JobPosting detail, matches its Deel ATS ID and canonical URL, and keeps only explicit Amsterdam vacancies.
+- Klarna's official press kit reports 3,400 employees: <https://www.klarna.com/international/press/>. The configured `2,000+` band follows the app's EU large-company classification.
+- Klarna describes itself as a digital bank and flexible-payments provider: <https://investors.klarna.com/overview/>. The configured industries cover its payments, banking, shopping, and merchant-commerce products.
+- The current Amsterdam vacancy is in English. The board does not prove visa sponsorship or the legal contract entity; confirm both before relying on recognised-sponsor status.
+
 ## Microsoft
 
 - Official source: <https://apply.careers.microsoft.com/careers?location=Netherlands&hl=en>. Its first-party search API at <https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com&query=&location=Netherlands&start=0&hl=en> declares an exact total and exposes fixed 10-row pagination. The adapter verifies every declared page, unique Eightfold and Microsoft job IDs, matching detail records, official URLs, dates, descriptions, and explicit Netherlands locations before accepting a complete scan.
