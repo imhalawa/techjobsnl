@@ -868,7 +868,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 23);
+        assert_eq!(migrated.companies.len(), 39);
         assert!(
             migrated
                 .companies
@@ -1188,7 +1188,23 @@ mod tests {
                 "centric",
                 "cmcom",
                 "yuki",
-                "reddit"
+                "reddit",
+                "imc",
+                "flow-traders",
+                "bunq",
+                "dpg-media",
+                "miro",
+                "checkout-com",
+                "fourthline",
+                "ockto",
+                "drw",
+                "jump-trading",
+                "tower-research",
+                "webb-traders",
+                "stx-group",
+                "elastic",
+                "multisafepay",
+                "act-commodities"
             ]
         );
 

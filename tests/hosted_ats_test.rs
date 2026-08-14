@@ -235,8 +235,11 @@ fn parses_complete_recruitee_offers() {
 fn recruitee_accepts_null_optional_requirements() {
     let mut offers = recruitee_fixture();
     offers["offers"][0]["requirements"] = serde_json::Value::Null;
+    offers["offers"][0]["department"] = serde_json::Value::Null;
 
     let jobs = parse_recruitee_response("funda", &offers.to_string()).unwrap();
+
+    assert_eq!(jobs[0].department, None);
 
     assert_eq!(jobs[0].description, "Build the housing platform.");
 }
@@ -334,6 +337,137 @@ async fn da_vinci_live_returns_complete_unique_netherlands_jobs() {
         .with_country_filter(Some("NL"));
     let jobs = complete_jobs(source.scan().await.unwrap());
     assert_live_jobs("Da Vinci", &jobs);
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn hosted_candidate_batch_live_returns_complete_unique_netherlands_jobs() {
+    let client = live_client();
+    let sources: Vec<(&str, Box<dyn JobSource>)> = vec![
+        (
+            "IMC Trading",
+            Box::new(
+                GreenhouseSource::new("imc", "imc", client.clone()).with_country_filter(Some("NL")),
+            ),
+        ),
+        (
+            "Flow Traders",
+            Box::new(
+                GreenhouseSource::new("flow-traders", "flowtraders", client.clone())
+                    .with_country_filter(Some("NL")),
+            ),
+        ),
+        (
+            "bunq",
+            Box::new(RecruiteeSource::new(
+                "bunq",
+                "https://bunq.recruitee.com",
+                client.clone(),
+            )),
+        ),
+        (
+            "DPG Media",
+            Box::new(RecruiteeSource::new(
+                "dpg-media",
+                "https://vacatures.dpgmedia.nl",
+                client.clone(),
+            )),
+        ),
+        (
+            "Miro",
+            Box::new(job_watch::sources::ashby::AshbySource::new(
+                "miro",
+                "miro",
+                client.clone(),
+            )),
+        ),
+        (
+            "Checkout.com",
+            Box::new(job_watch::sources::ashby::AshbySource::new(
+                "checkout-com",
+                "checkout.com",
+                client.clone(),
+            )),
+        ),
+        (
+            "Fourthline",
+            Box::new(
+                GreenhouseSource::new("fourthline", "fourthline", client.clone())
+                    .with_country_filter(Some("NL")),
+            ),
+        ),
+        (
+            "Ockto",
+            Box::new(RecruiteeSource::new(
+                "ockto",
+                "https://ockto.recruitee.com",
+                client.clone(),
+            )),
+        ),
+        (
+            "DRW",
+            Box::new(
+                GreenhouseSource::new("drw", "drweng", client.clone())
+                    .with_country_filter(Some("NL")),
+            ),
+        ),
+        (
+            "Jump Trading",
+            Box::new(
+                GreenhouseSource::new("jump-trading", "jumptrading", client.clone())
+                    .with_country_filter(Some("NL")),
+            ),
+        ),
+        (
+            "Tower Research",
+            Box::new(
+                GreenhouseSource::new("tower-research", "towerresearchcapital", client.clone())
+                    .with_country_filter(Some("NL")),
+            ),
+        ),
+        (
+            "WEBB Traders",
+            Box::new(RecruiteeSource::new(
+                "webb-traders",
+                "https://webbtraders.recruitee.com",
+                client.clone(),
+            )),
+        ),
+        (
+            "STX Group",
+            Box::new(
+                GreenhouseSource::new("stx-group", "stxgroup", client.clone())
+                    .with_country_filter(Some("NL")),
+            ),
+        ),
+        (
+            "Elastic",
+            Box::new(
+                GreenhouseSource::new("elastic", "elastic", client.clone())
+                    .with_country_filter(Some("NL")),
+            ),
+        ),
+        (
+            "MultiSafepay",
+            Box::new(RecruiteeSource::new(
+                "multisafepay",
+                "https://careers.multisafepay.com",
+                client.clone(),
+            )),
+        ),
+        (
+            "ACT Commodities",
+            Box::new(
+                GreenhouseSource::new("act-commodities", "testendouble", client)
+                    .with_country_filter(Some("NL")),
+            ),
+        ),
+    ];
+
+    for (name, source) in sources {
+        let jobs = complete_jobs(source.scan().await.unwrap());
+        assert_live_jobs(name, &jobs);
+    }
 }
 
 #[tokio::test]

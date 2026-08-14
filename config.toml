@@ -270,3 +270,172 @@ enabled = true
 strategy = "greenhouse"
 board = "reddit"
 country_filter = "NL"
+
+[[companies]]
+id = "imc"
+name = "IMC Trading"
+industry = "Proprietary trading, Market making, Financial services"
+scale = "1,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "imc"
+country_filter = "NL"
+
+[[companies]]
+id = "flow-traders"
+name = "Flow Traders"
+industry = "Proprietary trading, Market making, Digital assets"
+scale = "500–999 · Large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "flowtraders"
+country_filter = "NL"
+
+[[companies]]
+id = "bunq"
+name = "bunq"
+industry = "Fintech, Banking, Payments"
+scale = "500–999 · Large company"
+enabled = true
+[companies.source]
+strategy = "recruitee"
+base_url = "https://bunq.recruitee.com"
+
+[[companies]]
+id = "dpg-media"
+name = "DPG Media"
+industry = "Media, Advertising, Technology"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "recruitee"
+base_url = "https://vacatures.dpgmedia.nl"
+
+[[companies]]
+id = "miro"
+name = "Miro"
+industry = "Collaboration software, B2B SaaS, Technology"
+scale = "1,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "ashby"
+board = "miro"
+
+[[companies]]
+id = "checkout-com"
+name = "Checkout.com"
+industry = "Fintech, Payments, Financial infrastructure"
+scale = "1,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "ashby"
+board = "checkout.com"
+
+[[companies]]
+id = "fourthline"
+name = "Fourthline"
+industry = "Fintech, Identity verification, Regtech"
+scale = "200+ · Medium or large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "fourthline"
+country_filter = "NL"
+
+[[companies]]
+id = "ockto"
+name = "Ockto"
+industry = "Fintech, Open finance, Financial data"
+scale = "50–249 · Medium-sized company"
+enabled = true
+[companies.source]
+strategy = "recruitee"
+base_url = "https://ockto.recruitee.com"
+
+[[companies]]
+id = "drw"
+name = "DRW"
+industry = "Proprietary trading, Market making, Financial services"
+scale = "1,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "drweng"
+country_filter = "NL"
+
+[[companies]]
+id = "jump-trading"
+name = "Jump Trading"
+industry = "Proprietary trading, Market making, Financial services"
+scale = "1,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "jumptrading"
+country_filter = "NL"
+
+[[companies]]
+id = "tower-research"
+name = "Tower Research"
+industry = "Proprietary trading, Market making, Financial services"
+scale = "1,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "towerresearchcapital"
+country_filter = "NL"
+
+[[companies]]
+id = "webb-traders"
+name = "WEBB Traders"
+industry = "Proprietary trading, Market making, Financial services"
+scale = "50–249 · Medium-sized company"
+enabled = true
+[companies.source]
+strategy = "recruitee"
+base_url = "https://webbtraders.recruitee.com"
+
+[[companies]]
+id = "stx-group"
+name = "STX Group"
+industry = "Environmental commodities, Energy trading, Climate finance"
+scale = "200+ · Medium or large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "stxgroup"
+country_filter = "NL"
+
+[[companies]]
+id = "elastic"
+name = "Elastic"
+industry = "Search, Observability, Security, Cloud"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "elastic"
+country_filter = "NL"
+
+[[companies]]
+id = "multisafepay"
+name = "MultiSafepay"
+industry = "Fintech, Payments, E-commerce"
+scale = "50–249 · Medium-sized company"
+enabled = true
+[companies.source]
+strategy = "recruitee"
+base_url = "https://careers.multisafepay.com"
+
+[[companies]]
+id = "act-commodities"
+name = "ACT Commodities"
+industry = "Environmental commodities, Energy trading, Climate finance"
+scale = "200+ · Medium or large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "testendouble"
+country_filter = "NL"

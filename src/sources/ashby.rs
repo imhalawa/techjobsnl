@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{ObservedJob, SourceErrorKind, SourceScan};
 
-use super::{JobSource, SourceError, http::send_text, json_ld::html_markdown};
+use super::{
+    JobSource, SourceError, country_code_for_location, http::send_text, json_ld::html_markdown,
+};
 
 const ASHBY_BOARD_ENDPOINT: &str = "https://api.ashbyhq.com/posting-api/job-board";
 const REDIRECT_LIMIT: usize = 5;
@@ -83,7 +85,7 @@ struct AshbyJob {
     secondary_locations: Vec<AshbyLocation>,
     published_at: Option<String>,
     is_listed: bool,
-    address: AshbyAddress,
+    address: Option<AshbyAddress>,
     job_url: String,
     apply_url: String,
     description_plain: String,
@@ -95,7 +97,7 @@ struct AshbyJob {
 #[derive(Debug, Deserialize, Serialize)]
 struct AshbyLocation {
     location: String,
-    address: AshbyAddress,
+    address: Option<AshbyAddress>,
     #[serde(flatten)]
     extra: serde_json::Map<String, serde_json::Value>,
 }
@@ -178,7 +180,7 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
     push_unique(
         &mut countries,
         &mut seen_countries,
-        normalise_country(&job.address.postal_address.address_country),
+        country_for_location(company_id, &job.id, &job.location, job.address.as_ref())?,
     );
     for secondary in &job.secondary_locations {
         push_unique(
@@ -189,7 +191,12 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
         push_unique(
             &mut countries,
             &mut seen_countries,
-            normalise_country(&secondary.address.postal_address.address_country),
+            country_for_location(
+                company_id,
+                &job.id,
+                &secondary.location,
+                secondary.address.as_ref(),
+            )?,
         );
     }
 
@@ -220,6 +227,22 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
         raw_payload,
         published_at,
     })
+}
+
+fn country_for_location(
+    company_id: &str,
+    job_id: &str,
+    location: &str,
+    address: Option<&AshbyAddress>,
+) -> Result<String, SourceError> {
+    address
+        .map(|address| normalise_country(&address.postal_address.address_country))
+        .or_else(|| country_code_for_location(location).map(str::to_owned))
+        .ok_or_else(|| {
+            SourceError::schema(format!(
+                "Ashby job {job_id} for {company_id} has unresolved location {location:?}"
+            ))
+        })
 }
 
 fn normalise_country(country: &str) -> String {

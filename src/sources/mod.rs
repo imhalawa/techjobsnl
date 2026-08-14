@@ -83,6 +83,9 @@ fn country_code_for_location(location: &str) -> Option<&'static str> {
 
     match location {
         "Amsterdam" => Some("NL"),
+        "AUSTRALIA" => Some("AU"),
+        "Austin" | "Remote, USA" => Some("US"),
+        "Copenhagen" => Some("DK"),
         "Bengaluru" | "Mumbai" => Some("IN"),
         "Berlin" | "Munich" => Some("DE"),
         "Chicago" | "New York" | "San Francisco" | "Washington D.C., District of Columbia" => {

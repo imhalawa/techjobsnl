@@ -138,7 +138,7 @@ fn observed_job(
     Ok(ObservedJob {
         source_id: id.to_string(),
         title: offer.title,
-        department: non_empty(&offer.department),
+        department: offer.department.as_deref().and_then(non_empty),
         team: non_empty(&offer.category_code),
         employment_type: non_empty(&offer.employment_type_code),
         locations: location_names,
@@ -179,8 +179,7 @@ struct RecruiteeResponse {
 struct RecruiteeOffer {
     id: Option<u64>,
     title: String,
-    #[serde(default)]
-    department: String,
+    department: Option<String>,
     #[serde(default)]
     category_code: String,
     #[serde(default)]
