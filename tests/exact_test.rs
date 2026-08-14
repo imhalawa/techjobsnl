@@ -32,7 +32,7 @@ fn parses_a_complete_exact_board_and_detail() {
 #[ignore = "live external source"]
 async fn exact_live_returns_complete_unique_netherlands_jobs() {
     let client = reqwest::Client::builder()
-        .user_agent("job-watch/0.1 (+Exact live test)")
+        .user_agent("techjobsnl/0.1 (+Exact live test)")
         .timeout(Duration::from_secs(30))
         .build()
         .unwrap();

@@ -306,7 +306,7 @@ fn getnoticed_rejects_non_official_or_non_https_bases() {
 #[tokio::test]
 async fn getnoticed_client_rejects_cross_host_redirects_before_fetching_the_target() {
     let (source_url, target) = cross_host_redirect();
-    let client = build_client("job-watch-test", Duration::from_secs(5)).unwrap();
+    let client = build_client("techjobsnl-test", Duration::from_secs(5)).unwrap();
 
     let error = send_text(client.get(source_url), "ABN AMRO")
         .await
@@ -320,7 +320,7 @@ async fn getnoticed_client_rejects_cross_host_redirects_before_fetching_the_targ
 #[tokio::test]
 async fn getnoticed_client_rejects_same_host_http_redirects_before_fetching_the_target() {
     let (source_url, target) = same_host_http_redirect();
-    let client = build_client("job-watch-test", Duration::from_secs(5)).unwrap();
+    let client = build_client("techjobsnl-test", Duration::from_secs(5)).unwrap();
 
     let error = send_text(client.get(source_url), "ABN AMRO")
         .await
@@ -337,7 +337,7 @@ async fn getnoticed_client_rejects_same_host_http_redirects_before_fetching_the_
 #[tokio::test]
 async fn getnoticed_client_rejects_alternate_port_redirects_before_fetching_the_target() {
     let (source_url, target) = alternate_port_redirect();
-    let client = build_client("job-watch-test", Duration::from_secs(5)).unwrap();
+    let client = build_client("techjobsnl-test", Duration::from_secs(5)).unwrap();
 
     let _ = send_text(client.get(source_url), "ABN AMRO").await;
 
@@ -356,7 +356,7 @@ async fn getnoticed_live_returns_complete_unique_abn_jobs() {
         BASE_URL,
         Some("Nederland".to_owned()),
         build_client(
-            "job-watch/0.1 (+ABN AMRO live test)",
+            "techjobsnl/0.1 (+ABN AMRO live test)",
             Duration::from_secs(30),
         )
         .unwrap(),
@@ -404,7 +404,7 @@ async fn getnoticed_live_returns_complete_unique_topicus_jobs() {
         TOPICUS_BASE_URL,
         None,
         build_client(
-            "job-watch/0.1 (+Topicus live test)",
+            "techjobsnl/0.1 (+Topicus live test)",
             Duration::from_secs(30),
         )
         .unwrap(),
@@ -439,7 +439,7 @@ async fn getnoticed_live_returns_complete_unique_brand_new_day_jobs() {
         BRAND_NEW_DAY_BASE_URL,
         None,
         build_client(
-            "job-watch/0.1 (+Brand New Day live test)",
+            "techjobsnl/0.1 (+Brand New Day live test)",
             Duration::from_secs(30),
         )
         .unwrap(),

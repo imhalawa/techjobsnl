@@ -97,7 +97,7 @@ async fn scan(service: &ScanService, run_id: &str) {
 #[tokio::test]
 async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
     let mut config = Config::load(format!("{}/config.toml", env!("CARGO_MANIFEST_DIR"))).unwrap();
-    assert_eq!(config.database_path, ".data/job-watch.sqlite3");
+    assert_eq!(config.database_path, ".data/techjobsnl.sqlite3");
     assert_eq!(config.scan.concurrency, 4);
     assert_eq!(
         config

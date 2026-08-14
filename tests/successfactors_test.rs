@@ -68,7 +68,7 @@ fn rejects_an_incomplete_successfactors_snapshot() {
 #[ignore = "live external source"]
 async fn flatexdegiro_live_returns_every_nl_job() {
     let client = build_client(
-        "job-watch/0.1 (+flatexDEGIRO live test)",
+        "techjobsnl/0.1 (+flatexDEGIRO live test)",
         Duration::from_secs(30),
     )
     .unwrap();

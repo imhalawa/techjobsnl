@@ -1,12 +1,12 @@
 param(
-    [string]$Version = $env:JOB_WATCH_VERSION,
-    [string]$InstallDir = $env:JOB_WATCH_INSTALL_DIR
+    [string]$Version = $(if ($env:TECHJOBSNL_VERSION) { $env:TECHJOBSNL_VERSION } else { $env:JOB_WATCH_VERSION }),
+    [string]$InstallDir = $(if ($env:TECHJOBSNL_INSTALL_DIR) { $env:TECHJOBSNL_INSTALL_DIR } else { $env:JOB_WATCH_INSTALL_DIR })
 )
 
 $ErrorActionPreference = "Stop"
-$Repository = if ($env:JOB_WATCH_REPOSITORY) { $env:JOB_WATCH_REPOSITORY } else { "imhalawa/job-tracker-nl" }
+$Repository = if ($env:TECHJOBSNL_REPOSITORY) { $env:TECHJOBSNL_REPOSITORY } elseif ($env:JOB_WATCH_REPOSITORY) { $env:JOB_WATCH_REPOSITORY } else { "imhalawa/techjobsnl" }
 if (-not $Version) { $Version = "latest" }
-if (-not $InstallDir) { $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\job-watch\bin" }
+if (-not $InstallDir) { $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\techjobsnl\bin" }
 
 $Architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
 $Target = switch ($Architecture) {
@@ -15,8 +15,10 @@ $Target = switch ($Architecture) {
     default { throw "Unsupported CPU architecture: $Architecture" }
 }
 
-$Asset = "job-watch-$Target.zip"
-$DownloadBase = if ($env:JOB_WATCH_DOWNLOAD_BASE) {
+$Asset = "techjobsnl-$Target.zip"
+$DownloadBase = if ($env:TECHJOBSNL_DOWNLOAD_BASE) {
+    $env:TECHJOBSNL_DOWNLOAD_BASE.TrimEnd("/")
+} elseif ($env:JOB_WATCH_DOWNLOAD_BASE) {
     $env:JOB_WATCH_DOWNLOAD_BASE.TrimEnd("/")
 } elseif ($Version -eq "latest") {
     "https://github.com/$Repository/releases/latest/download"
@@ -24,7 +26,7 @@ $DownloadBase = if ($env:JOB_WATCH_DOWNLOAD_BASE) {
     "https://github.com/$Repository/releases/download/$Version"
 }
 
-$TemporaryDir = Join-Path ([System.IO.Path]::GetTempPath()) ("job-watch-install-" + [guid]::NewGuid())
+$TemporaryDir = Join-Path ([System.IO.Path]::GetTempPath()) ("techjobsnl-install-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $TemporaryDir | Out-Null
 try {
     $Archive = Join-Path $TemporaryDir $Asset
@@ -42,7 +44,7 @@ try {
     $Expanded = Join-Path $TemporaryDir "expanded"
     Expand-Archive -Path $Archive -DestinationPath $Expanded
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Copy-Item -Force (Join-Path $Expanded "job-watch.exe") (Join-Path $InstallDir "job-watch.exe")
+    Copy-Item -Force (Join-Path $Expanded "techjobsnl.exe") (Join-Path $InstallDir "techjobsnl.exe")
 
     $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
     $PathEntries = if ($UserPath) { $UserPath -split ";" } else { @() }
@@ -52,7 +54,7 @@ try {
         $env:Path = "$env:Path;$InstallDir"
         Write-Host "Added $InstallDir to your user PATH. Open a new terminal to use it."
     }
-    Write-Host "Installed job-watch to $InstallDir\job-watch.exe"
+    Write-Host "Installed techjobsnl to $InstallDir\techjobsnl.exe"
 } finally {
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TemporaryDir
 }

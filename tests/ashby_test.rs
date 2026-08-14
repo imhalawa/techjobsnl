@@ -186,7 +186,7 @@ fn rejects_empty_job_identity_and_official_urls_as_schema_errors() {
 
 #[test]
 fn rejects_an_invalid_user_agent_before_scanning() {
-    let error = build_client("job-watch\ninvalid", Duration::from_secs(20)).unwrap_err();
+    let error = build_client("techjobsnl\ninvalid", Duration::from_secs(20)).unwrap_err();
 
     assert_eq!(error.kind, SourceErrorKind::Configuration);
     assert!(!error.retryable);
@@ -196,7 +196,7 @@ fn rejects_an_invalid_user_agent_before_scanning() {
 
 #[test]
 fn job_source_contract_is_object_safe() {
-    let client = build_client("job-watch/0.1", Duration::from_secs(20)).unwrap();
+    let client = build_client("techjobsnl/0.1", Duration::from_secs(20)).unwrap();
     let source: Box<dyn JobSource> = Box::new(AshbySource::new("mollie", "mollie", client));
 
     assert_eq!(source.company_id(), "mollie");
@@ -205,7 +205,7 @@ fn job_source_contract_is_object_safe() {
 #[tokio::test]
 #[ignore = "live external source"]
 async fn scans_live_mollie_board_as_a_complete_unique_result() {
-    let client = build_client("job-watch/0.1", Duration::from_secs(20)).unwrap();
+    let client = build_client("techjobsnl/0.1", Duration::from_secs(20)).unwrap();
     let source = AshbySource::new("mollie", "mollie", client);
 
     let SourceScan::Complete { observations } = source.scan().await.unwrap() else {
@@ -231,7 +231,7 @@ async fn scans_live_mollie_board_as_a_complete_unique_result() {
 #[ignore = "live external source"]
 async fn scans_live_airwallex_board_as_a_complete_unique_result() {
     let client = build_client(
-        "job-watch/0.1 (+Airwallex live test)",
+        "techjobsnl/0.1 (+Airwallex live test)",
         Duration::from_secs(20),
     )
     .unwrap();
@@ -261,7 +261,7 @@ async fn scans_live_airwallex_board_as_a_complete_unique_result() {
 #[ignore = "live external source"]
 async fn scans_live_datasnipper_board_as_a_complete_unique_result() {
     let client = build_client(
-        "job-watch/0.1 (+DataSnipper live test)",
+        "techjobsnl/0.1 (+DataSnipper live test)",
         Duration::from_secs(20),
     )
     .unwrap();
@@ -301,7 +301,7 @@ async fn scans_live_datasnipper_board_as_a_complete_unique_result() {
 #[ignore = "live external source"]
 async fn scans_live_bitvavo_board_with_its_official_headquarters_mapping() {
     let client = build_client(
-        "job-watch/0.1 (+Bitvavo live test)",
+        "techjobsnl/0.1 (+Bitvavo live test)",
         Duration::from_secs(20),
     )
     .unwrap();

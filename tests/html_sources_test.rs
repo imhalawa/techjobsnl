@@ -260,5 +260,5 @@ fn mutate_json_ld(html: &mut String, mutation: impl FnOnce(&mut serde_json::Valu
 }
 
 fn live_client() -> reqwest::Client {
-    build_client("job-watch/0.1 (+ING live test)", Duration::from_secs(30)).unwrap()
+    build_client("techjobsnl/0.1 (+ING live test)", Duration::from_secs(30)).unwrap()
 }

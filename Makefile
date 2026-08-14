@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-CARGO_TARGET_DIR ?= $(HOME)/.cache/job-watch-target
+CARGO_TARGET_DIR ?= $(HOME)/.cache/techjobsnl-target
 export CARGO_TARGET_DIR
 
 .PHONY: help run require-tty build test test-live check fmt clippy clean

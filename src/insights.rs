@@ -671,10 +671,9 @@ fn stack_trends(
         .collect::<Vec<_>>();
     rows.sort_by(|left, right| {
         right
-            .metric
-            .current_count
-            .cmp(&left.metric.current_count)
-            .then_with(|| right.company_count.cmp(&left.company_count))
+            .company_count
+            .cmp(&left.company_count)
+            .then_with(|| right.metric.current_count.cmp(&left.metric.current_count))
             .then_with(|| right.association_bps.cmp(&left.association_bps))
             .then_with(|| left.key.cmp(&right.key))
     });
@@ -728,7 +727,7 @@ impl StackGraph {
                 continue;
             };
             for (name, evidence) in &job_facts.skills {
-                if let Some(role) = evidence.stack_role {
+                if let Some(role) = evidence.stack_role.filter(|_| evidence.supports_stack()) {
                     *graph.nodes.entry(name.clone()).or_default() += 1;
                     graph.roles.insert(name.clone(), role);
                 }
@@ -741,7 +740,7 @@ impl StackGraph {
             let stackable = job_facts
                 .skills
                 .iter()
-                .filter(|(_, evidence)| evidence.stack_role.is_some());
+                .filter(|(_, evidence)| evidence.stack_role.is_some() && evidence.supports_stack());
             let mut families = HashMap::<String, (&String, u8)>::new();
             for (name, evidence) in stackable {
                 let family = evidence.stack_family.as_ref().unwrap_or(name).clone();
@@ -1036,12 +1035,16 @@ fn edge_key(left: &str, right: &str) -> (String, String) {
 }
 
 pub(crate) fn supports_stack(facts: &JobFacts, skills: &[String]) -> bool {
-    skills.iter().all(|skill| facts.skills.contains_key(skill))
-        && !skills.iter().enumerate().any(|(index, left)| {
-            skills[index + 1..]
-                .iter()
-                .any(|right| skills_are_alternatives(facts, left, right))
-        })
+    skills.iter().all(|skill| {
+        facts
+            .skills
+            .get(skill)
+            .is_some_and(|evidence| evidence.stack_role.is_some() && evidence.supports_stack())
+    }) && !skills.iter().enumerate().any(|(index, left)| {
+        skills[index + 1..]
+            .iter()
+            .any(|right| skills_are_alternatives(facts, left, right))
+    })
 }
 
 fn skills_are_alternatives(facts: &JobFacts, left: &str, right: &str) -> bool {
@@ -1364,6 +1367,113 @@ mod tests {
         );
 
         assert!(report.stacks.is_empty());
+    }
+
+    #[test]
+    fn example_and_secondary_technologies_do_not_form_stack_paths() {
+        let now = Utc.with_ymd_and_hms(2026, 8, 14, 12, 0, 0).unwrap();
+        let jobs = (0..3)
+            .map(|index| {
+                job(
+                    index,
+                    now - Duration::days(1),
+                    "AWS (primary), Azure, GCP; Docker, Terraform, GitHub Actions",
+                )
+            })
+            .collect::<Vec<_>>();
+        let facts = jobs
+            .iter()
+            .map(|job| (job.key.clone(), analytics::extract(job)))
+            .collect::<HashMap<_, _>>();
+
+        let report = AnalyticsReport::build(
+            &jobs,
+            &facts,
+            &[],
+            &AnalyticsFilters::default(),
+            &LibraryState::default(),
+            now,
+            3,
+        );
+
+        assert!(
+            report.stacks.iter().all(|stack| !stack
+                .key
+                .0
+                .iter()
+                .any(|skill| skill == "Microsoft Azure"))
+        );
+    }
+
+    #[test]
+    fn example_lists_do_not_form_stack_paths() {
+        let now = Utc.with_ymd_and_hms(2026, 8, 14, 12, 0, 0).unwrap();
+        let jobs = (0..3)
+            .map(|index| {
+                job(
+                    index,
+                    now - Duration::days(1),
+                    "Cloud technologies, e.g. Microsoft Azure, Docker, Terraform.",
+                )
+            })
+            .collect::<Vec<_>>();
+        let facts = jobs
+            .iter()
+            .map(|job| (job.key.clone(), analytics::extract(job)))
+            .collect::<HashMap<_, _>>();
+
+        let report = AnalyticsReport::build(
+            &jobs,
+            &facts,
+            &[],
+            &AnalyticsFilters::default(),
+            &LibraryState::default(),
+            now,
+            3,
+        );
+
+        assert!(report.stacks.is_empty());
+    }
+
+    #[test]
+    fn stack_ranking_prefers_firm_diversity_over_repeated_postings() {
+        let now = Utc.with_ymd_and_hms(2026, 8, 14, 12, 0, 0).unwrap();
+        let specs = [
+            ("a", "AWS Docker Terraform"),
+            ("a", "AWS Docker Terraform"),
+            ("a", "AWS Docker Terraform"),
+            ("b", "AWS Docker Terraform"),
+            ("b", "AWS Docker Terraform"),
+            ("c", "Microsoft Azure Kubernetes Ansible"),
+            ("d", "Microsoft Azure Kubernetes Ansible"),
+            ("e", "Microsoft Azure Kubernetes Ansible"),
+        ];
+        let jobs = specs
+            .iter()
+            .enumerate()
+            .map(|(index, (company, description))| {
+                let mut job = job(index, now - Duration::days(1), description);
+                job.key.company_id = (*company).into();
+                job
+            })
+            .collect::<Vec<_>>();
+        let facts = jobs
+            .iter()
+            .map(|job| (job.key.clone(), analytics::extract(job)))
+            .collect::<HashMap<_, _>>();
+
+        let report = AnalyticsReport::build(
+            &jobs,
+            &facts,
+            &[],
+            &AnalyticsFilters::default(),
+            &LibraryState::default(),
+            now,
+            3,
+        );
+
+        assert_eq!(report.stacks[0].company_count, 3);
+        assert_eq!(report.stacks[0].metric.current_count, 3);
     }
 
     #[test]

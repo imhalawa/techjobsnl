@@ -94,7 +94,7 @@ fn rejects_incomplete_successfactors_pagination() {
 #[ignore = "live external source"]
 async fn worldline_live_returns_complete_unique_netherlands_jobs() {
     let client = reqwest::Client::builder()
-        .user_agent("job-watch/0.1 (+Worldline live test)")
+        .user_agent("techjobsnl/0.1 (+Worldline live test)")
         .cookie_store(true)
         .timeout(Duration::from_secs(30))
         .build()

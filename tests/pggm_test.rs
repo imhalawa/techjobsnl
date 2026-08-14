@@ -125,7 +125,7 @@ fn rejects_missing_pages_duplicates_and_non_official_urls() {
 #[ignore = "live external source"]
 async fn pggm_live_returns_complete_unique_netherlands_jobs() {
     let client = reqwest::Client::builder()
-        .user_agent("job-watch/0.1 (+PGGM live test)")
+        .user_agent("techjobsnl/0.1 (+PGGM live test)")
         .timeout(Duration::from_secs(30))
         .build()
         .unwrap();

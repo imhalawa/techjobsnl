@@ -461,7 +461,7 @@ async fn each_hanging_attempt_times_out_and_uses_the_timeout_retry_budget() {
             concurrency: 1,
             timeout_seconds: 1,
             retry_count: 1,
-            user_agent: "job-watch-test/0.1".into(),
+            user_agent: "techjobsnl-test/0.1".into(),
         },
     );
     let (tx, mut rx) = mpsc::unbounded_channel();
@@ -538,7 +538,7 @@ async fn retryable_timeouts_use_the_configured_retry_budget() {
             concurrency: 1,
             timeout_seconds: 20,
             retry_count: 2,
-            user_agent: "job-watch-test/0.1".into(),
+            user_agent: "techjobsnl-test/0.1".into(),
         },
     );
     let (tx, _rx) = mpsc::unbounded_channel();
@@ -595,7 +595,7 @@ async fn retries_rate_limits_and_server_errors_but_not_client_errors() {
             concurrency: 3,
             timeout_seconds: 20,
             retry_count: 1,
-            user_agent: "job-watch-test/0.1".into(),
+            user_agent: "techjobsnl-test/0.1".into(),
         },
     );
     let (tx, _rx) = mpsc::unbounded_channel();
@@ -640,7 +640,7 @@ async fn retry_after_overrides_the_fallback_backoff() {
             concurrency: 1,
             timeout_seconds: 20,
             retry_count: 1,
-            user_agent: "job-watch-test/0.1".into(),
+            user_agent: "techjobsnl-test/0.1".into(),
         },
     );
     let (tx, _rx) = mpsc::unbounded_channel();
@@ -675,7 +675,7 @@ async fn a_statusless_non_timeout_transport_error_is_not_retried() {
             concurrency: 1,
             timeout_seconds: 20,
             retry_count: 1,
-            user_agent: "job-watch-test/0.1".into(),
+            user_agent: "techjobsnl-test/0.1".into(),
         },
     );
     let (tx, _rx) = mpsc::unbounded_channel();
@@ -746,7 +746,7 @@ async fn source_fetches_respect_the_concurrency_limit_and_event_lifecycle() {
             concurrency: 2,
             timeout_seconds: 20,
             retry_count: 0,
-            user_agent: "job-watch-test/0.1".into(),
+            user_agent: "techjobsnl-test/0.1".into(),
         },
     );
     let (tx, mut rx) = mpsc::unbounded_channel();
@@ -892,7 +892,7 @@ fn service(
             concurrency: 2,
             timeout_seconds: 20,
             retry_count: 0,
-            user_agent: "job-watch-test/0.1".into(),
+            user_agent: "techjobsnl-test/0.1".into(),
         },
     )
 }

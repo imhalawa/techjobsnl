@@ -17,7 +17,7 @@ use crossterm::{
 };
 use futures_util::StreamExt;
 use job_watch::{
-    analytics::{JobFacts, SkillSuggestion},
+    analytics::{JobFacts, SkillSuggestion, SuggestionStatus},
     config::{Config, FiltersConfig, SourceConfig},
     domain::{JobKey, JobRecord, ScanEvent},
     filter::EligibilityFilter,
@@ -193,12 +193,24 @@ fn user_config_path() -> Result<PathBuf> {
     let home = env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
     let xdg = env::var_os("XDG_CONFIG_HOME").map(PathBuf::from);
     let appdata = env::var_os("APPDATA").map(PathBuf::from);
-    Ok(config_path_for(
+    let current = config_path_for(
         current_platform(),
         home.as_deref(),
         xdg.as_deref(),
         appdata.as_deref(),
-    )?)
+    )?;
+    Ok(prefer_existing_config(current))
+}
+
+fn prefer_existing_config(current: PathBuf) -> PathBuf {
+    if current.is_file() {
+        return current;
+    }
+    let legacy = current
+        .parent()
+        .and_then(Path::parent)
+        .map(|base| base.join("job-watch/config.toml"));
+    legacy.filter(|path| path.is_file()).unwrap_or(current)
 }
 
 fn config_path_for(
@@ -222,7 +234,7 @@ fn config_path_for(
             "user config directory is unavailable",
         )
     })?;
-    Ok(base.join("job-watch/config.toml"))
+    Ok(base.join("techjobsnl/config.toml"))
 }
 
 fn ensure_default_config(path: &Path) -> io::Result<()> {
@@ -320,6 +332,8 @@ async fn run(
     let mut reload_in_flight = false;
     let mut reload_requested = false;
     let mut attempted_discoveries = HashSet::new();
+    let mut animation_tick = tokio::time::interval(Duration::from_millis(120));
+    animation_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         if reload_requested && !reload_in_flight {
@@ -353,6 +367,7 @@ async fn run(
             && attempted_discoveries.insert(work.cache_key().to_owned())
         {
             active_discovery = true;
+            app.set_discovery_loading(true);
             let discovery_tx = discovery_tx.clone();
             let store = Arc::clone(&store);
             tokio::spawn(async move {
@@ -403,20 +418,32 @@ async fn run(
                     let mut open_job_url = open_url;
                     let mut copy_job_url = copy_url;
                     let mut save_filters = |filters| save_filters(&config_path, &filters);
-                    match execute_command(
+                    let effect = match execute_command(
                         command,
                         &store,
                         app,
                         &mut open_job_url,
                         &mut copy_job_url,
                         &mut save_filters,
-                    )? {
+                    ) {
+                        Ok(effect) => effect,
+                        Err(error) => {
+                            app.set_feedback(format!("ERROR: {error}"));
+                            continue;
+                        }
+                    };
+                    match effect {
                         CommandEffect::StartScan => {
-                            start_scan(
+                            let started = start_scan(
                                 &mut active_scan,
                                 Arc::clone(&scan_service),
                                 scan_tx.clone(),
                             );
+                            app.set_feedback(if started {
+                                "Scan started"
+                            } else {
+                                "Scan already running"
+                            });
                         }
                         CommandEffect::FiltersChanged => {
                             scan_service.update_filter(EligibilityFilter::new(
@@ -444,20 +471,37 @@ async fn run(
             Some(result) = analytics_rx.recv() => {
                 match result {
                     Ok(result) => app.finish_analytics_work(result),
-                    Err(error) => app.fail_analytics_work(error),
+                    Err(error) => {
+                        app.fail_analytics_work(error.clone());
+                        app.set_feedback(format!("ERROR: {error}"));
+                    }
                 }
             }
             Some(result) = discovery_rx.recv() => {
                 active_discovery = false;
-                if let Ok(Some(suggestions)) = result {
-                    app.replace_skill_suggestions(suggestions);
+                app.set_discovery_loading(false);
+                match result {
+                    Ok(Some(suggestions)) => {
+                        app.replace_skill_suggestions(suggestions);
+                        app.set_feedback("Skill discovery complete");
+                    }
+                    Ok(None) => {}
+                    Err(error) => app.set_feedback(format!("ERROR: {error}")),
                 }
             }
             Some(result) = reload_rx.recv() => {
                 reload_in_flight = false;
                 if !reload_requested {
-                    apply_reload(app, result.map_err(io::Error::other)?);
                     app.set_data_loading(false);
+                    match result {
+                        Ok(data) => {
+                            apply_reload(app, data);
+                            if !app.has_feedback() {
+                                app.set_feedback("Jobs loaded");
+                            }
+                        }
+                        Err(error) => app.set_feedback(format!("ERROR: {error}")),
+                    }
                 }
             }
             scan_result = async {
@@ -466,6 +510,9 @@ async fn run(
                 finish_scan(&mut active_scan, scan_result)?;
                 reload_requested = true;
                 app.set_data_loading(true);
+            }
+            _ = animation_tick.tick(), if app.animation_active() => {
+                app.advance_animation();
             }
         }
     }
@@ -765,20 +812,33 @@ fn execute_command(
 ) -> Result<CommandEffect> {
     match command {
         AppCommand::ToggleApplied(key) => {
+            let was_applied = app
+                .jobs()
+                .iter()
+                .find(|job| job.key == key)
+                .is_some_and(|job| job.applied_at.is_some());
             store.lock().unwrap().toggle_applied(&key, Utc::now())?;
+            app.set_feedback(if was_applied {
+                "Marked as not applied"
+            } else {
+                "Marked as applied"
+            });
             Ok(CommandEffect::ReloadJobs)
         }
         AppCommand::OpenUrl(url) => {
             open_url(&url)?;
+            app.set_feedback("Opened job in browser");
             Ok(CommandEffect::Continue)
         }
         AppCommand::CopyUrl(url) => {
             copy_url(&url)?;
+            app.set_feedback("Copied job URL");
             Ok(CommandEffect::Continue)
         }
         AppCommand::SaveFilters(filters) => {
             save_filters(filters.clone())?;
             app.apply_filters(filters);
+            app.set_feedback("Settings saved");
             Ok(CommandEffect::FiltersChanged)
         }
         AppCommand::SaveAnalyticsState(filters, library) => {
@@ -793,6 +853,11 @@ fn execute_command(
                 .lock()
                 .unwrap()
                 .review_skill_suggestion(&name, status)?;
+            app.set_feedback(match status {
+                SuggestionStatus::Approved => "Skill approved",
+                SuggestionStatus::Rejected => "Skill rejected",
+                SuggestionStatus::Pending => "Skill review reset",
+            });
             Ok(CommandEffect::ReloadJobs)
         }
         AppCommand::StartScan => Ok(CommandEffect::StartScan),
@@ -992,6 +1057,7 @@ mod tests {
             SourceErrorKind, SourceScan,
         },
         filter::EligibilityFilter,
+        insights::{AnalyticsFilters, LibraryState},
         scanner::ScanService,
         sources::{JobSource, SourceError},
         storage::{JobQuery, Store},
@@ -1003,8 +1069,8 @@ mod tests {
     use super::{
         CommandEffect, Platform, abort_scan, apply_reload, browser_command, build_sources,
         config_path_for, copy_url_with, ensure_default_config, execute_command, finish_scan,
-        finish_with_restore, handle_runtime_scan_event, initialize, load_jobs, save_filters,
-        start_scan, sync_default_companies,
+        finish_with_restore, handle_runtime_scan_event, initialize, load_jobs,
+        prefer_existing_config, save_filters, start_scan, sync_default_companies,
     };
 
     #[test]
@@ -1015,22 +1081,22 @@ mod tests {
 
         assert_eq!(
             config_path_for(Platform::Linux, Some(home), Some(xdg), None).unwrap(),
-            xdg.join("job-watch/config.toml")
+            xdg.join("techjobsnl/config.toml")
         );
         assert_eq!(
             config_path_for(Platform::Macos, Some(home), None, None).unwrap(),
-            home.join("Library/Application Support/job-watch/config.toml")
+            home.join("Library/Application Support/techjobsnl/config.toml")
         );
         assert_eq!(
             config_path_for(Platform::Windows, Some(home), None, Some(appdata)).unwrap(),
-            appdata.join("job-watch/config.toml")
+            appdata.join("techjobsnl/config.toml")
         );
     }
 
     #[test]
     fn first_start_creates_default_config_without_overwriting_it_later() {
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("job-watch/config.toml");
+        let path = directory.path().join("techjobsnl/config.toml");
 
         ensure_default_config(&path).unwrap();
         assert!(Config::load(&path).is_ok());
@@ -1038,6 +1104,17 @@ mod tests {
         ensure_default_config(&path).unwrap();
 
         assert_eq!(std::fs::read_to_string(path).unwrap(), "user changes");
+    }
+
+    #[test]
+    fn existing_legacy_config_is_reused() {
+        let directory = tempfile::tempdir().unwrap();
+        let current = directory.path().join("techjobsnl/config.toml");
+        let legacy = directory.path().join("job-watch/config.toml");
+        std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+        std::fs::write(&legacy, "existing config").unwrap();
+
+        assert_eq!(prefer_existing_config(current), legacy);
     }
 
     #[test]
@@ -1495,7 +1572,7 @@ mod tests {
                 concurrency: 1,
                 timeout_seconds: 30,
                 retry_count: 0,
-                user_agent: "job-watch-test".into(),
+                user_agent: "techjobsnl-test".into(),
             },
             analytics: AnalyticsConfig::default(),
             ui: UiConfig {
@@ -1590,6 +1667,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(effect, CommandEffect::ReloadJobs);
+        assert!(app.footer_status().contains("Marked as applied"));
         assert!(app.selected_job().unwrap().applied_at.is_none());
         assert_eq!(
             store
@@ -1791,7 +1869,7 @@ mod tests {
             error.to_string().contains(
                 &directory
                     .path()
-                    .join(".data/job-watch.sqlite3")
+                    .join(".data/techjobsnl.sqlite3")
                     .display()
                     .to_string()
             )
@@ -1806,7 +1884,7 @@ mod tests {
             include_str!("../config.toml"),
         )
         .unwrap();
-        std::fs::create_dir_all(directory.path().join(".data/job-watch.sqlite3")).unwrap();
+        std::fs::create_dir_all(directory.path().join(".data/techjobsnl.sqlite3")).unwrap();
 
         let error = match initialize(&directory.path().join("config.toml")) {
             Ok(_) => panic!("startup unexpectedly opened a directory as a database"),
@@ -1817,7 +1895,7 @@ mod tests {
             error.to_string().contains(
                 &directory
                     .path()
-                    .join(".data/job-watch.sqlite3")
+                    .join(".data/techjobsnl.sqlite3")
                     .display()
                     .to_string()
             )
@@ -1931,6 +2009,52 @@ mod tests {
 
         assert_eq!(effect, CommandEffect::Continue);
         assert_eq!(copied_url.as_deref(), Some("https://example.test/job"));
+        assert!(app.footer_status().contains("Copied job URL"));
+    }
+
+    #[test]
+    fn repeated_library_saves_keep_every_job_in_storage() {
+        let store = store_with_job();
+        let jobs = store.lock().unwrap().list_jobs(JobQuery::active()).unwrap();
+        let mut app = App::new(config(), jobs);
+        let mut opened = |_: &str| -> super::Result<()> { Ok(()) };
+        let mut copied = |_: &str| -> super::Result<()> { Ok(()) };
+        let mut saved = |_: FiltersConfig| -> super::Result<()> { Ok(()) };
+        let filters = AnalyticsFilters::default();
+        let mut library = LibraryState::default();
+
+        library.jobs.insert(JobKey::new("acme", "job-1"));
+        execute_command(
+            AppCommand::SaveAnalyticsState(filters.clone(), library.clone()),
+            &store,
+            &mut app,
+            &mut opened,
+            &mut copied,
+            &mut saved,
+        )
+        .unwrap();
+        library.jobs.insert(JobKey::new("acme", "job-2"));
+        execute_command(
+            AppCommand::SaveAnalyticsState(filters, library),
+            &store,
+            &mut app,
+            &mut opened,
+            &mut copied,
+            &mut saved,
+        )
+        .unwrap();
+
+        assert_eq!(
+            store
+                .lock()
+                .unwrap()
+                .analytics_state()
+                .unwrap()
+                .1
+                .jobs
+                .len(),
+            2
+        );
     }
 
     #[test]

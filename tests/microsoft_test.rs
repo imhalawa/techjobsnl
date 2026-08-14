@@ -144,7 +144,7 @@ fn rejects_listing_detail_identity_drift() {
 #[ignore = "live external source"]
 async fn microsoft_live_returns_complete_unique_netherlands_jobs() {
     let client = reqwest::Client::builder()
-        .user_agent("job-watch/0.1 (+Microsoft live test)")
+        .user_agent("techjobsnl/0.1 (+Microsoft live test)")
         .timeout(Duration::from_secs(30))
         .build()
         .unwrap();

@@ -359,38 +359,66 @@ fn render_skills_trends(frame: &mut Frame, app: &App, area: Rect) {
         render_analytics_loading(frame, app, area);
         return;
     };
-    let sections = Layout::vertical([Constraint::Percentage(68), Constraint::Fill(1)]).split(area);
-    let tables =
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(sections[0]);
-    render_skill_table(
-        frame,
-        app,
-        tables[0],
-        "Hard skills",
-        &report.hard_skills,
-        SkillKind::Hard,
-    );
-    render_skill_table(
-        frame,
-        app,
-        tables[1],
-        "Soft skills",
-        &report.soft_skills,
-        SkillKind::Soft,
-    );
-    let metrics = match app.analytics_skill_kind() {
-        SkillKind::Hard => report
-            .hard_skills
-            .iter()
-            .map(|skill| &skill.metric)
-            .collect::<Vec<_>>(),
-        SkillKind::Soft => report
-            .soft_skills
-            .iter()
-            .map(|skill| &skill.metric)
-            .collect::<Vec<_>>(),
+    let sections = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Percentage(66),
+        Constraint::Fill(1),
+    ])
+    .split(area);
+    render_skill_kind_tabs(frame, app, sections[0]);
+    let (title, skills) = match app.analytics_skill_kind() {
+        SkillKind::Hard => ("Hard skills", &report.hard_skills),
+        SkillKind::Soft => ("Soft skills", &report.soft_skills),
     };
-    render_metric_chart(frame, app, sections[1], "Demand chart", &metrics);
+    render_skill_table(
+        frame,
+        app,
+        sections[1],
+        title,
+        skills,
+        app.analytics_skill_kind(),
+    );
+    let metrics = skills.iter().map(|skill| &skill.metric).collect::<Vec<_>>();
+    render_metric_chart(frame, app, sections[2], "Demand chart", &metrics);
+}
+
+fn render_skill_kind_tabs(frame: &mut Frame, app: &App, area: Rect) {
+    let spans = [SkillKind::Hard, SkillKind::Soft]
+        .into_iter()
+        .flat_map(|kind| {
+            let selected = kind == app.analytics_skill_kind();
+            let label = match kind {
+                SkillKind::Hard => "Hard Skills",
+                SkillKind::Soft => "Soft Skills",
+            };
+            [
+                Span::styled(
+                    format!(" {label} "),
+                    Style::new()
+                        .fg(if selected {
+                            app.theme().warning
+                        } else {
+                            app.theme().primary_text
+                        })
+                        .bg(if selected {
+                            app.theme().selected_row
+                        } else {
+                            app.theme().background
+                        })
+                        .add_modifier(if selected {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        }),
+                ),
+                Span::raw(" "),
+            ]
+        })
+        .collect::<Vec<_>>();
+    frame.render_widget(
+        Paragraph::new(Line::from(spans)).style(Style::new().bg(app.theme().background)),
+        area,
+    );
 }
 
 fn render_skill_table(
@@ -962,11 +990,12 @@ fn render_library_jobs(frame: &mut Frame, app: &App, area: Rect) {
         ))
         .highlight_style(Style::new().bg(app.theme().selected_row))
         .highlight_symbol("› ");
-    let mut state = ListState::default();
+    let mut state = ListState::default().with_offset(app.job_list_offset());
     if !jobs.is_empty() {
         state.select(Some(app.selected_index()));
     }
     frame.render_stateful_widget(list, area, &mut state);
+    app.set_job_list_offset(state.offset());
     render_scrollbar(
         frame,
         app,
@@ -1777,6 +1806,12 @@ fn render_job_list(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
                 Style::new().fg(theme.applied),
             ));
         }
+        if app.is_job_saved(job) {
+            state.push(Span::styled(
+                format!(" {}", app.icons().saved),
+                Style::new().fg(theme.warning),
+            ));
+        }
         state.push(Span::styled(
             format!("  {}", compact_date(job.first_seen_at)),
             Style::new().fg(theme.muted_text),
@@ -1817,11 +1852,12 @@ fn render_job_list(frame: &mut Frame, app: &App, area: Rect, borders: Borders) {
         ))
         .highlight_style(Style::new().bg(theme.selected_row))
         .highlight_symbol("› ");
-    let mut state = ListState::default();
+    let mut state = ListState::default().with_offset(app.job_list_offset());
     if !jobs.is_empty() {
         state.select(Some(app.selected_index()));
     }
     frame.render_stateful_widget(list, area, &mut state);
+    app.set_job_list_offset(state.offset());
     render_scrollbar(
         frame,
         app,
@@ -2556,11 +2592,15 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme();
     let keys = &app.config().keybindings;
     let status = app.footer_status();
-    let (icon, status_color) = if status.starts_with("FAILED") {
+    let (icon, status_color) = if status.starts_with("ERROR") || status.contains("FAILED") {
         (app.icons().source_failure, theme.error)
-    } else if status.starts_with("INCOMPLETE") {
+    } else if status.contains("INCOMPLETE") {
         (app.icons().source_failure, theme.warning)
-    } else if status.starts_with("SCANNING") || status == "LOADING" {
+    } else if status.contains("SCANNING")
+        || status.contains("LOADING")
+        || status.contains("ANALYZING")
+        || status.contains("DISCOVERING")
+    {
         (app.icons().scanning, theme.warning)
     } else {
         (app.icons().open, theme.open)
@@ -2569,8 +2609,9 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         let limit = if area.width < 80 { 12 } else { 32 };
         let query = app.search_query().chars().take(limit).collect::<String>();
         vec![
-            format!("SEARCH {query}"),
-            "Enter apply".to_owned(),
+            format!("Search: {query}"),
+            "↑↓ select".to_owned(),
+            "Enter keep".to_owned(),
             "Esc clear".to_owned(),
         ]
     } else if app.input_mode() == InputMode::Setting {
@@ -2596,12 +2637,22 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         }
         actions
     } else if app.view() == View::Library {
-        let mut actions = vec![
-            "[/] section".to_owned(),
-            "↑/↓ rows".to_owned(),
-            "* remove · m status/target".to_owned(),
-            "Tab navigation".to_owned(),
-        ];
+        let mut actions = if app.library_tab() == LibraryTab::Jobs {
+            vec![
+                "Enter go to job".to_owned(),
+                format!("{} open", keys.open),
+                format!("{} copy", keys.copy),
+                "* remove".to_owned(),
+                "[/] section".to_owned(),
+            ]
+        } else {
+            vec![
+                "[/] section".to_owned(),
+                "↑/↓ rows".to_owned(),
+                "* remove · m status/target".to_owned(),
+                "Tab navigation".to_owned(),
+            ]
+        };
         if area.width >= 80 {
             actions.push(format!("{} quit", keys.quit));
         }
@@ -2701,39 +2752,113 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme();
     let keys = &app.config().keybindings;
     let margin = Margin {
-        horizontal: (area.width / 10).max(2),
-        vertical: (area.height / 8).max(1),
+        horizontal: if area.width < 100 {
+            2
+        } else {
+            (area.width / 12).max(2)
+        },
+        vertical: if area.height < 32 {
+            1
+        } else {
+            (area.height / 10).max(1)
+        },
     };
     let overlay = area.inner(margin);
-    let text = format!(
-        "Tab/Esc focus navigation; ↑/↓ choose; Enter open\n\
-         Inside a tab: ↑/↓ or j/k select\n\
-         J/K scroll details\n\
-         Mouse: hover; click tabs/rows; drag job divider; wheel select or scroll details\n\
-         Click Settings to edit; click Help to close\n\n\
-         Analytics: [/] or 1-4 sections; arrows rows/type; J/K evidence; Enter/open\n\
-         Filters: t/± time; C/R/S/W factors; x clear; * save; m skill status\n\
-         Library: [/] or 1-5; * remove; a/d optional AI review; never auto-approved\n\n\
-         {} scan  {} search jobs  {} filter company/New/Applied\n\
-         {} applied  {} history  {} open  {} copy\n\
-         Enter narrow: details; otherwise: open\n\
-         Search: title or company; Enter accept; Esc clear\n\
-         Esc close help  {} toggle help  {} quit",
-        keys.scan,
-        keys.search,
-        keys.filter,
-        keys.toggle_applied,
-        keys.history,
-        keys.open,
-        keys.copy,
-        keys.help,
-        keys.quit,
-    );
+    let mut lines = vec![
+        help_section("GET AROUND", theme.warning),
+        help_row("Tab / Esc", "Focus navigation", theme),
+        help_row("↑/↓ or j/k", "Select a tab or row", theme),
+        help_row("Enter", "Open the selected tab or item", theme),
+        Line::default(),
+    ];
+    match app.view() {
+        View::Active | View::New | View::Applied | View::History => {
+            lines.push(help_section("JOBS", theme.warning));
+            lines.push(help_row(&keys.scan, "Scan enabled sources", theme));
+            lines.push(help_row(&keys.search, "Search title or company", theme));
+            lines.push(help_row(
+                &keys.filter,
+                "Cycle company, New, Applied, All",
+                theme,
+            ));
+            lines.push(help_row(
+                &keys.toggle_applied,
+                "Mark or unmark as applied",
+                theme,
+            ));
+            lines.push(help_row(
+                &format!("{} / {}", keys.open, keys.copy),
+                "Open job / copy URL",
+                theme,
+            ));
+            lines.push(help_row("J / K", "Scroll job details", theme));
+        }
+        View::Analytics => {
+            lines.push(help_section("ANALYTICS", theme.warning));
+            lines.push(help_row("1–4 or [ ]", "Change section", theme));
+            lines.push(help_row("Left / Right", "Change Hard / Soft Skills", theme));
+            lines.push(help_row("↑/↓ or j/k", "Select a row", theme));
+            lines.push(help_row("J / K", "Select matching evidence", theme));
+            lines.push(help_row("t or + / -", "Change time window", theme));
+            lines.push(help_row("C/R/S/W", "Cycle shared filters", theme));
+            lines.push(help_row("x", "Clear shared filters", theme));
+            lines.push(help_row("m", "Change selected skill status", theme));
+        }
+        View::Library => {
+            lines.push(help_section("LIBRARY", theme.warning));
+            lines.push(help_row("1–5 or [ ]", "Change section", theme));
+            lines.push(help_row("↑/↓ or j/k", "Select a saved item", theme));
+            if app.library_tab() == LibraryTab::Jobs {
+                lines.push(help_row("Enter", "Locate job in Active or History", theme));
+                lines.push(help_row(
+                    &format!("{} / {}", keys.open, keys.copy),
+                    "Open job / copy URL",
+                    theme,
+                ));
+            }
+            lines.push(help_row("*", "Remove selected item", theme));
+            lines.push(help_row("m", "Change skill status or target role", theme));
+            lines.push(help_row(
+                "a / d",
+                "Approve / reject an AI skill suggestion",
+                theme,
+            ));
+        }
+        View::Settings => {
+            lines.push(help_section("SETTINGS", theme.warning));
+            lines.push(help_row("↑/↓ or j/k", "Select a setting", theme));
+            lines.push(help_row("Enter / Space", "Change or toggle it", theme));
+            lines.push(help_row("Enter / Esc", "Save / cancel editing", theme));
+        }
+        View::Scans | View::Sources => {
+            lines.push(help_section("SCANS & SOURCES", theme.warning));
+            lines.push(help_row(&keys.scan, "Scan enabled sources", theme));
+            lines.push(help_row("↑/↓ or j/k", "Select a scan or source", theme));
+        }
+    }
+    lines.extend([
+        Line::default(),
+        help_section("SAVE TO LIBRARY", theme.warning),
+        help_row("*", "Save a selected job or Analytics item", theme),
+        help_row("Then", "Open Library; 1–5 changes its section", theme),
+        help_row("* in Library", "Remove the selected saved item", theme),
+        Line::default(),
+        help_row(
+            "Mouse",
+            "Click items · wheel scroll · drag job divider",
+            theme,
+        ),
+        help_row(
+            &format!("{} / Esc", keys.help),
+            &format!("Close this cheat sheet · {} quits", keys.quit),
+            theme,
+        ),
+    ]);
     frame.render_widget(Clear, overlay);
     frame.render_widget(
-        Paragraph::new(text)
+        Paragraph::new(Text::from(lines))
             .block(panel(
-                "Help",
+                "Cheat sheet",
                 theme.focused_border,
                 theme.background,
                 Borders::ALL,
@@ -2742,6 +2867,25 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
             .wrap(Wrap { trim: true }),
         overlay,
     );
+}
+
+fn help_section(label: &str, color: Color) -> Line<'static> {
+    Line::from(Span::styled(
+        label.to_owned(),
+        Style::new().fg(color).add_modifier(Modifier::BOLD),
+    ))
+}
+
+fn help_row(key: &str, action: &str, theme: super::Theme) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            format!("{key:<14}"),
+            Style::new()
+                .fg(theme.focused_border)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(action.to_owned(), Style::new().fg(theme.primary_text)),
+    ])
 }
 
 fn compact_date(value: DateTime<Utc>) -> String {

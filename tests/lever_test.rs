@@ -24,7 +24,7 @@ fn parses_and_filters_a_complete_lever_board() {
 #[ignore = "live external source"]
 async fn finom_live_returns_complete_unique_netherlands_jobs() {
     let client = reqwest::Client::builder()
-        .user_agent("job-watch/0.1 (+Lever live test)")
+        .user_agent("techjobsnl/0.1 (+Lever live test)")
         .timeout(Duration::from_secs(30))
         .build()
         .unwrap();
@@ -55,7 +55,7 @@ async fn finom_live_returns_complete_unique_netherlands_jobs() {
 #[ignore = "live external source"]
 async fn tomtom_live_returns_complete_unique_netherlands_jobs() {
     let client = reqwest::Client::builder()
-        .user_agent("job-watch/0.1 (+Lever live test)")
+        .user_agent("techjobsnl/0.1 (+Lever live test)")
         .timeout(Duration::from_secs(30))
         .build()
         .unwrap();

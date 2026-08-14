@@ -19,8 +19,8 @@ use crate::{
     domain::{JobKey, JobRecord},
 };
 
-// Cached JSON changed when SkillEvidence gained stack metadata; changing this invalidates old rows.
-const EXTRACTOR_VERSION: &str = "taxonomy-v4";
+// Cached JSON changed when SkillEvidence gained stack eligibility; changing this invalidates old rows.
+const EXTRACTOR_VERSION: &str = "taxonomy-v7";
 const SKILL_BANK_JSON: &str = include_str!("../assets/software-skills.json");
 const STACK_BANK_JSON: &str = include_str!("../assets/software-stack-roles.json");
 const ROLE_BANK_JSON: &str = include_str!("../assets/role-families.json");
@@ -62,6 +62,16 @@ pub enum RequirementKind {
     Mentioned,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StackEvidenceKind {
+    Direct,
+    Preferred,
+    Example,
+    Alternative,
+    Secondary,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillEvidence {
     pub matched_alias: String,
@@ -73,6 +83,17 @@ pub struct SkillEvidence {
     pub stack_family: Option<String>,
     #[serde(default)]
     pub stack_priority: u8,
+    #[serde(default)]
+    pub stack_evidence: Option<StackEvidenceKind>,
+}
+
+impl SkillEvidence {
+    pub const fn supports_stack(&self) -> bool {
+        matches!(
+            self.stack_evidence,
+            Some(StackEvidenceKind::Direct | StackEvidenceKind::Preferred)
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -316,7 +337,9 @@ pub fn extract(job: &JobRecord) -> JobFacts {
         .iter()
         .filter_map(|skill| {
             skill_evidence(description, skill)
-                .or_else(|| skill_evidence(&job.classified.observed.title, skill))
+                .into_iter()
+                .chain(skill_evidence(&job.classified.observed.title, skill))
+                .max_by_key(evidence_rank)
                 .map(|evidence| (skill.name.clone(), evidence))
         })
         .collect();
@@ -373,24 +396,29 @@ fn skill_evidence(text: &str, skill: &BankSkill) -> Option<SkillEvidence> {
         )
         .collect::<Vec<_>>();
     aliases.sort_by_key(|(alias, _)| std::cmp::Reverse(alias.len()));
-    aliases.into_iter().find_map(|(alias, case_sensitive)| {
-        text.lines().find_map(|line| {
-            let matched = if case_sensitive {
-                contains_term(line, alias)
-            } else {
-                contains_term(&line.to_lowercase(), &alias.to_lowercase())
-            };
-            let stack = STACK_BANK.skills.get(&skill.name);
-            matched.then(|| SkillEvidence {
-                matched_alias: alias.clone(),
-                context: compact(line, 180),
-                kind: skill.kind,
-                stack_role: stack.map(|item| item.role),
-                stack_family: stack.and_then(|item| item.family.clone()),
-                stack_priority: stack.map_or(0, |item| item.priority),
+    aliases
+        .into_iter()
+        .flat_map(|(alias, case_sensitive)| {
+            text.lines().filter_map(move |line| {
+                let matched = if case_sensitive {
+                    contains_skill_term(line, alias, &skill.name)
+                } else {
+                    contains_skill_term(&line.to_lowercase(), &alias.to_lowercase(), &skill.name)
+                };
+                let stack = STACK_BANK.skills.get(&skill.name);
+                matched.then(|| SkillEvidence {
+                    matched_alias: alias.clone(),
+                    context: compact(line, 180),
+                    kind: skill.kind,
+                    stack_role: stack.map(|item| item.role),
+                    stack_family: stack.and_then(|item| item.family.clone()),
+                    stack_priority: stack.map_or(0, |item| item.priority),
+                    stack_evidence: stack
+                        .map(|item| classify_stack_evidence(line, alias, item.role)),
+                })
             })
         })
-    })
+        .max_by_key(evidence_rank)
 }
 
 pub(crate) fn apply_approved_suggestions(
@@ -412,25 +440,132 @@ pub(crate) fn apply_approved_suggestions(
         {
             let evidence = std::iter::once(&suggestion.name)
                 .chain(suggestion.aliases.iter())
-                .find_map(|alias| {
-                    text.lines().find_map(|line| {
-                        contains_term(&line.to_lowercase(), &alias.to_lowercase()).then(|| {
-                            SkillEvidence {
-                                matched_alias: alias.clone(),
-                                context: compact(line, 180),
-                                kind: suggestion.kind,
-                                stack_role: suggestion.stack_role,
-                                stack_family: suggestion.stack_family.clone(),
-                                stack_priority: u8::from(suggestion.stack_role.is_some()),
-                            }
+                .flat_map(|alias| {
+                    text.lines()
+                        .filter(move |line| {
+                            contains_term(&line.to_lowercase(), &alias.to_lowercase())
                         })
-                    })
-                });
+                        .map(move |line| SkillEvidence {
+                            matched_alias: alias.clone(),
+                            context: compact(line, 180),
+                            kind: suggestion.kind,
+                            stack_role: suggestion.stack_role,
+                            stack_family: suggestion.stack_family.clone(),
+                            stack_priority: u8::from(suggestion.stack_role.is_some()),
+                            stack_evidence: suggestion
+                                .stack_role
+                                .map(|role| classify_stack_evidence(line, alias, role)),
+                        })
+                })
+                .max_by_key(evidence_rank);
             if let Some(evidence) = evidence {
                 job_facts.skills.insert(suggestion.name.clone(), evidence);
             }
         }
     }
+}
+
+fn contains_skill_term(text: &str, term: &str, skill: &str) -> bool {
+    text.match_indices(term).any(|(start, _)| {
+        let end = start + term.len();
+        term_is_bounded(text, start, end)
+            && !(skill == "Microsoft Azure"
+                && term.eq_ignore_ascii_case("Azure")
+                && azure_product_suffix(text[end..].trim_start()))
+    })
+}
+
+fn azure_product_suffix(suffix: &str) -> bool {
+    let suffix = suffix.to_lowercase();
+    [
+        "devops",
+        "ai ",
+        "openai",
+        "data ",
+        "kubernetes",
+        "container apps",
+        "bicep",
+        "resource manager",
+    ]
+    .iter()
+    .any(|product| suffix.starts_with(product))
+}
+
+fn evidence_rank(evidence: &SkillEvidence) -> (u8, usize) {
+    let strength = match evidence.stack_evidence {
+        Some(StackEvidenceKind::Direct) => 4,
+        Some(StackEvidenceKind::Preferred) => 3,
+        None => 2,
+        Some(StackEvidenceKind::Secondary) => 1,
+        Some(StackEvidenceKind::Example | StackEvidenceKind::Alternative) => 0,
+    };
+    (strength, evidence.matched_alias.len())
+}
+
+// ponytail: line-level rules favor precision; add section parsing if measured stack recall is low.
+fn classify_stack_evidence(line: &str, alias: &str, role: StackRole) -> StackEvidenceKind {
+    let lower = line.to_lowercase();
+    if ["e.g", "for example", "such as"]
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
+        return StackEvidenceKind::Example;
+    }
+    if role == StackRole::Cloud && mentioned_cloud_count(&lower) > 1 {
+        let alias = alias.to_lowercase();
+        if lower.contains("(primary)") {
+            return if alias_has_qualifier(&lower, &alias, "(primary)") {
+                StackEvidenceKind::Direct
+            } else {
+                StackEvidenceKind::Secondary
+            };
+        }
+        if lower.contains("preferred") {
+            return if alias_has_qualifier(&lower, &alias, "preferred") {
+                StackEvidenceKind::Preferred
+            } else {
+                StackEvidenceKind::Secondary
+            };
+        }
+        if !["multi-cloud", "multicloud", "hybrid cloud"]
+            .iter()
+            .any(|marker| lower.contains(marker))
+        {
+            return StackEvidenceKind::Alternative;
+        }
+    }
+    if [
+        "one of",
+        "at least one",
+        "either",
+        " and/or ",
+        "not required",
+        "no experience",
+    ]
+    .iter()
+    .any(|marker| lower.contains(marker))
+        || lower.contains(" or ")
+    {
+        StackEvidenceKind::Alternative
+    } else if requirement_kind(line) == RequirementKind::Preferred {
+        StackEvidenceKind::Preferred
+    } else {
+        StackEvidenceKind::Direct
+    }
+}
+
+fn mentioned_cloud_count(line: &str) -> usize {
+    ["aws", "azure", "gcp", "google cloud"]
+        .iter()
+        .filter(|term| contains_term(line, term))
+        .count()
+}
+
+fn alias_has_qualifier(line: &str, alias: &str, qualifier: &str) -> bool {
+    line.match_indices(alias).any(|(start, _)| {
+        let end = start + alias.len();
+        term_is_bounded(line, start, end) && line[end..].trim_start().starts_with(qualifier)
+    })
 }
 
 fn discover_emerging_skills(
@@ -564,7 +699,7 @@ impl CliRunner for ProcessRunner {
             .map_err(|error| error.to_string())?
             .as_nanos();
         let working_directory = std::env::temp_dir().join(format!(
-            "job-watch-discovery-{}-{nonce}",
+            "techjobsnl-discovery-{}-{nonce}",
             std::process::id()
         ));
         fs::create_dir(&working_directory).map_err(|error| error.to_string())?;
@@ -890,11 +1025,15 @@ pub fn contains_term(text: &str, term: &str) -> bool {
     !term.is_empty()
         && text.match_indices(term).any(|(start, _)| {
             let end = start + term.len();
-            let before = text[..start].chars().next_back();
-            let after = text[end..].chars().next();
-            before.is_none_or(|character| !character.is_alphanumeric())
-                && after.is_none_or(|character| !character.is_alphanumeric())
+            term_is_bounded(text, start, end)
         })
+}
+
+fn term_is_bounded(text: &str, start: usize, end: usize) -> bool {
+    let before = text[..start].chars().next_back();
+    let after = text[end..].chars().next();
+    before.is_none_or(|character| !character.is_alphanumeric())
+        && after.is_none_or(|character| !character.is_alphanumeric())
 }
 
 #[cfg(test)]
@@ -903,8 +1042,8 @@ mod tests {
 
     use super::{
         CanonicalSkill, CliRunner, EmergingSkill, EmergingTaxonomy, RequirementKind, SKILL_BANK,
-        STACK_BANK, Seniority, SkillKind, SkillTaxonomy, WorkMode, discover_taxonomy_with, extract,
-        validate_emerging,
+        STACK_BANK, Seniority, SkillKind, SkillTaxonomy, StackEvidenceKind, WorkMode,
+        discover_taxonomy_with, extract, validate_emerging,
     };
     use crate::{
         config::{AnalyticsConfig, AnalyticsProvider},
@@ -1026,6 +1165,74 @@ mod tests {
         assert_eq!(facts.skills["Spring Boot"].stack_priority, 2);
         assert!(facts.skills["DevOps"].stack_role.is_none());
         assert!(facts.skills["Artificial intelligence"].stack_role.is_none());
+    }
+
+    #[test]
+    fn specific_product_names_do_not_match_broader_skills() {
+        let facts = extract(&job(
+            "DevOps Engineer",
+            "Build release pipelines with Azure DevOps and GitHub Actions. Use Azure AI Search.",
+        ));
+
+        assert!(!facts.skills.contains_key("Microsoft Azure"));
+        assert!(facts.skills.contains_key("GitHub Actions"));
+    }
+
+    #[test]
+    fn direct_stack_evidence_beats_an_example_list() {
+        let facts = extract(&job(
+            "Platform Engineer",
+            "Cloud technologies, e.g. Azure, GCP, or AWS.\nDeploy production services on Azure.",
+        ));
+
+        assert_eq!(
+            facts.skills["Microsoft Azure"].context,
+            "Deploy production services on Azure."
+        );
+        assert_eq!(
+            facts.skills["Microsoft Azure"].stack_evidence,
+            Some(StackEvidenceKind::Direct)
+        );
+    }
+
+    #[test]
+    fn preferred_cloud_is_distinguished_from_secondary_alternatives() {
+        let facts = extract(&job(
+            "AI Engineer",
+            "Azure preferred, AWS or GCP also acceptable.",
+        ));
+
+        assert_eq!(
+            facts.skills["Microsoft Azure"].stack_evidence,
+            Some(StackEvidenceKind::Preferred)
+        );
+        assert_eq!(
+            facts.skills["AWS"].stack_evidence,
+            Some(StackEvidenceKind::Secondary)
+        );
+        assert_eq!(
+            facts.skills["Google Cloud"].stack_evidence,
+            Some(StackEvidenceKind::Secondary)
+        );
+    }
+
+    #[test]
+    fn slash_separated_cloud_catalogue_is_alternative_evidence() {
+        let facts = extract(&job(
+            "Full Stack Engineer",
+            "Cloud services (AWS/Azure/GCP); Docker, Terraform, GitHub Actions.",
+        ));
+
+        for skill in ["AWS", "Microsoft Azure", "Google Cloud"] {
+            assert_eq!(
+                facts.skills[skill].stack_evidence,
+                Some(StackEvidenceKind::Alternative)
+            );
+        }
+        assert_eq!(
+            facts.skills["Docker"].stack_evidence,
+            Some(StackEvidenceKind::Direct)
+        );
     }
 
     #[test]

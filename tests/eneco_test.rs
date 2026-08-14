@@ -39,7 +39,8 @@ fn parses_a_complete_eneco_snapshot() {
 #[tokio::test]
 #[ignore = "live external source"]
 async fn eneco_live_returns_complete_unique_tech_jobs() {
-    let client = build_client("job-watch/0.1 (+Eneco live test)", Duration::from_secs(20)).unwrap();
+    let client =
+        build_client("techjobsnl/0.1 (+Eneco live test)", Duration::from_secs(20)).unwrap();
     let source = EnecoSource::new(
         "eneco",
         "https://www.werkenbijeneco.nl/vacatures?f=1270",

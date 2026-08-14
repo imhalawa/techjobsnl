@@ -11,6 +11,7 @@ use job_watch::{
     domain::{
         ClassifiedJob, Eligibility, JobKey, JobRecord, ObservedJob, ScanEvent, SourceErrorKind,
     },
+    insights::{AnalyticsFilters, LibraryState},
     storage::{ScanOutcome, ScanReadModel, SourceHealth, SourceReadModel},
     ui::{App, AppCommand, IconSet, InputMode, MouseTarget, Theme, View, render},
 };
@@ -301,6 +302,116 @@ fn search_filters_by_title_or_company_but_not_posting_text_and_escape_cancels() 
 }
 
 #[test]
+fn search_keeps_arrow_navigation_and_uses_a_compact_prompt() {
+    let mut app = App::new(
+        config(),
+        vec![
+            job("Backend Engineer", false, false),
+            job("Platform Engineer", false, false),
+            job("Data Engineer", false, false),
+        ],
+    );
+
+    app.handle_key(key('/'));
+    for character in "engineer".chars() {
+        app.handle_key(key(character));
+    }
+    app.handle_key(special(KeyCode::Down));
+
+    assert_eq!(app.selected_index(), 1);
+    assert_eq!(
+        app.selected_job().unwrap().classified.observed.title,
+        "Platform Engineer"
+    );
+    let footer = row(&rendered_buffer(&app, 100, 20), 19);
+    assert!(footer.contains("Search: engineer"));
+    assert!(footer.contains("↑↓ select"));
+    assert!(!footer.contains("SEARCH engineer"));
+}
+
+#[test]
+fn clearing_search_keeps_the_selected_job_visible_and_savable() {
+    let target = job("Needle Engineer", false, false);
+    let mut jobs = (0..20)
+        .map(|index| job(&format!("Engineer {index:02}"), false, false))
+        .collect::<Vec<_>>();
+    jobs.insert(17, target.clone());
+    let mut app = App::new(config(), jobs);
+
+    app.handle_key(key('/'));
+    for character in "needle".chars() {
+        app.handle_key(key(character));
+    }
+    assert_eq!(app.selected_job().unwrap().key, target.key);
+
+    assert!(matches!(
+        app.handle_key(key('*')),
+        AppCommand::SaveAnalyticsState(_, _)
+    ));
+    assert!(app.library().jobs.contains(&target.key));
+    assert_eq!(app.search_query(), "needle");
+
+    app.handle_key(special(KeyCode::Esc));
+    assert_eq!(app.selected_job().unwrap().key, target.key);
+    assert!(rendered(&app, 79, 12).contains("Needle Engineer"));
+}
+
+#[test]
+fn multiple_searched_jobs_remain_saved() {
+    let backend = job("Backend Engineer", false, false);
+    let platform = job("Platform Engineer", false, false);
+    let mut app = App::new(config(), vec![backend.clone(), platform.clone()]);
+
+    for (query, title) in [
+        ("backend", "Backend Engineer"),
+        ("platform", "Platform Engineer"),
+    ] {
+        app.handle_key(key('/'));
+        for character in query.chars() {
+            app.handle_key(key(character));
+        }
+        assert!(matches!(
+            app.handle_key(key('*')),
+            AppCommand::SaveAnalyticsState(_, _)
+        ));
+        assert!(rendered(&app, 100, 25).contains(&format!("Saved {title}")));
+        app.handle_key(special(KeyCode::Esc));
+    }
+
+    assert_eq!(app.library().jobs.len(), 2);
+    assert!(app.library().jobs.contains(&backend.key));
+    assert!(app.library().jobs.contains(&platform.key));
+}
+
+#[test]
+fn saved_jobs_open_in_their_listing_or_browser() {
+    let open = job("Open Engineer", false, false);
+    let mut closed = job("Closed Engineer", false, false);
+    closed.source_open = false;
+    closed.closed_at = Some(closed.last_seen_at);
+    let mut library = LibraryState::default();
+    library.jobs.insert(open.key.clone());
+    library.jobs.insert(closed.key.clone());
+    let mut app = App::new(config(), vec![open.clone(), closed.clone()]);
+    app.replace_analytics_state(AnalyticsFilters::default(), library, vec![]);
+    open_view(&mut app, 7);
+
+    assert_eq!(app.selected_job().unwrap().key, closed.key);
+    assert_eq!(app.handle_key(special(KeyCode::Enter)), AppCommand::None);
+    assert_eq!(app.view(), View::History);
+    assert_eq!(app.selected_job().unwrap().key, closed.key);
+
+    open_view(&mut app, 7);
+    app.handle_key(special(KeyCode::Down));
+    assert_eq!(app.selected_job().unwrap().key, open.key);
+    assert!(matches!(app.handle_key(key('o')), AppCommand::OpenUrl(_)));
+    assert!(matches!(app.handle_key(key('c')), AppCommand::CopyUrl(_)));
+    let footer = row(&rendered_buffer(&app, 100, 20), 19);
+    assert!(footer.contains("Enter go to job"));
+    assert!(footer.contains("o open"));
+}
+
+#[test]
 fn configured_filter_cycles_companies_new_applied_and_clears() {
     let mut app = App::new(
         config_with_two_companies(),
@@ -501,6 +612,31 @@ fn mouse_hover_click_focus_and_wheel_match_the_existing_ui_actions() {
         30,
     );
     assert!(!app.help_visible());
+}
+
+#[test]
+fn clicking_a_visible_job_preserves_its_viewport_row() {
+    let jobs = (0..40)
+        .map(|index| job(&format!("Engineer {index:02}"), false, false))
+        .collect::<Vec<_>>();
+    let mut app = App::new(config(), jobs);
+    for _ in 0..25 {
+        app.handle_key(special(KeyCode::Down));
+    }
+
+    let before = rendered_buffer(&app, 140, 20);
+    let clicked_row = row(&before, 4);
+    app.handle_mouse(
+        mouse(MouseEventKind::Down(MouseButton::Left), 24, 3),
+        140,
+        20,
+    );
+    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 24, 3), 140, 20);
+    let selected_title = &app.selected_job().unwrap().classified.observed.title;
+    assert!(clicked_row.contains(selected_title));
+
+    let after = rendered_buffer(&app, 140, 20);
+    assert!(row(&after, 4).contains(selected_title));
 }
 
 #[test]
@@ -740,11 +876,13 @@ fn analytics_splits_hard_and_soft_trends_with_independent_navigation() {
     open_view(&mut app, 6);
     app.handle_key(key('2'));
 
-    let screen = rendered(&app, 200, 24);
+    let screen = rendered(&app, 79, 24);
+    assert!(screen.contains("Hard Skills"));
+    assert!(screen.contains("Soft Skills"));
     assert!(screen.contains("Hard skills · 3"));
-    assert!(screen.contains("Soft skills · 2"));
     assert!(screen.contains("Python"));
     assert!(screen.contains("4 · 100%"));
+    assert!(!screen.contains("Communication"));
     assert_eq!(
         app.skill_stats_for(SkillKind::Soft)
             .first()
@@ -759,6 +897,10 @@ fn analytics_splits_hard_and_soft_trends_with_independent_navigation() {
     app.handle_key(special(KeyCode::Right));
     assert_eq!(app.analytics_skill_kind(), SkillKind::Soft);
     assert_eq!(app.selected_index(), 0);
+    let soft_screen = rendered(&app, 79, 24);
+    assert!(soft_screen.contains("Soft skills · 2"));
+    assert!(soft_screen.contains("Communication"));
+    assert!(!soft_screen.contains("Python"));
     app.handle_key(special(KeyCode::Down));
     assert_eq!(app.selected_index(), 1);
     app.handle_key(special(KeyCode::Left));
@@ -768,13 +910,13 @@ fn analytics_splits_hard_and_soft_trends_with_independent_navigation() {
     assert_eq!(app.selected_index(), 1);
 
     app.handle_mouse(
-        mouse(MouseEventKind::Down(MouseButton::Left), 24, 5),
+        mouse(MouseEventKind::Down(MouseButton::Left), 24, 2),
         200,
         24,
     );
     assert_eq!(app.analytics_skill_kind(), SkillKind::Hard);
     app.handle_mouse(
-        mouse(MouseEventKind::Down(MouseButton::Left), 90, 5),
+        mouse(MouseEventKind::Down(MouseButton::Left), 38, 2),
         200,
         24,
     );
@@ -972,7 +1114,7 @@ fn reported_mouse_wheel_burst_moves_one_analytics_item() {
     app.handle_key(key('2'));
 
     for _ in 0..3 {
-        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 24, 5), 140, 24);
+        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 24, 6), 140, 24);
     }
 
     assert_eq!(app.selected_index(), 1);
@@ -1270,6 +1412,7 @@ fn theme_overrides_and_ascii_icons_preserve_the_configured_semantics() {
             open: "O",
             new: "*",
             applied: "A",
+            saved: "S",
             history: "H",
             scanning: "R",
             source_failure: "!",
@@ -1396,7 +1539,7 @@ fn renderer_shows_active_search_mode_and_query() {
         app.handle_key(key(character));
     }
 
-    assert!(rendered(&app, 100, 25).contains("SEARCH back"));
+    assert!(rendered(&app, 100, 25).contains("Search: back"));
 }
 
 #[test]
@@ -1607,24 +1750,32 @@ fn configured_help_opens_an_overlay_with_fixed_and_contextual_controls() {
 
     app.handle_key(key('i'));
     let screen = rendered(&app, 79, 28);
-    assert!(screen.contains("Tab/Esc focus navigation"));
-    assert!(screen.contains("Inside a tab: ↑/↓ or j/k select"));
-    assert!(screen.contains("J/K scroll details"));
-    assert!(screen.contains("Analytics: [/] or 1-4 sections"));
-    assert!(screen.contains("s scan"));
-    assert!(screen.contains("z search jobs"));
-    assert!(screen.contains("v filter company/New/Applied"));
-    assert!(screen.contains("x applied"));
-    assert!(screen.contains("u open"));
-    assert!(screen.contains("w copy"));
-    assert!(screen.contains("y history"));
-    assert!(screen.contains("Enter narrow: details; otherwise: open"));
-    assert!(screen.contains("Esc close help"));
-    assert!(screen.contains("e quit"));
+    assert!(screen.contains("Cheat sheet"));
+    assert!(screen.contains("GET AROUND"));
+    assert!(screen.contains("Tab / Esc"));
+    assert!(screen.contains("Focus navigation"));
+    assert!(screen.contains("JOBS"));
+    assert!(screen.contains("s             Scan enabled sources"));
+    assert!(screen.contains("z             Search title or company"));
+    assert!(screen.contains("v             Cycle company, New, Applied, All"));
+    assert!(screen.contains("x             Mark or unmark as applied"));
+    assert!(screen.contains("u / w         Open job / copy URL"));
+    assert!(screen.contains("SAVE TO LIBRARY"));
+    assert!(screen.contains("Save a selected job or Analytics item"));
+    assert!(screen.contains("Open Library; 1–5 changes its section"));
+    assert!(screen.contains("* in Library  Remove the selected saved item"));
+    assert!(screen.contains("i / Esc       Close this cheat sheet · e quits"));
 
     app.handle_key(special(KeyCode::Esc));
     assert!(!app.help_visible());
     assert!(rendered(&app, 79, 28).contains("Active jobs"));
+
+    open_view(&mut app, 6);
+    app.handle_key(key('i'));
+    let analytics_help = rendered(&app, 79, 28);
+    assert!(analytics_help.contains("ANALYTICS"));
+    assert!(analytics_help.contains("Left / Right  Change Hard / Soft Skills"));
+    assert!(analytics_help.contains("i / Esc       Close this cheat sheet · e quits"));
 }
 
 #[test]
@@ -1739,7 +1890,13 @@ fn background_reload_has_a_visible_loading_indicator() {
     let mut app = App::new(config(), vec![]);
     app.set_data_loading(true);
 
-    assert!(row(&rendered_buffer(&app, 100, 20), 19).contains("LOADING"));
+    let first = row(&rendered_buffer(&app, 100, 20), 19);
+    app.advance_animation();
+    let second = row(&rendered_buffer(&app, 100, 20), 19);
+
+    assert!(first.contains("LOADING"));
+    assert!(second.contains("LOADING"));
+    assert_ne!(first, second);
 }
 
 #[test]

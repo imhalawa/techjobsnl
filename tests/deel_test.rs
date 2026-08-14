@@ -65,7 +65,7 @@ fn deel_board_rejects_missing_details() {
 #[ignore = "live official source"]
 async fn klarna_live_board_is_complete_and_has_netherlands_jobs() {
     let client = reqwest::Client::builder()
-        .user_agent("job-watch/0.1 (+Deel live test)")
+        .user_agent("techjobsnl/0.1 (+Deel live test)")
         .timeout(Duration::from_secs(60))
         .build()
         .unwrap();

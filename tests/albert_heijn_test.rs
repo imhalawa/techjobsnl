@@ -42,7 +42,7 @@ fn parses_a_complete_albert_heijn_snapshot() {
 #[ignore = "live external source"]
 async fn albert_heijn_live_returns_complete_unique_tech_jobs() {
     let client = build_client(
-        "job-watch/0.1 (+Albert Heijn live test)",
+        "techjobsnl/0.1 (+Albert Heijn live test)",
         Duration::from_secs(20),
     )
     .unwrap();

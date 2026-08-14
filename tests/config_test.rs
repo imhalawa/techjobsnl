@@ -30,7 +30,7 @@ fn valid_config() -> Config {
             concurrency: 1,
             timeout_seconds: 20,
             retry_count: 0,
-            user_agent: "job-watch-test".into(),
+            user_agent: "techjobsnl-test".into(),
         },
         analytics: AnalyticsConfig::default(),
         ui: UiConfig {
@@ -77,7 +77,7 @@ database_path = ".data/jobs.sqlite3"
 concurrency = 2
 timeout_seconds = 20
 retry_count = 2
-user_agent = "job-watch-test"
+user_agent = "techjobsnl-test"
 [filters]
 countries = ["NL"]
 new_job_max_age_days = 7
@@ -151,7 +151,7 @@ database_path = ".data/jobs.sqlite3"
 concurrency = 2
 timeout_seconds = 20
 retry_count = 2
-user_agent = "job-watch-test"
+user_agent = "techjobsnl-test"
 [filters]
 countries = ["NL"]
 new_job_max_age_days = 7
@@ -200,7 +200,7 @@ database_path = ".data/jobs.sqlite3"
 concurrency = 2
 timeout_seconds = 20
 retry_count = 2
-user_agent = "job-watch-test"
+user_agent = "techjobsnl-test"
 [filters]
 countries = ["NL"]
 new_job_max_age_days = 7

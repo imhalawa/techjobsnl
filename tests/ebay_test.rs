@@ -147,7 +147,7 @@ fn rejects_a_listing_url_outside_the_official_ebay_host() {
 #[tokio::test]
 async fn ebay_http_client_rejects_cross_host_redirects_before_fetching_the_target() {
     let (source_url, target) = cross_host_redirect();
-    let client = build_ebay_client("job-watch-test", Duration::from_secs(5)).unwrap();
+    let client = build_ebay_client("techjobsnl-test", Duration::from_secs(5)).unwrap();
 
     let error = send_text(client.get(source_url), "eBay").await.unwrap_err();
 
@@ -159,7 +159,7 @@ async fn ebay_http_client_rejects_cross_host_redirects_before_fetching_the_targe
 #[tokio::test]
 async fn ebay_http_client_rejects_same_host_http_redirects_before_fetching_the_target() {
     let (source_url, target) = same_host_http_redirect();
-    let client = build_ebay_client("job-watch-test", Duration::from_secs(5)).unwrap();
+    let client = build_ebay_client("techjobsnl-test", Duration::from_secs(5)).unwrap();
 
     let error = send_text(client.get(source_url), "eBay").await.unwrap_err();
 
@@ -175,7 +175,7 @@ async fn ebay_http_client_rejects_same_host_http_redirects_before_fetching_the_t
 #[ignore = "live external source"]
 async fn ebay_live_returns_complete_unique_netherlands_jobs() {
     let client =
-        build_ebay_client("job-watch/0.1 (+eBay live test)", Duration::from_secs(20)).unwrap();
+        build_ebay_client("techjobsnl/0.1 (+eBay live test)", Duration::from_secs(20)).unwrap();
     let source = EbaySource::new("ebay", LISTING_URL, client);
     let SourceScan::Complete { observations } = source.scan().await.unwrap() else {
         panic!("eBay scan must be complete");

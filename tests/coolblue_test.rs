@@ -73,7 +73,7 @@ fn rejects_incomplete_or_untrusted_coolblue_pages() {
 #[ignore = "live external source"]
 async fn coolblue_live_returns_complete_unique_netherlands_jobs() {
     let client = reqwest::Client::builder()
-        .user_agent("job-watch-live-test/0.1")
+        .user_agent("techjobsnl-live-test/0.1")
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .unwrap();

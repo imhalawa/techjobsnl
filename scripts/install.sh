@@ -1,9 +1,9 @@
 #!/bin/sh
 set -eu
 
-repository=${JOB_WATCH_REPOSITORY:-imhalawa/job-tracker-nl}
-version=${JOB_WATCH_VERSION:-latest}
-install_dir=${JOB_WATCH_INSTALL_DIR:-"$HOME/.local/bin"}
+repository=${TECHJOBSNL_REPOSITORY:-${JOB_WATCH_REPOSITORY:-imhalawa/techjobsnl}}
+version=${TECHJOBSNL_VERSION:-${JOB_WATCH_VERSION:-latest}}
+install_dir=${TECHJOBSNL_INSTALL_DIR:-${JOB_WATCH_INSTALL_DIR:-"$HOME/.local/bin"}}
 
 case "$(uname -s)" in
     Linux) os=unknown-linux-gnu ;;
@@ -23,16 +23,16 @@ case "$(uname -m)" in
         ;;
 esac
 
-asset="job-watch-$arch-$os.tar.gz"
-if [ -n "${JOB_WATCH_DOWNLOAD_BASE:-}" ]; then
-    download_base=$JOB_WATCH_DOWNLOAD_BASE
+asset="techjobsnl-$arch-$os.tar.gz"
+if [ -n "${TECHJOBSNL_DOWNLOAD_BASE:-${JOB_WATCH_DOWNLOAD_BASE:-}}" ]; then
+    download_base=${TECHJOBSNL_DOWNLOAD_BASE:-$JOB_WATCH_DOWNLOAD_BASE}
 elif [ "$version" = latest ]; then
     download_base="https://github.com/$repository/releases/latest/download"
 else
     download_base="https://github.com/$repository/releases/download/$version"
 fi
 
-temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/job-watch-install.XXXXXX")
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/techjobsnl-install.XXXXXX")
 trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
 
 download() {
@@ -72,15 +72,15 @@ if [ "$actual" != "$expected" ]; then
     exit 1
 fi
 
-tar -xzf "$temporary_dir/$asset" -C "$temporary_dir" job-watch
+tar -xzf "$temporary_dir/$asset" -C "$temporary_dir" techjobsnl
 mkdir -p "$install_dir"
-temporary_binary="$install_dir/.job-watch.$$"
-cp "$temporary_dir/job-watch" "$temporary_binary"
+temporary_binary="$install_dir/.techjobsnl.$$"
+cp "$temporary_dir/techjobsnl" "$temporary_binary"
 chmod 755 "$temporary_binary"
-mv "$temporary_binary" "$install_dir/job-watch"
+mv "$temporary_binary" "$install_dir/techjobsnl"
 
-printf 'Installed job-watch to %s/job-watch\n' "$install_dir"
+printf 'Installed techjobsnl to %s/techjobsnl\n' "$install_dir"
 case ":$PATH:" in
     *":$install_dir:"*) ;;
-    *) printf 'Add %s to PATH before running job-watch.\n' "$install_dir" ;;
+    *) printf 'Add %s to PATH before running techjobsnl.\n' "$install_dir" ;;
 esac

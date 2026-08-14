@@ -71,7 +71,7 @@ fn uses_the_visible_job_body_when_afas_omits_the_json_ld_description() {
 #[ignore = "live external source"]
 async fn afas_live_returns_complete_unique_netherlands_jobs() {
     let client = reqwest::Client::builder()
-        .user_agent("job-watch/0.1 (+AFAS live test)")
+        .user_agent("techjobsnl/0.1 (+AFAS live test)")
         .timeout(Duration::from_secs(30))
         .build()
         .unwrap();

@@ -1,14 +1,17 @@
 [package]
-name = "job-watch"
+name = "techjobsnl"
 version = "0.1.0"
 edition = "2024"
+license = "AGPL-3.0-only"
+repository = "https://github.com/imhalawa/techjobsnl"
+readme = "README.md"
 
 [lib]
 name = "job_watch"
 path = "src/lib.rs"
 
 [[bin]]
-name = "job-watch"
+name = "techjobsnl"
 path = "src/main.rs"
 
 [dependencies]

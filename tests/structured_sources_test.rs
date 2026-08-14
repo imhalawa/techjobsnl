@@ -211,7 +211,7 @@ fn assert_schema_error(result: Result<Vec<ObservedJob>, job_watch::sources::Sour
 }
 
 fn live_client() -> reqwest::Client {
-    build_client("job-watch/0.1 (+bol live test)", Duration::from_secs(30)).unwrap()
+    build_client("techjobsnl/0.1 (+bol live test)", Duration::from_secs(30)).unwrap()
 }
 
 fn assert_live_jobs(jobs: &[ObservedJob]) {

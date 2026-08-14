@@ -1,6 +1,25 @@
-# Job Watch
+# TechJobsNL
 
-Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. It enables Mollie's, Airwallex's, and DataSnipper's Ashby boards, Adyen's, Databricks', and Reddit's Greenhouse boards, Booking.com's Jibe API, Funda's Recruitee board, bol.com's official careers API, ING's and ABN AMRO's official Netherlands careers sources, and eBay's official Netherlands careers pages.
+TechJobsNL is a local Rust terminal application for finding, reviewing, and analysing Netherlands job vacancies. It collects jobs from official company career sources, applies configurable country and title filters, tracks vacancy history in SQLite, and keeps job-market analytics explainable with exact posting evidence.
+
+![TechJobsNL active jobs](docs/images/jobs.png)
+
+## Purpose and independence
+
+TechJobsNL is an independent, open-source learning project. It organizes publicly accessible job postings from official company career pages so its author and users can learn about Rust, terminal interfaces, data collection, and job-market analysis.
+
+This project is not affiliated with, endorsed by, or sponsored by any company listed in the application. Company names and trademarks belong to their respective owners. Job information can change at any time; always verify role details and application requirements on the official posting.
+
+## Features
+
+- **One review queue:** active, new, applied, closed, and reopened jobs with full descriptions and official links.
+- **Verified source lifecycle:** complete scans may update and close jobs; incomplete or failed scans preserve the last trusted state.
+- **Search and filters:** search by title or company and filter by company, new, or applied status.
+- **Local analytics:** skills, technology stacks, roles, seniority, experience, work mode, employment, education, companies, momentum, confidence, and posting evidence.
+- **Personal library:** save multiple jobs, skills, stacks, roles, and companies; saved job rows show a star, actions show footer feedback, and long-running work shows an animated loader.
+- **Local persistence:** SQLite stores jobs, snapshots, scan history, applied state, analytics facts, filters, and library choices.
+- **Keyboard and mouse:** responsive terminal layouts, configurable action keys, clickable tabs and rows, scrolling, and a draggable job/details divider.
+- **Broad source coverage:** the shipped catalog contains 60+ company profiles across 30+ configured official-source strategies. See [source evidence](SOURCES.md) for the current companies and caveats.
 
 ## Install
 
@@ -12,84 +31,110 @@ Install the latest release to `~/.local/bin`:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/imhalawa/job-tracker-nl/main/scripts/install.sh | sh
+  https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.sh | sh
 ```
 
-If `~/.local/bin` is not on `PATH`, the installer prints the command needed to add it. Rerun the installer to upgrade. Set `JOB_WATCH_VERSION=v0.1.0` to install a specific release or `JOB_WATCH_INSTALL_DIR` to choose another directory.
+If `~/.local/bin` is not on `PATH`, the installer prints the command needed to add it. Rerun it to upgrade. Set `TECHJOBSNL_VERSION=v0.1.0` to install a specific release or `TECHJOBSNL_INSTALL_DIR` to choose another directory.
 
 ### Windows
 
 Open PowerShell and run:
 
 ```powershell
-irm https://raw.githubusercontent.com/imhalawa/job-tracker-nl/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.ps1 | iex
 ```
 
-The installer places `job-watch.exe` under `%LOCALAPPDATA%\Programs\job-watch\bin` and adds that directory to the user `PATH`. Open a new terminal after the first installation. Rerun the installer to upgrade; set `$env:JOB_WATCH_VERSION = "v0.1.0"` first to install a specific release.
+The installer places `techjobsnl.exe` under `%LOCALAPPDATA%\Programs\techjobsnl\bin` and adds that directory to the user `PATH`. Open a new terminal after the first installation. Rerun it to upgrade; set `$env:TECHJOBSNL_VERSION = "v0.1.0"` first to install a specific release.
 
-The initial binaries are not code-signed. macOS Gatekeeper or Windows SmartScreen may therefore ask for confirmation. Every release includes `SHA256SUMS`, and both installers verify the downloaded archive before installing it.
+The initial binaries are not code-signed. macOS Gatekeeper or Windows SmartScreen may ask for confirmation. Every release includes `SHA256SUMS`, and both installers verify the downloaded archive.
 
-### Manual installation
+### Manual or Cargo installation
 
-Download the archive for your operating system and CPU from [GitHub Releases](https://github.com/imhalawa/job-tracker-nl/releases), verify it against `SHA256SUMS`, extract `job-watch` or `job-watch.exe`, and place it in a directory on `PATH`.
+Download the archive for your operating system and CPU from [GitHub Releases](https://github.com/imhalawa/techjobsnl/releases), verify it against `SHA256SUMS`, extract `techjobsnl` or `techjobsnl.exe`, and place it on `PATH`.
 
-Rust users can build and install version `v0.1.0` directly from the tagged source:
+Rust users can install a tagged version from source:
 
 ```bash
-cargo install --locked --git https://github.com/imhalawa/job-tracker-nl.git --tag v0.1.0 job-watch
+cargo install --locked --git https://github.com/imhalawa/techjobsnl.git --tag v0.1.0 techjobsnl
 ```
 
 ### Uninstall
 
-- macOS and Linux: remove `~/.local/bin/job-watch`, or the custom installation path.
-- Windows: remove `%LOCALAPPDATA%\Programs\job-watch` and remove its `bin` directory from the user `PATH`.
+- macOS and Linux: remove `~/.local/bin/techjobsnl`, or the custom installation path.
+- Windows: remove `%LOCALAPPDATA%\Programs\techjobsnl` and remove its `bin` directory from the user `PATH`.
 
-Uninstalling the executable does not delete configuration or job history. Their locations are documented below.
+Uninstalling the executable does not delete configuration or job history.
 
 ## Run from source
 
-From the repository root:
+You need a Rust toolchain with Rust 2024 edition support.
 
 ```bash
 cargo run --release
 ```
 
-On first start, the application creates `config.toml` from its built-in defaults. It uses the standard user configuration directory:
+The first run creates the user configuration and database. It loads saved jobs without making a network request; press `r` when you want to scan enabled sources.
 
-- Linux: `${XDG_CONFIG_HOME:-~/.config}/job-watch/config.toml`
-- macOS: `~/Library/Application Support/job-watch/config.toml`
-- Windows: `%APPDATA%\job-watch\config.toml`
+Configuration paths:
 
-It loads stored active jobs at startup and does not contact a source until you press `r`.
+- Linux: `${XDG_CONFIG_HOME:-~/.config}/techjobsnl/config.toml`
+- macOS: `~/Library/Application Support/techjobsnl/config.toml`
+- Windows: `%APPDATA%\techjobsnl\config.toml`
 
-## Publishing a release
+Upgrades reuse an existing `job-watch/config.toml` and its configured database automatically. New installations use the paths above.
+
+Press `?` inside the app for the complete context-aware key guide.
+
+## Documentation
+
+| Guide | Purpose |
+|---|---|
+| [User guide](docs/USER_GUIDE.md) | Every view, workflow, keyboard action, and mouse action |
+| [Configuration](docs/CONFIGURATION.md) | All settings, defaults, validation rules, and source strategy fields |
+| [Architecture](docs/ARCHITECTURE.md) | Runtime flow, modules, persistence, scan safety, and analytics design |
+| [Data and privacy](docs/DATA_AND_PRIVACY.md) | Network access, local storage, optional AI use, deletion, and recovery |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common startup, scan, terminal, browser, clipboard, and AI issues |
+| [Resume entry](docs/RESUME.md) | Accurate project wording, bullets, and interview talking points |
+| [Source evidence](SOURCES.md) | Official endpoints, completeness evidence, sponsor caveats, and live checks |
+
+## Verification
+
+Run the deterministic offline suite:
+
+```bash
+make test
+```
+
+Run formatting, Clippy, Makefile checks, and all offline tests:
+
+```bash
+make check
+```
+
+Live source tests are ignored by default because they contact external services:
+
+```bash
+make test-live
+```
+
+## Publish a release
 
 Release tags must exactly match the version in `Cargo.toml`. After updating the version and passing `make check`, create and push an annotated tag:
 
 ```bash
-git tag -a v0.1.0 -m "Job Watch v0.1.0"
+git tag -a v0.1.0 -m "TechJobsNL v0.1.0"
 git push origin v0.1.0
 ```
 
-The release workflow builds six native archives: macOS, Linux, and Windows for x86-64 and ARM64. It publishes them with SHA-256 checksums and generated release notes only after all checks and builds pass. The Windows ARM64 GitHub runner is currently a public preview; the Rust Windows ARM64 target itself is fully supported.
+The release workflow validates the tag, runs offline checks, builds six native archives for macOS, Linux, and Windows on x86-64 and ARM64, generates SHA-256 checksums, and publishes generated release notes. The Windows ARM64 GitHub runner is currently a public preview.
 
-## Keys
+Live vacancy counts change and a company brand does not prove the legal employer or visa-sponsor status. Read [SOURCES.md](SOURCES.md) and confirm the employment entity before relying on sponsor information.
 
-- `r`: scan enabled sources
-- `Tab` or `Esc`: focus the navigation tabs; arrow keys or `j`/`k` select a tab; `Enter` opens it
-- Inside a tab, arrow keys or `j`/`k`: move through that tab's items
-- `J`/`K`: scroll job details
-- `/`: search by job title or company; `Enter` accepts the search, while `Esc` cancels and clears it during editing (press `/`, then `Esc`, to clear an accepted search)
-- `f`: cycle company, new, and applied filters, then clear the filter
-- `h`: switch between active jobs and history
-- `a`: mark or unmark the selected job as applied
-- `o`: open the selected job in the default browser
-- `c`: copy the selected job URL to the system clipboard
-- `?`: show or hide help
-- `q`: quit
-- Mouse: click tabs and rows, scroll lists or details, and drag the divider between job list and details to resize both panes for the current session
+## License
 
-The Settings tab edits the user `config.toml`. It controls the new-job age, countries, included title patterns, and excluded title patterns. Clear included titles to allow every job type, including non-engineering roles. Country and title changes apply on the next scan; jobs without a publication date are not considered new.
+Copyright © 2026 Mohamed Halawa.
+
+The project source code is licensed under the [GNU Affero General Public License v3.0 only](LICENSE). The project does not claim ownership of third-party company names, trademarks, logos, or job-posting content, and the project license does not grant rights to them. The software is provided without warranty under the terms of the license.
 
 Job eligibility is controlled by `[filters]` in `config.toml`. The shipped country and title patterns preserve the current Netherlands engineering defaults. An empty `include_title_patterns` list allows every title; an empty `exclude_title_patterns` list excludes none.
 
@@ -105,9 +150,9 @@ The Library stores starred jobs, skills, stacks, roles, and companies in SQLite.
 
 ## Local data
 
-The SQLite database is `.data/job-watch.sqlite3`, relative to the user configuration directory. It stores jobs, scan history, lifecycle changes, applied status, snapshots, versioned analytics facts, persistent Analytics filters, the Library, and reviewed AI suggestions. Unchanged descriptions reuse their cached extraction.
+The SQLite database is `.data/techjobsnl.sqlite3`, relative to the user configuration directory. It stores jobs, scan history, lifecycle changes, applied status, snapshots, versioned analytics facts, persistent Analytics filters, the Library, and reviewed AI suggestions. Unchanged descriptions reuse their cached extraction.
 
-It is safe to delete the database while Job Watch is not running. Deletion permanently removes all local history and applied markers; the next run creates an empty database, and the next complete scan treats every eligible job as new.
+It is safe to delete the database while TechJobsNL is not running. Deletion permanently removes all local history and applied markers; the next run creates an empty database, and the next complete scan treats every eligible job as new.
 
 ## Scan state
 

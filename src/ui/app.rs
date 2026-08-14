@@ -171,6 +171,7 @@ pub(crate) struct TitlePreset {
 pub enum MouseTarget {
     Navigation(usize),
     AnalyticsTab(usize),
+    AnalyticsSkillKind(usize),
     MarketSection(usize),
     LibraryTab(usize),
     Item(usize),
@@ -235,6 +236,9 @@ pub struct App {
     analytics_in_flight: bool,
     analytics_error: Option<String>,
     data_loading: bool,
+    discovery_loading: bool,
+    feedback: Option<(String, Instant)>,
+    animation_frame: usize,
     evidence_index: usize,
     active_job_count: usize,
     company_filter: Option<String>,
@@ -249,6 +253,7 @@ pub struct App {
     editing_setting: Option<Setting>,
     advanced_settings: bool,
     job_list_width: Option<u16>,
+    job_list_offset: Cell<usize>,
     divider_dragging: bool,
     scan_progress: ScanProgress,
     hovered: Option<MouseTarget>,
@@ -303,6 +308,9 @@ impl App {
             analytics_in_flight: false,
             analytics_error: None,
             data_loading: false,
+            discovery_loading: false,
+            feedback: None,
+            animation_frame: 0,
             evidence_index: 0,
             active_job_count,
             company_filter: None,
@@ -317,6 +325,7 @@ impl App {
             editing_setting: None,
             advanced_settings: false,
             job_list_width: None,
+            job_list_offset: Cell::new(0),
             divider_dragging: false,
             scan_progress: ScanProgress::default(),
             hovered: None,
@@ -453,6 +462,37 @@ impl App {
 
     pub fn data_loading(&self) -> bool {
         self.data_loading
+    }
+
+    pub fn set_discovery_loading(&mut self, loading: bool) {
+        self.discovery_loading = loading;
+    }
+
+    pub fn set_feedback(&mut self, message: impl Into<String>) {
+        self.feedback = Some((message.into(), Instant::now() + StdDuration::from_secs(3)));
+    }
+
+    pub fn has_feedback(&self) -> bool {
+        self.feedback.is_some()
+    }
+
+    pub fn advance_animation(&mut self) {
+        self.animation_frame = self.animation_frame.wrapping_add(1);
+        if self
+            .feedback
+            .as_ref()
+            .is_some_and(|(_, until)| Instant::now() >= *until)
+        {
+            self.feedback = None;
+        }
+    }
+
+    pub fn animation_active(&self) -> bool {
+        self.data_loading
+            || self.scan_progress.active
+            || self.analytics_in_flight
+            || self.discovery_loading
+            || self.feedback.is_some()
     }
 
     pub fn emerging_discovery_work(&self) -> Option<EmergingDiscoveryWork> {
@@ -657,6 +697,15 @@ impl App {
         if key.kind == KeyEventKind::Release {
             return AppCommand::None;
         }
+        if self.input_mode == InputMode::Search
+            && key.code == KeyCode::Char('*')
+            && matches!(
+                self.view,
+                View::Active | View::New | View::Applied | View::History
+            )
+        {
+            return self.toggle_selected_job();
+        }
         if self.input_mode == InputMode::Search {
             return self.handle_search_key(key.code);
         }
@@ -713,14 +762,7 @@ impl App {
                 self.narrow_details_visible = !self.narrow_details_visible;
             }
             KeyCode::Enter => return self.open_selected(),
-            KeyCode::Char('*') => {
-                if let Some(key) = self.selected_job().map(|job| job.key.clone()) {
-                    if !self.library.jobs.remove(&key) {
-                        self.library.jobs.insert(key);
-                    }
-                    return self.save_analytics_state_command();
-                }
-            }
+            KeyCode::Char('*') => return self.toggle_selected_job(),
             KeyCode::Char(character) => return self.handle_action_key(character),
             _ => {}
         }
@@ -867,6 +909,10 @@ impl App {
                 self.selected_index = 0;
                 Some(AppCommand::None)
             }
+            KeyCode::Enter if self.library_tab == LibraryTab::Jobs => {
+                self.go_to_selected_library_job();
+                Some(AppCommand::None)
+            }
             KeyCode::Char('*') => {
                 self.remove_selected_library_item();
                 Some(self.save_analytics_state_command())
@@ -993,6 +1039,11 @@ impl App {
                 self.scan_progress.active = false;
                 self.scan_progress.failed = failed;
                 self.scan_progress.incomplete = incomplete;
+                self.set_feedback(if failed == 0 && incomplete == 0 {
+                    "Scan complete".to_owned()
+                } else {
+                    format!("Scan complete · FAILED {failed} · INCOMPLETE {incomplete}")
+                });
             }
         }
     }
@@ -1097,6 +1148,10 @@ impl App {
                     && published
                         >= now - Duration::days(i64::from(self.config.filters.new_job_max_age_days))
             })
+    }
+
+    pub fn is_job_saved(&self, job: &JobRecord) -> bool {
+        self.library.jobs.contains(&job.key)
     }
 
     pub fn apply_filters(&mut self, filters: FiltersConfig) {
@@ -1485,15 +1540,40 @@ impl App {
         ))
     }
 
+    pub(crate) fn job_list_offset(&self) -> usize {
+        self.job_list_offset.get()
+    }
+
+    pub(crate) fn set_job_list_offset(&self, offset: usize) {
+        self.job_list_offset.set(offset);
+    }
+
     pub fn footer_status(&self) -> String {
-        if self.data_loading {
-            "LOADING".to_owned()
-        } else if self.scan_progress.active {
-            format!(
-                "SCANNING {}/{}",
-                self.scan_progress.finished, self.scan_progress.company_count
-            )
+        let spinner = if self.config.ui.unicode_icons {
+            ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][self.animation_frame % 10]
         } else {
+            ["|", "/", "-", "\\"][self.animation_frame % 4]
+        };
+        let busy = if self.data_loading {
+            Some(format!("{spinner} LOADING"))
+        } else if self.scan_progress.active {
+            Some(format!(
+                "{spinner} SCANNING {}/{}",
+                self.scan_progress.finished, self.scan_progress.company_count
+            ))
+        } else if self.analytics_in_flight {
+            Some(format!("{spinner} ANALYZING"))
+        } else if self.discovery_loading {
+            Some(format!("{spinner} DISCOVERING SKILLS"))
+        } else {
+            None
+        };
+        if let Some((message, until)) = &self.feedback
+            && Instant::now() < *until
+        {
+            return busy.map_or_else(|| message.clone(), |busy| format!("{message} · {busy}"));
+        }
+        busy.unwrap_or_else(|| {
             let failed = self
                 .sources
                 .iter()
@@ -1513,27 +1593,72 @@ impl App {
             } else {
                 "OK".to_owned()
             }
-        }
+        })
     }
 
     fn handle_search_key(&mut self, code: KeyCode) -> AppCommand {
-        match code {
+        let selected_key = self.selected_job().map(|job| job.key.clone());
+        let changed = match code {
             KeyCode::Esc => {
                 self.search_query.clear();
                 self.input_mode = InputMode::Normal;
+                self.set_feedback("Search cleared");
+                true
             }
-            KeyCode::Enter => self.input_mode = InputMode::Normal,
+            KeyCode::Enter => {
+                self.input_mode = InputMode::Normal;
+                self.set_feedback("Search applied");
+                false
+            }
+            KeyCode::Up => {
+                self.move_selection(-1);
+                false
+            }
+            KeyCode::Down => {
+                self.move_selection(1);
+                false
+            }
             KeyCode::Backspace => {
                 self.search_query.pop();
-                self.clamp_selection();
+                true
             }
             KeyCode::Char(character) => {
                 self.search_query.push(character);
-                self.clamp_selection();
+                true
             }
-            _ => {}
+            _ => false,
+        };
+        if changed {
+            self.selected_index = selected_key
+                .as_ref()
+                .and_then(|key| self.visible_jobs().position(|job| &job.key == key))
+                .unwrap_or_else(|| {
+                    self.selected_index
+                        .min(self.visible_jobs().count().saturating_sub(1))
+                });
         }
         AppCommand::None
+    }
+
+    fn toggle_selected_job(&mut self) -> AppCommand {
+        let Some((key, title)) = self
+            .selected_job()
+            .map(|job| (job.key.clone(), job.classified.observed.title.clone()))
+        else {
+            return AppCommand::None;
+        };
+        let saved = if self.library.jobs.remove(&key) {
+            false
+        } else {
+            self.library.jobs.insert(key);
+            true
+        };
+        let command = self.save_analytics_state_command();
+        self.set_feedback(format!(
+            "{} {title}",
+            if saved { "Saved" } else { "Removed" }
+        ));
+        command
     }
 
     fn mouse_target(&self, column: u16, row: u16, width: u16, height: u16) -> Option<MouseTarget> {
@@ -1626,37 +1751,51 @@ impl App {
                 if column == list.right().saturating_sub(1) && list.contains((column, row).into()) {
                     return Some(MouseTarget::Divider);
                 }
-                item_at(column, row, list, 2, self.item_count(), self.selected_index)
-                    .map(MouseTarget::Item)
-                    .or_else(|| {
-                        details
-                            .contains((column, row).into())
-                            .then_some(MouseTarget::Details)
-                    })
+                item_at_offset(
+                    column,
+                    row,
+                    list,
+                    2,
+                    self.item_count(),
+                    self.job_list_offset.get(),
+                )
+                .map(MouseTarget::Item)
+                .or_else(|| {
+                    details
+                        .contains((column, row).into())
+                        .then_some(MouseTarget::Details)
+                })
             }
             _ if width >= 80 => {
                 let (list, details) = self.job_panes(content).expect("medium job panes");
                 if column == list.right().saturating_sub(1) && list.contains((column, row).into()) {
                     return Some(MouseTarget::Divider);
                 }
-                item_at(column, row, list, 2, self.item_count(), self.selected_index)
-                    .map(MouseTarget::Item)
-                    .or_else(|| {
-                        details
-                            .contains((column, row).into())
-                            .then_some(MouseTarget::Details)
-                    })
+                item_at_offset(
+                    column,
+                    row,
+                    list,
+                    2,
+                    self.item_count(),
+                    self.job_list_offset.get(),
+                )
+                .map(MouseTarget::Item)
+                .or_else(|| {
+                    details
+                        .contains((column, row).into())
+                        .then_some(MouseTarget::Details)
+                })
             }
             _ if self.narrow_details_visible => content
                 .contains((column, row).into())
                 .then_some(MouseTarget::Details),
-            _ => item_at(
+            _ => item_at_offset(
                 column,
                 row,
                 content,
                 2,
                 self.item_count(),
-                self.selected_index,
+                self.job_list_offset.get(),
             )
             .map(MouseTarget::Item),
         }
@@ -1672,6 +1811,14 @@ impl App {
                 self.focus = Focus::Content;
                 self.analytics_tab = ANALYTICS_TABS[index.min(ANALYTICS_TABS.len() - 1)];
                 self.reset_analytics_selection();
+            }
+            Some(MouseTarget::AnalyticsSkillKind(index)) => {
+                self.focus = Focus::Content;
+                self.select_analytics_kind(if index == 0 {
+                    SkillKind::Hard
+                } else {
+                    SkillKind::Soft
+                });
             }
             Some(MouseTarget::MarketSection(index)) => {
                 self.focus = Focus::Content;
@@ -1720,6 +1867,7 @@ impl App {
             Some(MouseTarget::Navigation(_)) => self.activate_navigation(),
             Some(
                 MouseTarget::AnalyticsTab(_)
+                | MouseTarget::AnalyticsSkillKind(_)
                 | MouseTarget::MarketSection(_)
                 | MouseTarget::LibraryTab(_),
             ) => AppCommand::None,
@@ -1749,6 +1897,7 @@ impl App {
             }
             Some(
                 MouseTarget::AnalyticsTab(_)
+                | MouseTarget::AnalyticsSkillKind(_)
                 | MouseTarget::MarketSection(_)
                 | MouseTarget::LibraryTab(_),
             ) => {}
@@ -1803,6 +1952,7 @@ impl App {
             AppCommand::None
         } else if key == keys.filter {
             self.cycle_filter();
+            self.set_feedback(format!("Filter: {}", self.filter_label()));
             self.reset_view_state();
             self.preserve_selection_on_replace = false;
             AppCommand::ReloadJobs
@@ -1873,6 +2023,7 @@ impl App {
 
     fn save_analytics_state_command(&mut self) -> AppCommand {
         self.invalidate_analytics();
+        self.set_feedback("Changes saved");
         AppCommand::SaveAnalyticsState(self.analytics_filters.clone(), self.library.clone())
     }
 
@@ -1964,6 +2115,37 @@ impl App {
         self.pending_skill_suggestions()
             .get(self.selected_index)
             .copied()
+    }
+
+    fn go_to_selected_library_job(&mut self) {
+        let Some((key, source_open)) = self
+            .selected_job()
+            .map(|job| (job.key.clone(), job.source_open))
+        else {
+            self.set_feedback("Nothing selected");
+            return;
+        };
+        self.view = if source_open {
+            View::Active
+        } else {
+            View::History
+        };
+        self.navigation_index = view_index(self.view);
+        self.focus = Focus::Content;
+        self.input_mode = InputMode::Normal;
+        self.company_filter = None;
+        self.search_query.clear();
+        let selected_index = self
+            .visible_jobs()
+            .position(|job| job.key == key)
+            .unwrap_or(0);
+        self.selected_index = selected_index;
+        self.job_list_offset.set(0);
+        self.set_feedback(if source_open {
+            "Located in Active jobs"
+        } else {
+            "Located in History"
+        });
     }
 
     fn remove_selected_library_item(&mut self) {
@@ -2131,6 +2313,7 @@ impl App {
                         Ok(days) => filters.new_job_max_age_days = days,
                         Err(_) => {
                             self.setting_error = Some("Enter a positive whole number.".into());
+                            self.set_feedback("ERROR: Enter a positive whole number");
                             return AppCommand::None;
                         }
                     },
@@ -2162,6 +2345,7 @@ impl App {
                 }
                 if let Err(error) = filters.validate() {
                     self.setting_error = Some(error.to_string());
+                    self.set_feedback(format!("ERROR: {error}"));
                     return AppCommand::None;
                 }
                 self.input_mode = InputMode::Normal;
@@ -2281,18 +2465,13 @@ impl App {
 
     fn reset_view_state(&mut self) {
         self.selected_index = 0;
+        self.job_list_offset.set(0);
         self.analytics_kind = SkillKind::Hard;
         self.hard_skill_index = 0;
         self.soft_skill_index = 0;
         self.evidence_index = 0;
         self.reset_detail_scroll();
         self.narrow_details_visible = false;
-    }
-
-    fn clamp_selection(&mut self) {
-        self.selected_index = self
-            .selected_index
-            .min(self.visible_jobs().count().saturating_sub(1));
     }
 
     fn cycle_filter(&mut self) {
@@ -2404,28 +2583,26 @@ impl App {
                 .map(MouseTarget::Item)
             }
             AnalyticsTab::Skills => {
-                let sections = Layout::vertical([Constraint::Percentage(68), Constraint::Fill(1)])
-                    .split(surface);
-                let panes = Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)])
-                    .split(sections[0]);
+                let sections = Layout::vertical([
+                    Constraint::Length(1),
+                    Constraint::Percentage(66),
+                    Constraint::Fill(1),
+                ])
+                .split(surface);
+                if sections[0].contains((column, row).into()) {
+                    return tab_at_widths(column, sections[0].x, &[14, 14])
+                        .map(MouseTarget::AnalyticsSkillKind);
+                }
                 let report = self.analytics_report()?;
-                table_item_at(
-                    column,
-                    row,
-                    panes[0],
-                    report.hard_skills.len(),
-                    self.hard_skill_index,
-                )
-                .map(MouseTarget::HardSkill)
-                .or_else(|| {
-                    table_item_at(
-                        column,
-                        row,
-                        panes[1],
-                        report.soft_skills.len(),
-                        self.soft_skill_index,
-                    )
-                    .map(MouseTarget::SoftSkill)
+                let (skills, selected_index) = match self.analytics_kind {
+                    SkillKind::Hard => (&report.hard_skills, self.hard_skill_index),
+                    SkillKind::Soft => (&report.soft_skills, self.soft_skill_index),
+                };
+                table_item_at(column, row, sections[1], skills.len(), selected_index).map(|index| {
+                    match self.analytics_kind {
+                        SkillKind::Hard => MouseTarget::HardSkill(index),
+                        SkillKind::Soft => MouseTarget::SoftSkill(index),
+                    }
                 })
             }
             AnalyticsTab::Stacks => {
@@ -2473,7 +2650,14 @@ impl App {
             area.height.saturating_sub(1),
         );
         if self.library_tab == LibraryTab::Jobs {
-            item_at(column, row, list, 2, self.item_count(), self.selected_index)
+            item_at_offset(
+                column,
+                row,
+                list,
+                2,
+                self.item_count(),
+                self.job_list_offset.get(),
+            )
         } else {
             table_item_at(column, row, list, self.item_count(), self.selected_index)
         }
@@ -2796,6 +2980,21 @@ fn item_at(
     }
     let visible_count = usize::from(inner.height / item_height).max(1);
     let first_visible = selected_index.saturating_sub(visible_count.saturating_sub(1));
+    item_at_offset(column, row, area, item_height, item_count, first_visible)
+}
+
+fn item_at_offset(
+    column: u16,
+    row: u16,
+    area: Rect,
+    item_height: u16,
+    item_count: usize,
+    first_visible: usize,
+) -> Option<usize> {
+    let inner = area.inner(ratatui::layout::Margin::new(1, 1));
+    if !inner.contains((column, row).into()) || item_count == 0 {
+        return None;
+    }
     let index = first_visible + usize::from((row - inner.y) / item_height);
     (index < item_count).then_some(index)
 }

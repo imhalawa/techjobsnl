@@ -1,4 +1,4 @@
-//! Shared contracts for the job-watch application.
+//! Shared contracts for the techjobsnl application.
 
 pub mod analytics;
 pub mod config;

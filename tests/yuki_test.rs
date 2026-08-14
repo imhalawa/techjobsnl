@@ -82,7 +82,7 @@ async fn yuki_live_returns_complete_unique_jobs() {
         "yuki",
         "https://jobs.yukisoftware.com/jobs.json",
         reqwest::Client::builder()
-            .user_agent("job-watch/0.1 (+Yuki live test)")
+            .user_agent("techjobsnl/0.1 (+Yuki live test)")
             .timeout(Duration::from_secs(30))
             .build()
             .unwrap(),
@@ -114,7 +114,7 @@ async fn info_support_live_returns_complete_unique_netherlands_jobs() {
         "info-support",
         "https://werkenbij.infosupport.com/en/jobs.json",
         reqwest::Client::builder()
-            .user_agent("job-watch/0.1 (+Teamtailor live test)")
+            .user_agent("techjobsnl/0.1 (+Teamtailor live test)")
             .timeout(Duration::from_secs(30))
             .build()
             .unwrap(),

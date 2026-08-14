@@ -11,7 +11,7 @@ if sh scripts/check-release-version.sh v9.9.9 >/dev/null 2>&1; then
     exit 1
 fi
 
-temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/job-watch-release-test.XXXXXX")
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/techjobsnl-release-test.XXXXXX")
 trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
 
 case "$(uname -s)" in
@@ -25,11 +25,11 @@ case "$(uname -m)" in
     *) exit 0 ;;
 esac
 
-asset="job-watch-$arch-$os.tar.gz"
+asset="techjobsnl-$arch-$os.tar.gz"
 mkdir -p "$temporary_dir/package" "$temporary_dir/release"
-printf '%s\n' '#!/bin/sh' 'printf "%s\n" installed' > "$temporary_dir/package/job-watch"
-chmod 755 "$temporary_dir/package/job-watch"
-tar -czf "$temporary_dir/release/$asset" -C "$temporary_dir/package" job-watch
+printf '%s\n' '#!/bin/sh' 'printf "%s\n" installed' > "$temporary_dir/package/techjobsnl"
+chmod 755 "$temporary_dir/package/techjobsnl"
+tar -czf "$temporary_dir/release/$asset" -C "$temporary_dir/package" techjobsnl
 if command -v sha256sum >/dev/null 2>&1; then
     hash=$(sha256sum "$temporary_dir/release/$asset" | awk '{ print $1 }')
 else
@@ -37,11 +37,11 @@ else
 fi
 printf '%s  %s\n' "$hash" "$asset" > "$temporary_dir/release/SHA256SUMS"
 
-JOB_WATCH_DOWNLOAD_BASE="file://$temporary_dir/release" \
-JOB_WATCH_INSTALL_DIR="$temporary_dir/bin" \
+TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
+TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" \
     sh scripts/install.sh >/dev/null
 
-test "$("$temporary_dir/bin/job-watch")" = installed
+test "$("$temporary_dir/bin/techjobsnl")" = installed
 test "$(grep -c 'target:' .github/workflows/release.yml)" -eq 6
 grep -q 'aarch64-pc-windows-msvc' .github/workflows/release.yml
 grep -q 'Download checksum verification failed' scripts/install.ps1
