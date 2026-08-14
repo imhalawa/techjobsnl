@@ -151,6 +151,10 @@ pub enum SourceConfig {
     Personio {
         base_url: String,
     },
+    Lever {
+        api_url: String,
+        country_filter: Option<String>,
+    },
     Yuki {
         feed_url: String,
     },
@@ -196,6 +200,7 @@ impl SourceConfig {
             Self::Ebay { .. } => "eBay",
             Self::Recruitee { .. } => "Recruitee",
             Self::Personio { .. } => "Personio XML Feed",
+            Self::Lever { .. } => "Lever",
             Self::Yuki { .. } => "Teamtailor JSON Feed",
             Self::Bol { .. } => "bol.com",
             Self::Coolblue { .. } => "Coolblue HTML",
@@ -211,6 +216,7 @@ impl SourceConfig {
 
     pub fn reference(&self) -> &str {
         match self {
+            Self::Lever { api_url, .. } => api_url,
             Self::Ashby { board } | Self::Greenhouse { board, .. } => board,
             Self::Jibe { base_url, .. }
             | Self::Recruitee { base_url }
@@ -241,6 +247,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
             country_filter,
         } => {
             validate_non_empty(board, path("board"))?;
+            if let Some(country) = country_filter {
+                validate_country(country, path("country_filter"))?;
+            }
+            Ok(())
+        }
+        SourceConfig::Lever {
+            api_url,
+            country_filter,
+        } => {
+            validate_https_url(api_url, path("api_url"))?;
             if let Some(country) = country_filter {
                 validate_country(country, path("country_filter"))?;
             }

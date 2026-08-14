@@ -1,5 +1,11 @@
 # Source and sponsor evidence
 
+## Finom
+
+- Official source: <https://api.eu.lever.co/v0/postings/pnlfin?mode=json>. Finom's official careers page links the `pnlfin` Lever tenant. The endpoint returns the complete public board in one response; the configured country filter keeps only explicit Amsterdam or Netherlands postings.
+- Finom's official careers page reports 500+ employees: <https://careers.finom.co/>.
+- The board identifies the Finom brand, not the legal employer for each contract. Confirm the employment entity before relying on sponsor status.
+
 ## Silverflow and Ohpen
 
 - Official sources: <https://silverflow.jobs.personio.com/xml?language=en> and <https://ohpen.jobs.personio.com/xml?language=en>. Each Personio XML feed returns every public position with stable IDs, offices, descriptions, employment metadata, and creation dates in one response.
