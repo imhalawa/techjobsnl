@@ -683,3 +683,13 @@ enabled = true
 [companies.source]
 strategy = "successfactors-api"
 base_url = "https://jobs.worldline.com"
+
+[[companies]]
+id = "buckaroo"
+name = "Buckaroo"
+industry = "Fintech, Payments, Financial services"
+scale = "200+ · Medium or large company"
+enabled = true
+[companies.source]
+strategy = "buckaroo"
+listing_url = "https://www.buckaroo.nl/over-buckaroo/vacatures"
