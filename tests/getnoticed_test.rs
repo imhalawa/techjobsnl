@@ -17,6 +17,7 @@ use job_watch::{
 use serde_json::Value;
 
 const BASE_URL: &str = "https://www.werkenbijabnamro.nl";
+const TOPICUS_BASE_URL: &str = "https://www.werkenbijtopicus.nl";
 
 #[test]
 fn getnoticed_builds_the_exact_abn_listing_request() {
@@ -327,6 +328,41 @@ async fn getnoticed_live_returns_complete_unique_abn_jobs() {
         assert_eq!(job.raw_payload["listing"]["id"].to_string(), job.source_id);
     }
     println!("ABN AMRO: {} jobs", observations.len());
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn getnoticed_live_returns_complete_unique_topicus_jobs() {
+    let source = GetnoticedSource::new(
+        "topicus",
+        TOPICUS_BASE_URL,
+        None,
+        build_client(
+            "job-watch/0.1 (+Topicus live test)",
+            Duration::from_secs(30),
+        )
+        .unwrap(),
+    );
+    let SourceScan::Complete { observations } = source.scan().await.unwrap() else {
+        panic!("Topicus scan must be complete");
+    };
+
+    assert!(!observations.is_empty());
+    let mut ids = HashSet::new();
+    for job in &observations {
+        assert!(ids.insert(&job.source_id));
+        assert!(!job.title.trim().is_empty());
+        assert!(!job.description.trim().is_empty());
+        assert!(!job.locations.is_empty());
+        assert_eq!(job.countries, ["NL"]);
+        assert!(job.job_url.starts_with(TOPICUS_BASE_URL));
+        assert_eq!(
+            job.apply_url,
+            format!("{}#vacancy-application-form", job.job_url)
+        );
+        assert!(job.published_at.is_some());
+    }
+    println!("Topicus: {} jobs", observations.len());
 }
 
 fn pages() -> Vec<String> {

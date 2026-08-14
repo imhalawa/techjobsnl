@@ -214,6 +214,16 @@ strategy = "coolblue"
 listing_url = "https://www.coolblue.nl/en/vacancies/search"
 
 [[companies]]
+id = "topicus"
+name = "Topicus"
+industry = "Financial software, Healthcare software, Education software, Public-sector software"
+scale = "Large European software group"
+enabled = true
+[companies.source]
+strategy = "getnoticed"
+base_url = "https://www.werkenbijtopicus.nl"
+
+[[companies]]
 id = "reddit"
 name = "Reddit"
 industry = "Social media, Advertising, Community platform"

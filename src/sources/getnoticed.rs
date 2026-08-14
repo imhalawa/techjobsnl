@@ -15,9 +15,34 @@ use super::{
     json_ld::{html_markdown, job_posting_value, parse_job_posting},
 };
 
-const OFFICIAL_HOST: &str = "www.werkenbijabnamro.nl";
 const REDIRECT_LIMIT: usize = 5;
 const MAX_PAGE_COUNT: usize = 100;
+
+#[derive(Clone, Copy)]
+struct SiteProfile {
+    host: &'static str,
+    source_name: &'static str,
+    hiring_organization: Option<&'static str>,
+    detail_prefix: &'static [&'static str],
+}
+
+fn site_profile(company_id: &str) -> Result<SiteProfile, SourceError> {
+    match company_id {
+        "abn-amro" => Ok(SiteProfile {
+            host: "www.werkenbijabnamro.nl",
+            source_name: "ABN AMRO",
+            hiring_organization: Some("ABN AMRO"),
+            detail_prefix: &["en", "vacancy"],
+        }),
+        "topicus" => Ok(SiteProfile {
+            host: "www.werkenbijtopicus.nl",
+            source_name: "Topicus",
+            hiring_organization: None,
+            detail_prefix: &["vacature"],
+        }),
+        _ => Err(schema(company_id, "unsupported Getnoticed site")),
+    }
+}
 
 pub struct GetnoticedSource {
     company_id: String,
@@ -115,8 +140,9 @@ impl JobSource for GetnoticedSource {
     }
 
     async fn scan(&self) -> Result<SourceScan, SourceError> {
+        let profile = site_profile(&self.company_id)?;
         let pages = self
-            .fetch_listing_pages(|request| send_text(request, "ABN AMRO"))
+            .fetch_listing_pages(|request| send_text(request, profile.source_name))
             .await?;
         let page_refs = pages.iter().map(String::as_str).collect::<Vec<_>>();
         let listings = parse_listings(&self.company_id, &self.base_url, &page_refs)?;
@@ -125,13 +151,16 @@ impl JobSource for GetnoticedSource {
             .iter()
             .map(|listing| (self.client.clone(), listing.detail_url.clone()))
             .collect::<Vec<_>>();
-        let details = stream::iter(requests)
-            .map(|(client, url)| async move { send_text(client.get(url), "ABN AMRO").await })
-            .buffered(4)
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
+        let details =
+            stream::iter(requests)
+                .map(|(client, url)| async move {
+                    send_text(client.get(url), profile.source_name).await
+                })
+                .buffered(4)
+                .collect::<Vec<_>>()
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()?;
         let detail_refs = details.iter().map(String::as_str).collect::<Vec<_>>();
 
         Ok(SourceScan::Complete {
@@ -189,6 +218,7 @@ fn parse_listings(
             listings.push(Listing {
                 id: row.id,
                 title,
+                city: required(&row.city, "city", row.id, company_id)?,
                 department,
                 detail_url,
                 raw: raw_listing,
@@ -241,15 +271,17 @@ fn observed_job(
     listing: Listing,
     detail: &str,
 ) -> Result<ObservedJob, SourceError> {
+    let profile = site_profile(company_id)?;
     let base = official_base(base_url, company_id)?;
     let document = Html::parse_document(detail);
     validate_vacancy_id(&document, listing.id, company_id)?;
-    let application_endpoint = application_endpoint(&document, &base, listing.id, company_id)?;
     let canonical = canonical_url(&document, &base, company_id)?;
     validate_canonical_identity(&canonical, listing.id, company_id)?;
 
-    let posting = parse_job_posting(detail, "ABN AMRO")?;
-    let raw_posting = job_posting_value(detail, "ABN AMRO")?;
+    let posting = parse_job_posting(detail, profile.source_name)?;
+    let raw_posting = job_posting_value(detail, profile.source_name)?;
+    let application_endpoint =
+        application_endpoint(&document, &base, listing.id, &raw_posting, company_id)?;
     let title = posting
         .title
         .as_deref()
@@ -267,7 +299,11 @@ fn observed_job(
         .as_ref()
         .and_then(|organization| organization.name.as_deref())
         .map(str::trim);
-    if hiring_organization != Some("ABN AMRO") {
+    if hiring_organization.is_none()
+        || profile
+            .hiring_organization
+            .is_some_and(|expected| hiring_organization != Some(expected))
+    {
         return Err(schema(
             company_id,
             format!(
@@ -311,12 +347,7 @@ fn observed_job(
             .or(place.address.address_locality.as_deref())
             .map(str::trim)
             .filter(|location| !location.is_empty())
-            .ok_or_else(|| {
-                schema(
-                    company_id,
-                    format!("detail {} has an unnamed location", listing.id),
-                )
-            })?;
+            .unwrap_or(&listing.city);
         let country_is_nl = place
             .address
             .address_country
@@ -334,7 +365,7 @@ fn observed_job(
         }
     }
 
-    let apply_url = apply_url(&base, listing.id);
+    let apply_url = apply_url(&base, &canonical, listing.id, company_id);
     Ok(ObservedJob {
         source_id: listing.id.to_string(),
         title: listing.title,
@@ -460,8 +491,27 @@ fn application_endpoint(
     document: &Html,
     base: &Url,
     id: u64,
+    posting: &Value,
     company_id: &str,
 ) -> Result<String, SourceError> {
+    if company_id == "topicus" {
+        let selector =
+            Selector::parse("#ub-apply-form[data-hireserve-form-container][data-vacancy-id]")
+                .expect("static Topicus application selector");
+        let ids = document
+            .select(&selector)
+            .filter_map(|element| element.value().attr("data-vacancy-id"))
+            .collect::<Vec<_>>();
+        let posting_id = posting.pointer("/identifier/value").and_then(Value::as_str);
+        if ids.len() != 1 || posting_id != Some(ids[0]) {
+            return Err(schema(
+                company_id,
+                format!("detail {id} has a mismatched application vacancy ID"),
+            ));
+        }
+        return Ok(format!("hireserve:{}", ids[0]));
+    }
+
     let selector = Selector::parse("[data-endpoint]").expect("static application selector");
     let endpoints = document
         .select(&selector)
@@ -512,15 +562,16 @@ fn validate_canonical_identity(
     expected_id: u64,
     company_id: &str,
 ) -> Result<(), SourceError> {
+    let profile = site_profile(company_id)?;
     let segments = canonical
         .path_segments()
         .map(Iterator::collect::<Vec<_>>)
         .unwrap_or_default();
-    if segments.len() != 4
-        || segments[0] != "en"
-        || segments[1] != "vacancy"
-        || segments[2].parse::<u64>().ok() != Some(expected_id)
-        || segments[3].is_empty()
+    let id_index = profile.detail_prefix.len();
+    if segments.len() != id_index + 2
+        || segments[..id_index] != *profile.detail_prefix
+        || segments[id_index].parse::<u64>().ok() != Some(expected_id)
+        || segments[id_index + 1].is_empty()
         || canonical.query().is_some()
         || canonical.fragment().is_some()
     {
@@ -533,28 +584,37 @@ fn validate_canonical_identity(
 }
 
 fn detail_url(base: &Url, id: u64, slug: &str, company_id: &str) -> Result<Url, SourceError> {
+    let profile = site_profile(company_id)?;
     let mut url = base.clone();
-    url.path_segments_mut()
-        .map_err(|()| schema(company_id, "official base URL cannot be a base"))?
-        .clear()
-        .push("en")
-        .push("vacancy")
-        .push(&id.to_string())
-        .push(slug);
+    let mut segments = url
+        .path_segments_mut()
+        .map_err(|()| schema(company_id, "official base URL cannot be a base"))?;
+    segments.clear();
+    for segment in profile.detail_prefix {
+        segments.push(segment);
+    }
+    segments.push(&id.to_string()).push(slug);
+    drop(segments);
     Ok(url)
 }
 
-fn apply_url(base: &Url, id: u64) -> Url {
+fn apply_url(base: &Url, canonical: &Url, id: u64, company_id: &str) -> Url {
+    if company_id == "topicus" {
+        let mut url = canonical.clone();
+        url.set_fragment(Some("vacancy-application-form"));
+        return url;
+    }
     let mut url = base.clone();
     url.set_path(&format!("/vacature-solliciteren/{id}"));
     url
 }
 
 fn official_base(value: &str, company_id: &str) -> Result<Url, SourceError> {
+    let profile = site_profile(company_id)?;
     let url = Url::parse(value)
         .map_err(|error| schema(company_id, format!("invalid base URL: {error}")))?;
     if url.scheme() != "https"
-        || url.host_str() != Some(OFFICIAL_HOST)
+        || url.host_str() != Some(profile.host)
         || url.port().is_some()
         || !url.username().is_empty()
         || url.password().is_some()
@@ -564,7 +624,7 @@ fn official_base(value: &str, company_id: &str) -> Result<Url, SourceError> {
     {
         return Err(schema(
             company_id,
-            format!("base URL must be exactly https://{OFFICIAL_HOST}"),
+            format!("base URL must be exactly https://{}", profile.host),
         ));
     }
     Ok(url)
@@ -576,8 +636,9 @@ fn require_official_origin(
     kind: &str,
     company_id: &str,
 ) -> Result<(), SourceError> {
+    let profile = site_profile(company_id)?;
     if url.scheme() != "https"
-        || url.host_str() != Some(OFFICIAL_HOST)
+        || url.host_str() != Some(profile.host)
         || url.origin() != base.origin()
     {
         return Err(schema(
@@ -636,6 +697,7 @@ struct ListingRow {
     id: u64,
     slug: String,
     title: String,
+    city: String,
     #[serde(default)]
     subtitle: Subtitle,
 }
@@ -654,6 +716,7 @@ struct Category {
 struct Listing {
     id: u64,
     title: String,
+    city: String,
     department: Option<String>,
     detail_url: Url,
     raw: Value,
@@ -664,6 +727,30 @@ mod tests {
     use std::{cell::Cell, future::ready};
 
     use super::*;
+
+    #[test]
+    fn topicus_profile_builds_and_validates_official_job_links() {
+        let base = official_base("https://www.werkenbijtopicus.nl", "topicus").unwrap();
+        let detail = detail_url(&base, 302, "app-developer-parro", "topicus").unwrap();
+        assert_eq!(
+            detail.as_str(),
+            "https://www.werkenbijtopicus.nl/vacature/302/app-developer-parro"
+        );
+        validate_canonical_identity(&detail, 302, "topicus").unwrap();
+        assert_eq!(
+            apply_url(&base, &detail, 302, "topicus").as_str(),
+            "https://www.werkenbijtopicus.nl/vacature/302/app-developer-parro#vacancy-application-form"
+        );
+
+        let document = Html::parse_document(
+            r#"<div id="ub-apply-form" data-hireserve-form-container data-vacancy-id="1327172"></div>"#,
+        );
+        let posting = serde_json::json!({"identifier": {"value": "1327172"}});
+        assert_eq!(
+            application_endpoint(&document, &base, 302, &posting, "topicus").unwrap(),
+            "hireserve:1327172"
+        );
+    }
 
     #[tokio::test]
     async fn corrupt_first_page_does_not_request_page_two() {

@@ -267,23 +267,25 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
             country_filter,
         } => {
             validate_https_url(base_url, path("base_url"))?;
-            if company.id != "abn-amro" {
-                return Err(ConfigError::invalid(
-                    path("strategy"),
-                    "getnoticed is supported only for abn-amro",
-                ));
-            }
-            if base_url != "https://www.werkenbijabnamro.nl" {
-                return Err(ConfigError::invalid(
-                    path("base_url"),
-                    "must be the official ABN AMRO careers URL",
-                ));
-            }
-            if country_filter.as_deref() != Some("Nederland") {
-                return Err(ConfigError::invalid(
-                    path("country_filter"),
-                    "must be Nederland",
-                ));
+            match company.id.as_str() {
+                "abn-amro"
+                    if base_url == "https://www.werkenbijabnamro.nl"
+                        && country_filter.as_deref() == Some("Nederland") => {}
+                "topicus"
+                    if base_url == "https://www.werkenbijtopicus.nl"
+                        && country_filter.is_none() => {}
+                "abn-amro" | "topicus" => {
+                    return Err(ConfigError::invalid(
+                        path("base_url"),
+                        "must match the company's official Getnoticed careers URL and filter",
+                    ));
+                }
+                _ => {
+                    return Err(ConfigError::invalid(
+                        path("strategy"),
+                        "getnoticed is supported only for abn-amro and topicus",
+                    ));
+                }
             }
             Ok(())
         }

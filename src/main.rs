@@ -787,6 +787,11 @@ mod tests {
             .iter()
             .filter(|company| company.id == "coolblue")
             .collect::<Vec<_>>();
+        let topicus = config
+            .companies
+            .iter()
+            .filter(|company| company.id == "topicus")
+            .collect::<Vec<_>>();
 
         assert_eq!(adyen.len(), 1);
         assert!(adyen[0].enabled);
@@ -895,6 +900,20 @@ mod tests {
                 if listing_url == "https://www.coolblue.nl/en/vacancies/search"
         ));
 
+        assert_eq!(topicus.len(), 1);
+        assert!(topicus[0].enabled);
+        assert_eq!(
+            topicus[0].industry,
+            "Financial software, Healthcare software, Education software, Public-sector software"
+        );
+        assert!(matches!(
+            &topicus[0].source,
+            SourceConfig::Getnoticed {
+                base_url,
+                country_filter: None,
+            } if base_url == "https://www.werkenbijtopicus.nl"
+        ));
+
         let enabled_ids = config
             .companies
             .iter()
@@ -919,6 +938,7 @@ mod tests {
                 "datasnipper",
                 "databricks",
                 "coolblue",
+                "topicus",
                 "reddit"
             ]
         );
