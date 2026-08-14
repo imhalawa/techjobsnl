@@ -511,11 +511,10 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
         .filter(|company| company.enabled)
         .map(|company| -> Result<Arc<dyn JobSource>> {
             match &company.source {
-                SourceConfig::Ashby { board } => Ok(Arc::new(ashby::AshbySource::new(
-                    &company.id,
-                    board,
-                    client.clone(),
-                ))),
+                SourceConfig::Ashby { board } => Ok(Arc::new(
+                    ashby::AshbySource::new(&company.id, board, client.clone())
+                        .with_location_country_overrides(&company.location_country_overrides),
+                )),
                 SourceConfig::Greenhouse {
                     board,
                     country_filter,
@@ -975,7 +974,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 46);
+        assert_eq!(migrated.companies.len(), 47);
         assert!(
             migrated
                 .companies
@@ -1318,7 +1317,8 @@ mod tests {
                 "keylane",
                 "info-support",
                 "wolters-kluwer",
-                "vanderlande"
+                "vanderlande",
+                "bitvavo"
             ]
         );
 

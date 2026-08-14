@@ -9,7 +9,9 @@ use job_watch::{
     filter::EligibilityFilter,
     sources::{
         JobSource,
-        ashby::{AshbySource, build_client, parse_ashby_response},
+        ashby::{
+            AshbySource, build_client, parse_ashby_response, parse_ashby_response_with_overrides,
+        },
     },
 };
 
@@ -92,6 +94,19 @@ fn resolves_an_ashby_location_when_the_optional_address_is_null() {
     board["jobs"][0]["location"] = "Amsterdam".into();
 
     let jobs = parse_ashby_response("mollie", &board.to_string()).unwrap();
+
+    assert_eq!(jobs[0].countries, ["NL"]);
+}
+
+#[test]
+fn resolves_an_official_location_label_from_company_configuration() {
+    let mut board = fixture_board();
+    board["jobs"][0]["address"] = serde_json::Value::Null;
+    board["jobs"][0]["location"] = "Headquarters".into();
+    let overrides = HashMap::from([("Headquarters".to_owned(), "NL".to_owned())]);
+
+    let jobs =
+        parse_ashby_response_with_overrides("bitvavo", &board.to_string(), &overrides).unwrap();
 
     assert_eq!(jobs[0].countries, ["NL"]);
 }
@@ -280,6 +295,34 @@ async fn scans_live_datasnipper_board_as_a_complete_unique_result() {
             .is_ok_and(|result| result.eligible)
     }));
     println!("DataSnipper: {} complete jobs", observations.len());
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn scans_live_bitvavo_board_with_its_official_headquarters_mapping() {
+    let client = build_client(
+        "job-watch/0.1 (+Bitvavo live test)",
+        Duration::from_secs(20),
+    )
+    .unwrap();
+    let overrides = HashMap::from([("Headquarters".to_owned(), "NL".to_owned())]);
+    let source =
+        AshbySource::new("bitvavo", "bitvavo", client).with_location_country_overrides(&overrides);
+
+    let SourceScan::Complete { observations } = source.scan().await.unwrap() else {
+        panic!("Ashby scans must be complete");
+    };
+    assert!(!observations.is_empty());
+    assert!(observations.iter().all(|job| job.countries == ["NL"]));
+    assert_eq!(
+        observations
+            .iter()
+            .map(|job| &job.source_id)
+            .collect::<HashSet<_>>()
+            .len(),
+        observations.len()
+    );
+    println!("Bitvavo: {} NL jobs", observations.len());
 }
 
 fn fixture_board() -> serde_json::Value {

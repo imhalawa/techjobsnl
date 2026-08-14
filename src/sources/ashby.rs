@@ -1,4 +1,7 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use chrono::{DateTime, Utc};
 use reqwest::{Client, Url, redirect::Policy};
@@ -16,6 +19,7 @@ const REDIRECT_LIMIT: usize = 5;
 pub struct AshbySource {
     company_id: String,
     board: String,
+    location_country_overrides: HashMap<String, String>,
     client: Client,
 }
 
@@ -24,8 +28,14 @@ impl AshbySource {
         Self {
             company_id: company_id.into(),
             board: board.into(),
+            location_country_overrides: HashMap::new(),
             client,
         }
+    }
+
+    pub fn with_location_country_overrides(mut self, overrides: &HashMap<String, String>) -> Self {
+        self.location_country_overrides = overrides.clone();
+        self
     }
 }
 
@@ -53,7 +63,11 @@ impl JobSource for AshbySource {
 
     async fn scan(&self) -> Result<SourceScan, SourceError> {
         let raw_json = send_text(self.client.get(board_url(&self.board)), "Ashby").await?;
-        let observations = parse_ashby_response(&self.company_id, &raw_json)?;
+        let observations = parse_ashby_response_with_overrides(
+            &self.company_id,
+            &raw_json,
+            &self.location_country_overrides,
+        )?;
         Ok(SourceScan::Complete { observations })
     }
 }
@@ -122,6 +136,14 @@ pub fn parse_ashby_response(
     company_id: &str,
     raw_json: &str,
 ) -> Result<Vec<ObservedJob>, SourceError> {
+    parse_ashby_response_with_overrides(company_id, raw_json, &HashMap::new())
+}
+
+pub fn parse_ashby_response_with_overrides(
+    company_id: &str,
+    raw_json: &str,
+    location_country_overrides: &HashMap<String, String>,
+) -> Result<Vec<ObservedJob>, SourceError> {
     let response: AshbyResponse = serde_json::from_str(raw_json).map_err(|error| {
         SourceError::schema(format!("invalid Ashby response for {company_id}: {error}"))
     })?;
@@ -137,11 +159,15 @@ pub fn parse_ashby_response(
 
     jobs.into_iter()
         .filter(|job| job.is_listed)
-        .map(|job| observed_job(company_id, job))
+        .map(|job| observed_job(company_id, job, location_country_overrides))
         .collect()
 }
 
-fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceError> {
+fn observed_job(
+    company_id: &str,
+    job: AshbyJob,
+    location_country_overrides: &HashMap<String, String>,
+) -> Result<ObservedJob, SourceError> {
     if job.id.trim().is_empty() {
         return Err(SourceError::schema(format!(
             "Ashby job for {company_id} has an empty id"
@@ -180,7 +206,13 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
     push_unique(
         &mut countries,
         &mut seen_countries,
-        country_for_location(company_id, &job.id, &job.location, job.address.as_ref())?,
+        country_for_location(
+            company_id,
+            &job.id,
+            &job.location,
+            job.address.as_ref(),
+            location_country_overrides,
+        )?,
     );
     for secondary in &job.secondary_locations {
         push_unique(
@@ -196,6 +228,7 @@ fn observed_job(company_id: &str, job: AshbyJob) -> Result<ObservedJob, SourceEr
                 &job.id,
                 &secondary.location,
                 secondary.address.as_ref(),
+                location_country_overrides,
             )?,
         );
     }
@@ -234,9 +267,11 @@ fn country_for_location(
     job_id: &str,
     location: &str,
     address: Option<&AshbyAddress>,
+    location_country_overrides: &HashMap<String, String>,
 ) -> Result<String, SourceError> {
     address
         .map(|address| normalise_country(&address.postal_address.address_country))
+        .or_else(|| location_country_overrides.get(location).cloned())
         .or_else(|| country_code_for_location(location).map(str::to_owned))
         .ok_or_else(|| {
             SourceError::schema(format!(
