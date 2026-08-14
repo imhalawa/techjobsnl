@@ -17,6 +17,12 @@
 - The careers source is in English, but language, relocation, work-authorisation, and visa sponsorship conditions vary by vacancy. Confirm them on each role.
 - The board identifies the Google brand, not the legal contract entity for each vacancy. Confirm that entity before relying on recognised-sponsor status.
 
+## Knab — deferred
+
+- Official source: <https://www.werkenbijknab.nl/vacatures>. Its first-party vacancy-search API at <https://www.werkenbijknab.nl/api/1/vacancy-search> declared exactly 0 published vacancies on 2026-08-14, matching the server-rendered board. The site's `robots.txt` permits this path, so automated-access denial is not the blocker.
+- The former `knab`, `knabnl`, and `werkenbijknab` Greenhouse board tokens all returned HTTP 404 on 2026-08-14. No BAWAG first-party careers replacement for Knab was found.
+- Knab remains unconfigured until a vacancy is published. A real listing and detail are required to prove stable IDs, official URLs, Netherlands locations, descriptions, dates, and exact completeness before enabling an adapter.
+
 ## flatexDEGIRO
 
 - Official source: <https://jobs.flatexdegiro.com/search/?q=&locationsearch=NL>. The SAP SuccessFactors board declares the exact Netherlands total and page size. The adapter follows every declared page, requires unique numeric IDs, fetches every detail, and validates the title, explicit `NL` address, publication date, full description, employer marker, job URL, and official application URL before accepting a complete scan.
