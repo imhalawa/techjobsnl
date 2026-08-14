@@ -520,3 +520,14 @@ tenant = "vanderlande"
 site = "careers"
 country = "Netherlands"
 country_code = "NL"
+
+[[companies]]
+id = "bitvavo"
+name = "Bitvavo"
+industry = "Crypto exchange, Fintech, Digital assets"
+scale = "500–999 · Large company"
+enabled = true
+location_country_overrides = { Headquarters = "NL" }
+[companies.source]
+strategy = "ashby"
+board = "bitvavo"

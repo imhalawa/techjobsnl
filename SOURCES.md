@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Bitvavo
+
+- Official source: <https://api.ashbyhq.com/posting-api/job-board/bitvavo>. Bitvavo's official careers site labels the same roles as Amsterdam while Ashby calls the location `Headquarters`: <https://jobs.bitvavo.com/find-your-role>.
+- Bitvavo states that all employees are based in Amsterdam and that eligible international hires receive relocation support: <https://jobs.bitvavo.com/life-at-bitvavo>.
+- Bitvavo's official company page reports 500+ employees: <https://bitvavo.com/en/about>.
+- The official careers footer identifies Bitvavo B.V.; confirm the contract entity on the vacancy before relying on sponsor status.
+
 ## Vanderlande
 
 - Official source: <https://vanderlande.wd3.myworkdayjobs.com/careers>. The Workday API exposes an explicit Netherlands facet, a first-page total, paginated stable paths, and complete detail records.
