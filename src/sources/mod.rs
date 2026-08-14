@@ -17,6 +17,7 @@ pub mod json_ld;
 pub mod lever;
 pub mod ns;
 pub mod personio;
+pub mod postnl;
 pub mod rabobank;
 pub mod recruitee;
 pub mod workable;
