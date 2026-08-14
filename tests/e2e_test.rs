@@ -154,6 +154,7 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
             "Bitvavo",
             "Exact",
             "AFAS Software",
+            "NS",
         ]
     );
 

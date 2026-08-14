@@ -192,6 +192,9 @@ pub enum SourceConfig {
     Afas {
         listing_url: String,
     },
+    Ns {
+        listing_url: String,
+    },
     AlbertHeijn {
         base_url: String,
     },
@@ -232,6 +235,7 @@ impl SourceConfig {
             Self::Eneco { .. } => "Eneco HTML",
             Self::Exact { .. } => "Exact HTML + JSON-LD",
             Self::Afas { .. } => "AFAS HTML + JSON-LD",
+            Self::Ns { .. } => "NS paged HTML + JSON-LD",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
             Self::Ing { .. } => "ING HTML",
             Self::Getnoticed { .. } => "Getnoticed",
@@ -265,6 +269,7 @@ impl SourceConfig {
             | Self::Eneco { listing_url }
             | Self::Exact { listing_url }
             | Self::Afas { listing_url }
+            | Self::Ns { listing_url }
             | Self::Ing { listing_url }
             | Self::PagedHtml { listing_url, .. } => listing_url,
             Self::Unsupported { reason } => reason,
@@ -374,6 +379,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("listing_url"),
                     "must be the official AFAS vacancy URL",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Ns { listing_url } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            if listing_url != "https://www.werkenbijns.nl/vacatures" {
+                return Err(ConfigError::invalid(
+                    path("listing_url"),
+                    "must be the official NS vacancy URL",
                 ));
             }
             Ok(())
