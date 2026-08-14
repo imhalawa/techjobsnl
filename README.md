@@ -149,3 +149,10 @@ TechJobsNL is an independent, open-source learning project. It is not affiliated
 Copyright © 2026 Mohamed Halawa.
 
 The source code is licensed under the [GNU Affero General Public License v3.0 only](LICENSE). The project does not claim ownership of third-party company names, trademarks, logos, or job-posting content. The software is provided without warranty under the license terms.
+
+## Support
+
+If TechJobsNL is useful to you, you can support its continued open-source development:
+
+- [Buy me a coffee](https://buymeacoffee.com/imhalawa)
+- [Sponsor on GitHub](https://github.com/sponsors/imhalawa)
