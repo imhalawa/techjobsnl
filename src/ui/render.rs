@@ -466,7 +466,11 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
     let rows = report.stacks.iter().map(|stack| {
         Row::new(vec![
             Cell::from(if stack.saved { "★" } else { " " }),
-            Cell::from(stack.path_label()),
+            Cell::from(format!(
+                "{} · {}",
+                stack.profile.label(),
+                stack.path_label()
+            )),
             Cell::from(format_demand(&stack.metric)),
             Cell::from(stack.company_count.to_string()),
             Cell::from(format!(
@@ -480,7 +484,7 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
         ])
     });
     let title = format!(
-        "Skill graph · {} paths · minimum {} jobs · strong links",
+        "Technology stacks · {} paths · minimum {} jobs · 3+ architectural roles",
         report.stacks.len(),
         app.config().analytics.minimum_cooccurrence
     );
@@ -538,13 +542,15 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
         ));
     }
     let association = format!(
-        "{}.{:02}× association · {} jobs · {} firms · {}",
+        "{} stack · {}.{:02}× association · {} jobs · {} firms · {}",
+        stack.profile.label(),
         stack.association_bps / 100,
         stack.association_bps % 100,
         stack.metric.current_count,
         stack.company_count,
         stack.metric.momentum.as_str()
     );
+    let graph_title = format!("Selected {} stack", stack.profile.label().to_lowercase());
     frame.render_widget(
         Paragraph::new(Text::from(vec![
             Line::from(path),
@@ -552,7 +558,7 @@ fn render_stacks_trends(frame: &mut Frame, app: &App, area: Rect) {
             Line::from(association),
         ]))
         .block(panel(
-            "Selected stack graph",
+            &graph_title,
             app.theme().unfocused_border,
             app.theme().background,
             Borders::ALL,

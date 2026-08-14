@@ -4,7 +4,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    analytics::{JobFacts, Seniority, SkillKind, WorkMode},
+    analytics::{JobFacts, Seniority, SkillKind, StackRole, WorkMode},
     domain::{JobKey, JobRecord},
     storage::{ScanOutcome, ScanReadModel},
 };
@@ -135,10 +135,38 @@ impl StackKey {
 pub struct StackTrend {
     pub key: StackKey,
     pub path: Vec<String>,
+    pub profile: StackProfile,
     pub metric: MetricRow,
     pub company_count: usize,
     pub association_bps: usize,
     pub saved: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StackProfile {
+    Application,
+    Frontend,
+    Data,
+    Ai,
+    Platform,
+    Mobile,
+    Testing,
+    Security,
+}
+
+impl StackProfile {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Application => "Application",
+            Self::Frontend => "Frontend",
+            Self::Data => "Data",
+            Self::Ai => "AI",
+            Self::Platform => "Platform",
+            Self::Mobile => "Mobile",
+            Self::Testing => "Testing",
+            Self::Security => "Security",
+        }
+    }
 }
 
 impl StackTrend {
@@ -595,15 +623,20 @@ fn stack_trends(
         .filter(|(_, candidate)| candidate.support >= minimum_support)
         .filter_map(|(key, candidate)| {
             graph
-                .strongest_path(key, minimum_support)
-                .map(|(path, association_bps)| (key.clone(), path, association_bps, candidate))
+                .semantic_path(key)
+                .map(|(path, association_bps, profile)| {
+                    (key.clone(), path, association_bps, profile, candidate)
+                })
+        })
+        .filter(|(_, _, _, _, candidate)| {
+            graph.companies.len() < 2 || candidate.companies.len() >= 2
         })
         .collect::<Vec<_>>();
     let supported_keys = supported
         .iter()
-        .map(|(key, _, _, candidate)| (key.clone(), candidate.support))
+        .map(|(key, _, _, _, candidate)| (key.clone(), candidate.support))
         .collect::<Vec<_>>();
-    supported.retain(|(key, _, _, candidate)| {
+    supported.retain(|(key, _, _, _, candidate)| {
         !supported_keys.iter().any(|(larger, larger_support)| {
             larger.0.len() > key.0.len()
                 && *larger_support == candidate.support
@@ -612,7 +645,7 @@ fn stack_trends(
     });
     let mut rows = supported
         .into_iter()
-        .map(|(key, path, association_bps, candidate)| {
+        .map(|(key, path, association_bps, profile, candidate)| {
             let path_label = path.join(" — ");
             StackTrend {
                 metric: metric(
@@ -626,6 +659,7 @@ fn stack_trends(
                 ),
                 company_count: candidate.companies.len(),
                 association_bps,
+                profile,
                 saved: library.stacks.contains(&key.0),
                 key,
                 path,
@@ -641,10 +675,27 @@ fn stack_trends(
             .then_with(|| right.association_bps.cmp(&left.association_bps))
             .then_with(|| left.key.cmp(&right.key))
     });
-    rows
+    let mut distinct = Vec::<StackTrend>::new();
+    for row in rows {
+        if distinct
+            .iter()
+            .all(|existing| !substantially_overlaps(&existing.key, &row.key))
+        {
+            distinct.push(row);
+        }
+    }
+    distinct
 }
 
-const MIN_STACK_ASSOCIATION_BPS: usize = 150;
+fn substantially_overlaps(left: &StackKey, right: &StackKey) -> bool {
+    let shared = left
+        .0
+        .iter()
+        .filter(|skill| right.0.contains(skill))
+        .count();
+    let union = left.0.len() + right.0.len() - shared;
+    shared * 4 >= union * 3
+}
 
 #[derive(Default)]
 struct StackCandidate {
@@ -655,7 +706,9 @@ struct StackCandidate {
 #[derive(Default)]
 struct StackGraph {
     job_count: usize,
+    companies: HashSet<String>,
     nodes: HashMap<String, usize>,
+    roles: HashMap<String, StackRole>,
     edges: BTreeMap<(String, String), usize>,
     candidates: BTreeMap<StackKey, StackCandidate>,
 }
@@ -667,12 +720,14 @@ impl StackGraph {
             ..Self::default()
         };
         for job in jobs {
+            graph.companies.insert(job.key.company_id.clone());
             let Some(job_facts) = facts.get(&job.key) else {
                 continue;
             };
             for (name, evidence) in &job_facts.skills {
-                if evidence.kind == SkillKind::Hard {
+                if let Some(role) = evidence.stack_role {
                     *graph.nodes.entry(name.clone()).or_default() += 1;
+                    graph.roles.insert(name.clone(), role);
                 }
             }
         }
@@ -680,10 +735,23 @@ impl StackGraph {
             let Some(job_facts) = facts.get(&job.key) else {
                 continue;
             };
-            let mut skills = job_facts
+            let stackable = job_facts
                 .skills
                 .iter()
-                .filter(|(_, evidence)| evidence.kind == SkillKind::Hard)
+                .filter(|(_, evidence)| evidence.stack_role.is_some());
+            let mut families = HashMap::<String, (&String, u8)>::new();
+            for (name, evidence) in stackable {
+                let family = evidence.stack_family.as_ref().unwrap_or(name).clone();
+                let replace = families.get(&family).is_none_or(|(current, priority)| {
+                    evidence.stack_priority > *priority
+                        || evidence.stack_priority == *priority && name < *current
+                });
+                if replace {
+                    families.insert(family, (name, evidence.stack_priority));
+                }
+            }
+            let mut skills = families
+                .into_values()
                 .map(|(name, _)| name.clone())
                 .collect::<Vec<_>>();
             skills.sort_by(|left, right| {
@@ -720,53 +788,239 @@ impl StackGraph {
         graph
     }
 
-    fn strongest_path(
-        &self,
-        key: &StackKey,
-        minimum_support: usize,
-    ) -> Option<(Vec<String>, usize)> {
-        let mut best: Option<(usize, usize, Vec<String>)> = None;
-        permutations(&key.0, &mut Vec::new(), &mut |path| {
-            let reversed = path.iter().rev().cloned().collect::<Vec<_>>();
-            if path > reversed.as_slice() {
-                return;
-            }
-            let strengths = path
-                .windows(2)
-                .filter_map(|pair| self.edge_association_bps(&pair[0], &pair[1], minimum_support))
-                .collect::<Vec<_>>();
-            if strengths.len() + 1 != path.len() {
-                return;
-            }
-            let minimum = strengths.iter().copied().min().unwrap_or_default();
-            let total = strengths.iter().sum();
-            let replace = best
-                .as_ref()
-                .is_none_or(|(best_minimum, best_total, best_path)| {
-                    minimum > *best_minimum
-                        || minimum == *best_minimum && total > *best_total
-                        || minimum == *best_minimum && total == *best_total && path < best_path
-                });
-            if replace {
-                best = Some((minimum, total, path.to_vec()));
-            }
-        });
-        best.map(|(minimum, _, path)| (path, minimum))
-    }
-
-    fn edge_association_bps(
-        &self,
-        left: &str,
-        right: &str,
-        minimum_support: usize,
-    ) -> Option<usize> {
-        let support = self.edges.get(&edge_key(left, right)).copied()?;
-        if support < minimum_support {
+    fn semantic_path(&self, key: &StackKey) -> Option<(Vec<String>, usize, StackProfile)> {
+        if key
+            .0
+            .iter()
+            .filter(|skill| {
+                matches!(
+                    self.roles.get(*skill),
+                    Some(StackRole::Language | StackRole::WebLanguage)
+                )
+            })
+            .count()
+            > 1
+        {
             return None;
         }
+        let distinct_roles = key
+            .0
+            .iter()
+            .filter_map(|skill| self.roles.get(skill))
+            .copied()
+            .collect::<HashSet<_>>();
+        let profile = stack_profile(&distinct_roles)?;
+        let mut path = key.0.clone();
+        path.sort_by(|left, right| {
+            self.roles
+                .get(left)
+                .cmp(&self.roles.get(right))
+                .then_with(|| left.cmp(right))
+        });
+        let association = path
+            .windows(2)
+            .filter_map(|pair| self.edge_association_bps(&pair[0], &pair[1]))
+            .min()
+            .unwrap_or_default();
+        Some((path, association, profile))
+    }
+
+    fn edge_association_bps(&self, left: &str, right: &str) -> Option<usize> {
+        let support = self.edges.get(&edge_key(left, right)).copied()?;
         let denominator = self.nodes.get(left)? * self.nodes.get(right)?;
-        let association = support * self.job_count * 100 / denominator;
-        (association >= MIN_STACK_ASSOCIATION_BPS).then_some(association)
+        Some(support * self.job_count * 100 / denominator)
+    }
+}
+
+fn stack_profile(roles: &HashSet<StackRole>) -> Option<StackProfile> {
+    use StackRole as R;
+
+    if roles.len() < 3 {
+        return None;
+    }
+    let has = |candidates: &[R]| candidates.iter().any(|role| roles.contains(role));
+    let only = |candidates: &[R]| roles.iter().all(|role| candidates.contains(role));
+    let language = has(&[R::Language, R::Runtime]);
+    let application_language = has(&[R::Language, R::WebLanguage, R::Runtime]);
+    let application = application_language
+        && has(&[R::ApplicationFramework])
+        && has(&[
+            R::ApiProtocol,
+            R::Database,
+            R::Messaging,
+            R::Cloud,
+            R::Container,
+        ])
+        && only(&[
+            R::Language,
+            R::WebLanguage,
+            R::Runtime,
+            R::ApplicationFramework,
+            R::ApiProtocol,
+            R::Database,
+            R::Messaging,
+            R::Cloud,
+            R::Container,
+            R::BuildTool,
+            R::TestingTool,
+        ]);
+    let frontend = has(&[R::Language, R::WebLanguage, R::Markup])
+        && has(&[R::UiFramework, R::ApplicationFramework])
+        && has(&[
+            R::Markup,
+            R::Styling,
+            R::StateManagement,
+            R::BuildTool,
+            R::TestingTool,
+        ])
+        && only(&[
+            R::Language,
+            R::WebLanguage,
+            R::Runtime,
+            R::Markup,
+            R::Styling,
+            R::UiFramework,
+            R::StateManagement,
+            R::ApplicationFramework,
+            R::ApiProtocol,
+            R::BuildTool,
+            R::TestingTool,
+        ]);
+    let data = language
+        && has(&[R::DataProcessing, R::DataPlatform])
+        && has(&[R::Database, R::Orchestration, R::Messaging, R::Cloud])
+        && only(&[
+            R::Language,
+            R::Runtime,
+            R::Database,
+            R::DataLibrary,
+            R::DataProcessing,
+            R::DataPlatform,
+            R::Orchestration,
+            R::Messaging,
+            R::Cloud,
+            R::Container,
+            R::Provisioning,
+        ]);
+    let ai = language
+        && has(&[R::AiFramework, R::AiTooling])
+        && has(&[R::DataLibrary, R::DataPlatform, R::Cloud, R::Container])
+        && only(&[
+            R::Language,
+            R::Runtime,
+            R::Database,
+            R::DataLibrary,
+            R::DataProcessing,
+            R::DataPlatform,
+            R::Orchestration,
+            R::Messaging,
+            R::AiFramework,
+            R::AiTooling,
+            R::Cloud,
+            R::Container,
+        ]);
+    let platform = has(&[R::Provisioning, R::Delivery])
+        && !has(&[R::Language, R::WebLanguage, R::Runtime])
+        && has(&[R::Cloud, R::OperatingSystem, R::Container])
+        && has(&[
+            R::Container,
+            R::ContainerTooling,
+            R::Delivery,
+            R::Networking,
+            R::ObservabilityTool,
+        ])
+        && only(&[
+            R::Cloud,
+            R::OperatingSystem,
+            R::Container,
+            R::ContainerTooling,
+            R::Provisioning,
+            R::SourceControl,
+            R::BuildTool,
+            R::Delivery,
+            R::Networking,
+            R::ObservabilityTool,
+            R::SecurityTooling,
+        ]);
+    let mobile = application_language
+        && has(&[R::MobilePlatform, R::MobileFramework])
+        && has(&[
+            R::ApplicationFramework,
+            R::BuildTool,
+            R::Cloud,
+            R::TestingTool,
+        ])
+        && only(&[
+            R::Language,
+            R::WebLanguage,
+            R::Runtime,
+            R::MobilePlatform,
+            R::MobileFramework,
+            R::ApplicationFramework,
+            R::ApiProtocol,
+            R::Database,
+            R::Cloud,
+            R::BuildTool,
+            R::TestingTool,
+        ]);
+    let testing = application_language
+        && has(&[R::ApplicationFramework, R::UiFramework])
+        && has(&[R::TestingTool])
+        && only(&[
+            R::Language,
+            R::WebLanguage,
+            R::Runtime,
+            R::UiFramework,
+            R::ApplicationFramework,
+            R::ApiProtocol,
+            R::Database,
+            R::BuildTool,
+            R::Delivery,
+            R::TestingTool,
+        ]);
+    let security = has(&[R::SecurityProtocol, R::SecurityTooling])
+        && has(&[
+            R::Language,
+            R::WebLanguage,
+            R::ApplicationFramework,
+            R::ApiProtocol,
+        ])
+        && has(&[R::Cloud, R::Database, R::Delivery, R::TestingTool])
+        && only(&[
+            R::Language,
+            R::WebLanguage,
+            R::Runtime,
+            R::ApplicationFramework,
+            R::ApiProtocol,
+            R::Database,
+            R::Cloud,
+            R::OperatingSystem,
+            R::Container,
+            R::Delivery,
+            R::Networking,
+            R::TestingTool,
+            R::SecurityProtocol,
+            R::SecurityTooling,
+        ]);
+
+    if security {
+        Some(StackProfile::Security)
+    } else if ai {
+        Some(StackProfile::Ai)
+    } else if frontend {
+        Some(StackProfile::Frontend)
+    } else if mobile {
+        Some(StackProfile::Mobile)
+    } else if data {
+        Some(StackProfile::Data)
+    } else if platform {
+        Some(StackProfile::Platform)
+    } else if testing {
+        Some(StackProfile::Testing)
+    } else if application {
+        Some(StackProfile::Application)
+    } else {
+        None
     }
 }
 
@@ -828,20 +1082,6 @@ fn combinations(
         chosen.push(items[index].clone());
         combinations(items, size, index + 1, chosen, visit);
         chosen.pop();
-    }
-}
-
-fn permutations(items: &[String], chosen: &mut Vec<String>, visit: &mut impl FnMut(&[String])) {
-    if chosen.len() == items.len() {
-        visit(chosen);
-        return;
-    }
-    for item in items {
-        if !chosen.contains(item) {
-            chosen.push(item.clone());
-            permutations(items, chosen, visit);
-            chosen.pop();
-        }
     }
 }
 
@@ -1023,7 +1263,7 @@ mod tests {
                     index,
                     now - Duration::days(10),
                     if index < 8 {
-                        "Python AWS Docker communication skills"
+                        "Python Django PostgreSQL communication skills"
                     } else {
                         "Java GCP"
                     },
@@ -1034,7 +1274,11 @@ mod tests {
             job(
                 index,
                 now - Duration::days(40),
-                if index < 15 { "Python AWS" } else { "Java GCP" },
+                if index < 15 {
+                    "Python Django"
+                } else {
+                    "Java GCP"
+                },
             )
         }));
         let facts = jobs
@@ -1074,7 +1318,7 @@ mod tests {
         assert_eq!(python.metric.previous_count, 3);
         assert_eq!(python.metric.momentum, Momentum::Rising);
         assert!(report.stacks.iter().any(|stack| {
-            stack.key.0 == ["AWS", "Docker", "Python"]
+            stack.key.0 == ["Django", "PostgreSQL", "Python"]
                 && stack.metric.current_count == 8
                 && stack.path.len() == 3
                 && stack.company_count == 1
@@ -1117,5 +1361,40 @@ mod tests {
         );
 
         assert!(report.stacks.is_empty());
+    }
+
+    #[test]
+    fn mixed_architectures_do_not_form_stack_paths() {
+        let now = Utc.with_ymd_and_hms(2026, 8, 14, 12, 0, 0).unwrap();
+        let jobs = (0..3)
+            .map(|index| {
+                job(
+                    index,
+                    now - Duration::days(1),
+                    "Python React Databricks AWS",
+                )
+            })
+            .collect::<Vec<_>>();
+        let facts = jobs
+            .iter()
+            .map(|job| (job.key.clone(), analytics::extract(job)))
+            .collect::<HashMap<_, _>>();
+
+        let report = AnalyticsReport::build(
+            &jobs,
+            &facts,
+            &[],
+            &AnalyticsFilters::default(),
+            &LibraryState::default(),
+            now,
+            3,
+        );
+
+        assert!(
+            report
+                .stacks
+                .iter()
+                .all(|stack| !stack.path.iter().any(|skill| skill == "React"))
+        );
     }
 }

@@ -984,6 +984,8 @@ fn emerging_skill_suggestions_are_reviewed_before_they_enter_analytics() {
         aliases: vec!["NM runtime".into()],
         evidence: vec!["Build with NewMesh and NM runtime".into()],
         status: SuggestionStatus::Pending,
+        stack_role: None,
+        stack_family: None,
     }]);
     open_view(&mut app, 7);
     app.handle_key(key('2'));
