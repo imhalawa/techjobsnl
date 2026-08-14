@@ -42,6 +42,26 @@ TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" \
     sh scripts/install.sh >/dev/null
 
 test "$("$temporary_dir/bin/techjobsnl")" = installed
-test "$(grep -c 'target:' .github/workflows/release.yml)" -eq 6
-grep -q 'aarch64-pc-windows-msvc' .github/workflows/release.yml
+release_workflow=.github/workflows/release.yml
+ci_workflow=.github/workflows/ci.yml
+
+test "$(grep -c 'target:' "$release_workflow")" -eq 6
+for target in \
+    x86_64-unknown-linux-gnu \
+    aarch64-unknown-linux-gnu \
+    x86_64-apple-darwin \
+    aarch64-apple-darwin \
+    x86_64-pc-windows-msvc \
+    aarch64-pc-windows-msvc
+do
+    grep -q "$target" "$release_workflow"
+done
+
+for runner in ubuntu-22.04 macos-15-intel windows-2022
+do
+    grep -q "$runner" "$ci_workflow"
+done
+grep -q 'pull_request:' "$ci_workflow"
+grep -q 'cargo test --locked --all-targets' "$ci_workflow"
+grep -q 'cargo build --locked --release' "$ci_workflow"
 grep -q 'Download checksum verification failed' scripts/install.ps1

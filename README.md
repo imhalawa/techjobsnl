@@ -1,5 +1,8 @@
 # TechJobsNL
 
+[![CI](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml)
+[![Release](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml)
+
 **Find Netherlands tech jobs by the skills they mention—not only by job title.**
 
 TechJobsNL is a local terminal job finder built with Rust and Ratatui. It collects vacancies from verified official company career sources, keeps their lifecycle in SQLite, and connects every analytics result back to the job postings behind it.
@@ -128,6 +131,8 @@ A company brand does not prove the legal employer or current visa-sponsor status
 make check      # formatting, Clippy, release checks, and offline tests
 make test-live  # ignored tests that contact external career sites
 ```
+
+GitHub Actions runs formatting, Clippy, offline tests, and a release build on Linux, macOS, and Windows for every pull request and push to `main`. Version tags matching `v*` run the six-target release workflow and publish checksum-verified archives for all three operating systems.
 
 Live tests are separate because external availability, counts, rate limits, and page contracts can change without a code change. Read [Contributing](CONTRIBUTING.md) before changing a source adapter.
 

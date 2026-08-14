@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            runner: ubuntu-22.04
+          - name: macOS
+            runner: macos-15-intel
+          - name: Windows
+            runner: windows-2022
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Rust checks
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Run Clippy
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - name: Run offline tests
+        run: cargo test --locked --all-targets
+      - name: Build release binary
+        run: cargo build --locked --release
+      - name: Check repository contracts
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          sh tests/makefile_test.sh
+          sh tests/release_test.sh
+      - name: Check Windows release scripts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          bash tests/release_test.sh
+          $null = [scriptblock]::Create((Get-Content scripts/install.ps1 -Raw))

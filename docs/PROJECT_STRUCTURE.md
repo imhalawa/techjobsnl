@@ -25,7 +25,7 @@ techjobsnl/
 ├── CANDIDATE_SOURCE_COMPATIBILITY.md # Historical source research snapshot
 ├── CONTRIBUTING.md          # Development and pull request workflow
 ├── scripts/                 # Install and release-version scripts
-├── .github/workflows/       # Release validation, builds, and publishing
+├── .github/workflows/       # Three-OS CI and six-target release publishing
 ├── config.toml              # Shipped defaults and company catalog
 ├── Makefile                 # Common development commands
 └── Cargo.toml               # Package metadata and dependencies

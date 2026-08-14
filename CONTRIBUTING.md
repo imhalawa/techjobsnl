@@ -41,6 +41,8 @@ make check
 
 `make check` verifies formatting, runs Clippy with warnings denied, checks release and Makefile behavior, and runs all deterministic offline tests.
 
+Pull requests and pushes to `main` repeat the Rust checks and release build on Linux, macOS, and Windows. A change should not merge until all three CI jobs pass.
+
 During development, run a focused test when it is faster:
 
 ```bash
