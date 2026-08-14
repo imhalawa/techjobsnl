@@ -868,7 +868,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 21);
+        assert_eq!(migrated.companies.len(), 22);
         assert!(
             migrated
                 .companies
@@ -1172,6 +1172,7 @@ mod tests {
                 "ebay",
                 "airwallex",
                 "adyen",
+                "backbase",
                 "funda",
                 "bol",
                 "rabobank",
