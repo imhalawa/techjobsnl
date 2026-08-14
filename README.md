@@ -3,6 +3,8 @@
 [![CI](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml)
 [![Release](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml)
 
+![TechJobsNL hero](docs/images/hero.png)
+
 **Find Netherlands tech jobs by the skills they mention—not only by job title.**
 
 TechJobsNL is a local terminal job finder built with Rust and Ratatui. It collects vacancies from verified official company career sources, keeps their lifecycle in SQLite, and connects every analytics result back to the job postings behind it.
