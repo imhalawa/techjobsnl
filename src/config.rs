@@ -162,6 +162,10 @@ pub enum SourceConfig {
     Yuki {
         feed_url: String,
     },
+    Teamtailor {
+        feed_url: String,
+        employer: String,
+    },
     Bol {
         base_url: String,
     },
@@ -207,6 +211,7 @@ impl SourceConfig {
             Self::Lever { .. } => "Lever",
             Self::Workable { .. } => "Workable",
             Self::Yuki { .. } => "Teamtailor JSON Feed",
+            Self::Teamtailor { .. } => "Teamtailor JSON Feed",
             Self::Bol { .. } => "bol.com",
             Self::Coolblue { .. } => "Coolblue HTML",
             Self::Rabobank { .. } => "Rabobank API",
@@ -234,6 +239,10 @@ impl SourceConfig {
             Self::Ebay { listing_url }
             | Self::Yuki {
                 feed_url: listing_url,
+            }
+            | Self::Teamtailor {
+                feed_url: listing_url,
+                ..
             }
             | Self::Coolblue { listing_url }
             | Self::Eneco { listing_url }
@@ -297,6 +306,10 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 ));
             }
             Ok(())
+        }
+        SourceConfig::Teamtailor { feed_url, employer } => {
+            validate_https_url(feed_url, path("feed_url"))?;
+            validate_non_empty(employer, path("employer"))
         }
         SourceConfig::Coolblue { listing_url } => {
             validate_https_url(listing_url, path("listing_url"))?;

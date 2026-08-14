@@ -559,6 +559,10 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     feed_url,
                     client.clone(),
                 ))),
+                SourceConfig::Teamtailor { feed_url, employer } => Ok(Arc::new(
+                    yuki::YukiSource::new(&company.id, feed_url, client.clone())
+                        .with_employer(employer),
+                )),
                 SourceConfig::Bol { base_url } => Ok(Arc::new(bol::BolSource::new(
                     &company.id,
                     base_url,
@@ -956,7 +960,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 43);
+        assert_eq!(migrated.companies.len(), 44);
         assert!(
             migrated
                 .companies
@@ -1296,7 +1300,8 @@ mod tests {
                 "silverflow",
                 "ohpen",
                 "finom",
-                "keylane"
+                "keylane",
+                "info-support"
             ]
         );
 

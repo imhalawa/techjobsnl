@@ -481,3 +481,14 @@ enabled = true
 strategy = "workable"
 account = "keylane"
 country_filter = "NL"
+
+[[companies]]
+id = "info-support"
+name = "Info Support"
+industry = "IT services, Software consulting, Data and AI"
+scale = "500–999 · Large company"
+enabled = true
+[companies.source]
+strategy = "teamtailor"
+feed_url = "https://werkenbij.infosupport.com/en/jobs.json"
+employer = "Info Support"

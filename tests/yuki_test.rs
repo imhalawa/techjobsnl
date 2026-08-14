@@ -4,7 +4,7 @@ use job_watch::{
     domain::{SourceErrorKind, SourceScan},
     sources::{
         JobSource,
-        yuki::{YukiSource, parse_yuki_feed},
+        yuki::{YukiSource, parse_teamtailor_feed, parse_yuki_feed},
     },
 };
 
@@ -32,6 +32,27 @@ fn yuki_parses_complete_official_json_feed() {
     assert_eq!(
         jobs[0].published_at.unwrap().to_rfc3339(),
         "2026-08-04T08:20:25+00:00"
+    );
+}
+
+#[test]
+fn generic_teamtailor_feed_accepts_its_configured_identity() {
+    let raw = fixture()
+        .replace("The Yuki Company", "Info Support")
+        .replace("jobs.yukisoftware.com", "werkenbij.infosupport.com/en");
+    let jobs = parse_teamtailor_feed(
+        "info-support",
+        &raw,
+        "https://werkenbij.infosupport.com/en/jobs.json",
+        "Info Support",
+    )
+    .unwrap();
+
+    assert_eq!(jobs.len(), 2);
+    assert!(
+        jobs[0]
+            .job_url
+            .starts_with("https://werkenbij.infosupport.com/en/jobs/")
     );
 }
 
@@ -84,6 +105,39 @@ async fn yuki_live_returns_complete_unique_jobs() {
         observations.len()
     );
     println!("Yuki: {} jobs", observations.len());
+}
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn info_support_live_returns_complete_unique_netherlands_jobs() {
+    let source = YukiSource::new(
+        "info-support",
+        "https://werkenbij.infosupport.com/en/jobs.json",
+        reqwest::Client::builder()
+            .user_agent("job-watch/0.1 (+Teamtailor live test)")
+            .timeout(Duration::from_secs(30))
+            .build()
+            .unwrap(),
+    )
+    .with_employer("Info Support");
+    let SourceScan::Complete { observations } = source.scan().await.unwrap() else {
+        panic!("Info Support scan must be complete");
+    };
+    assert!(!observations.is_empty());
+    assert!(
+        observations
+            .iter()
+            .all(|job| job.countries.contains(&"NL".into()))
+    );
+    assert_eq!(
+        observations
+            .iter()
+            .map(|job| &job.source_id)
+            .collect::<HashSet<_>>()
+            .len(),
+        observations.len()
+    );
+    println!("Info Support: {} NL jobs", observations.len());
 }
 
 fn fixture() -> String {

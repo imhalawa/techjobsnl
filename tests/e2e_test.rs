@@ -148,6 +148,7 @@ async fn configured_offline_scan_lifecycle_reaches_the_default_ui() {
             "Ohpen",
             "Finom",
             "Keylane",
+            "Info Support",
         ]
     );
 

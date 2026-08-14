@@ -10,11 +10,12 @@ use crate::domain::{ObservedJob, SourceScan};
 use super::{JobSource, SourceError, http::send_text, json_ld::html_markdown};
 
 const FEED_URL: &str = "https://jobs.yukisoftware.com/jobs.json";
-const OFFICIAL_HOST: &str = "jobs.yukisoftware.com";
+const YUKI_EMPLOYER: &str = "The Yuki Company";
 
 pub struct YukiSource {
     company_id: String,
     feed_url: String,
+    expected_employer: String,
     client: Client,
 }
 
@@ -23,8 +24,14 @@ impl YukiSource {
         Self {
             company_id: company_id.into(),
             feed_url: feed_url.into(),
+            expected_employer: YUKI_EMPLOYER.into(),
             client,
         }
+    }
+
+    pub fn with_employer(mut self, employer: impl Into<String>) -> Self {
+        self.expected_employer = employer.into();
+        self
     }
 }
 
@@ -35,23 +42,37 @@ impl JobSource for YukiSource {
     }
 
     async fn scan(&self) -> Result<SourceScan, SourceError> {
-        if self.feed_url != FEED_URL {
-            return Err(schema(&self.company_id, "unexpected feed URL"));
-        }
         let raw = send_text(self.client.get(&self.feed_url), "Yuki").await?;
         Ok(SourceScan::Complete {
-            observations: parse_yuki_feed(&self.company_id, &raw)?,
+            observations: parse_teamtailor_feed(
+                &self.company_id,
+                &raw,
+                &self.feed_url,
+                &self.expected_employer,
+            )?,
         })
     }
 }
 
 pub fn parse_yuki_feed(company_id: &str, raw: &str) -> Result<Vec<ObservedJob>, SourceError> {
+    parse_teamtailor_feed(company_id, raw, FEED_URL, YUKI_EMPLOYER)
+}
+
+pub fn parse_teamtailor_feed(
+    company_id: &str,
+    raw: &str,
+    expected_feed_url: &str,
+    expected_employer: &str,
+) -> Result<Vec<ObservedJob>, SourceError> {
     let feed: Feed = serde_json::from_str(raw)
         .map_err(|error| schema(company_id, format!("invalid JSON feed: {error}")))?;
+    let expected_home_url = expected_feed_url
+        .strip_suffix(".json")
+        .ok_or_else(|| schema(company_id, "configured feed URL must end with .json"))?;
     if feed.version != "https://jsonfeed.org/version/1.1"
-        || feed.title != "The Yuki Company"
-        || feed.home_page_url != "https://jobs.yukisoftware.com/jobs"
-        || feed.feed_url != FEED_URL
+        || feed.title != expected_employer
+        || feed.home_page_url != expected_home_url
+        || feed.feed_url != expected_feed_url
     {
         return Err(schema(company_id, "unexpected feed identity"));
     }
@@ -62,7 +83,13 @@ pub fn parse_yuki_feed(company_id: &str, raw: &str) -> Result<Vec<ObservedJob>, 
         .map(|raw_item| {
             let item: Item = serde_json::from_value(raw_item.clone())
                 .map_err(|error| schema(company_id, format!("invalid feed item: {error}")))?;
-            let job = observed_job(company_id, item, raw_item)?;
+            let job = observed_job(
+                company_id,
+                item,
+                raw_item,
+                expected_feed_url,
+                expected_employer,
+            )?;
             if !ids.insert(job.source_id.clone()) {
                 return Err(schema(
                     company_id,
@@ -78,12 +105,14 @@ fn observed_job(
     company_id: &str,
     item: Item,
     raw_payload: Value,
+    expected_feed_url: &str,
+    expected_employer: &str,
 ) -> Result<ObservedJob, SourceError> {
     if item.title.trim().is_empty()
         || item.title != item.posting.title
         || item.content_html != item.posting.description
         || item.date_published != item.posting.date_posted
-        || item.posting.hiring_organization.name != "The Yuki Company"
+        || item.posting.hiring_organization.name != expected_employer
     {
         return Err(schema(company_id, "feed item and JobPosting disagree"));
     }
@@ -92,7 +121,7 @@ fn observed_job(
         Value::String(value) if !value.trim().is_empty() => value,
         _ => return Err(schema(company_id, "job has an invalid identifier")),
     };
-    let job_url = official_job_url(&item.url, &source_id, company_id)?;
+    let job_url = official_job_url(&item.url, &source_id, expected_feed_url, company_id)?;
     if item.posting.job_location.is_empty() {
         return Err(schema(company_id, "job has no locations"));
     }
@@ -139,12 +168,23 @@ fn observed_job(
     })
 }
 
-fn official_job_url(raw: &str, id: &str, company_id: &str) -> Result<Url, SourceError> {
+fn official_job_url(
+    raw: &str,
+    id: &str,
+    expected_feed_url: &str,
+    company_id: &str,
+) -> Result<Url, SourceError> {
     let url =
         Url::parse(raw).map_err(|error| schema(company_id, format!("invalid job URL: {error}")))?;
-    let expected_prefix = format!("/jobs/{id}-");
+    let feed_url = Url::parse(expected_feed_url)
+        .map_err(|error| schema(company_id, format!("invalid configured feed URL: {error}")))?;
+    let jobs_path = feed_url
+        .path()
+        .strip_suffix(".json")
+        .ok_or_else(|| schema(company_id, "configured feed URL must end with .json"))?;
+    let expected_prefix = format!("{jobs_path}/{id}-");
     if url.scheme() != "https"
-        || url.host_str() != Some(OFFICIAL_HOST)
+        || url.host_str() != feed_url.host_str()
         || !url.path().starts_with(&expected_prefix)
         || url.path().len() == expected_prefix.len()
         || url.query().is_some()
