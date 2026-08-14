@@ -506,3 +506,17 @@ tenant = "wk"
 site = "External"
 country = "Netherlands"
 country_code = "NL"
+
+[[companies]]
+id = "vanderlande"
+name = "Vanderlande"
+industry = "Logistics automation, Warehouse automation, Airport systems, Industrial technology"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "workday"
+base_url = "https://vanderlande.wd3.myworkdayjobs.com"
+tenant = "vanderlande"
+site = "careers"
+country = "Netherlands"
+country_code = "NL"

@@ -56,3 +56,37 @@ async fn wolters_kluwer_live_returns_complete_unique_netherlands_jobs() {
     );
     println!("Wolters Kluwer: {} NL jobs", jobs.len());
 }
+
+#[tokio::test]
+#[ignore = "live external source"]
+async fn vanderlande_live_returns_complete_unique_netherlands_jobs() {
+    let client = reqwest::Client::builder()
+        .user_agent("job-watch/0.1 (+Workday live test)")
+        .timeout(Duration::from_secs(30))
+        .build()
+        .unwrap();
+    let source = WorkdaySource::new(
+        "vanderlande",
+        "https://vanderlande.wd3.myworkdayjobs.com",
+        "vanderlande",
+        "careers",
+        "Netherlands",
+        "NL",
+        client,
+    );
+    let jobs = match source.scan().await.unwrap() {
+        SourceScan::Complete { observations } => observations,
+        SourceScan::Incomplete { .. } => panic!("Vanderlande scan incomplete"),
+    };
+
+    assert!(!jobs.is_empty());
+    assert!(jobs.iter().all(|job| job.countries == ["NL"]));
+    assert_eq!(
+        jobs.iter()
+            .map(|job| &job.source_id)
+            .collect::<HashSet<_>>()
+            .len(),
+        jobs.len()
+    );
+    println!("Vanderlande: {} NL jobs", jobs.len());
+}
