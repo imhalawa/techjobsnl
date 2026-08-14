@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Backbase
+
+- Official source: <https://boards-api.greenhouse.io/v1/boards/workatbackbase/jobs?content=true>. The Greenhouse payload declares its complete global total; the configured country filter keeps only vacancies with an explicit Netherlands office.
+- Careers ownership: Backbase's official careers site publishes the same vacancies: <https://www.backbase.com/careers/jobs>.
+- Scale: Backbase reports 2,000+ employees globally: <https://www.backbase.com/about>.
+- Hiring entity: the board names the Backbase brand, not the legal employer for each contract. Confirm the employment entity before relying on any sponsor status.
+
 ## Reddit
 
 - Sponsor: the IND public register for work dated 2026-08-03 lists `Reddit Netherlands B.V.` with KvK `83433880`: <https://ind.nl/en/public-register-recognised-sponsors/public-register-work>.

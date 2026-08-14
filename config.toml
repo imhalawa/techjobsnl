@@ -96,6 +96,17 @@ strategy = "greenhouse"
 board = "adyen"
 
 [[companies]]
+id = "backbase"
+name = "Backbase"
+industry = "Fintech, Banking software, B2B SaaS"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "greenhouse"
+board = "workatbackbase"
+country_filter = "NL"
+
+[[companies]]
 id = "funda"
 name = "Funda"
 industry = "Real estate, Marketplace, Advertising"
