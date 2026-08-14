@@ -30,6 +30,7 @@ build:
 
 test:
 	sh tests/makefile_test.sh
+	sh tests/release_test.sh
 	cargo test --all-targets
 
 test-live:
@@ -39,6 +40,7 @@ check:
 	cargo fmt --check
 	cargo clippy --all-targets --all-features -- -D warnings
 	sh tests/makefile_test.sh
+	sh tests/release_test.sh
 	cargo test --all-targets
 
 fmt:

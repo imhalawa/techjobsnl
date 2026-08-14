@@ -2,7 +2,51 @@
 
 Job Watch is a local terminal application for reviewing eligible Netherlands vacancies. It enables Mollie's, Airwallex's, and DataSnipper's Ashby boards, Adyen's, Databricks', and Reddit's Greenhouse boards, Booking.com's Jibe API, Funda's Recruitee board, bol.com's official careers API, ING's and ABN AMRO's official Netherlands careers sources, and eBay's official Netherlands careers pages.
 
-## Run
+## Install
+
+GitHub Releases provide prebuilt binaries for macOS, Linux, and Windows on Intel/AMD and ARM64 computers. The Linux archives require glibc 2.35 or newer; the Windows archives require Windows 10 or newer.
+
+### macOS and Linux
+
+Install the latest release to `~/.local/bin`:
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://raw.githubusercontent.com/imhalawa/job-tracker-nl/main/scripts/install.sh | sh
+```
+
+If `~/.local/bin` is not on `PATH`, the installer prints the command needed to add it. Rerun the installer to upgrade. Set `JOB_WATCH_VERSION=v0.1.0` to install a specific release or `JOB_WATCH_INSTALL_DIR` to choose another directory.
+
+### Windows
+
+Open PowerShell and run:
+
+```powershell
+irm https://raw.githubusercontent.com/imhalawa/job-tracker-nl/main/scripts/install.ps1 | iex
+```
+
+The installer places `job-watch.exe` under `%LOCALAPPDATA%\Programs\job-watch\bin` and adds that directory to the user `PATH`. Open a new terminal after the first installation. Rerun the installer to upgrade; set `$env:JOB_WATCH_VERSION = "v0.1.0"` first to install a specific release.
+
+The initial binaries are not code-signed. macOS Gatekeeper or Windows SmartScreen may therefore ask for confirmation. Every release includes `SHA256SUMS`, and both installers verify the downloaded archive before installing it.
+
+### Manual installation
+
+Download the archive for your operating system and CPU from [GitHub Releases](https://github.com/imhalawa/job-tracker-nl/releases), verify it against `SHA256SUMS`, extract `job-watch` or `job-watch.exe`, and place it in a directory on `PATH`.
+
+Rust users can build and install version `v0.1.0` directly from the tagged source:
+
+```bash
+cargo install --locked --git https://github.com/imhalawa/job-tracker-nl.git --tag v0.1.0 job-watch
+```
+
+### Uninstall
+
+- macOS and Linux: remove `~/.local/bin/job-watch`, or the custom installation path.
+- Windows: remove `%LOCALAPPDATA%\Programs\job-watch` and remove its `bin` directory from the user `PATH`.
+
+Uninstalling the executable does not delete configuration or job history. Their locations are documented below.
+
+## Run from source
 
 From the repository root:
 
@@ -17,6 +61,17 @@ On first start, the application creates `config.toml` from its built-in defaults
 - Windows: `%APPDATA%\job-watch\config.toml`
 
 It loads stored active jobs at startup and does not contact a source until you press `r`.
+
+## Publishing a release
+
+Release tags must exactly match the version in `Cargo.toml`. After updating the version and passing `make check`, create and push an annotated tag:
+
+```bash
+git tag -a v0.1.0 -m "Job Watch v0.1.0"
+git push origin v0.1.0
+```
+
+The release workflow builds six native archives: macOS, Linux, and Windows for x86-64 and ARM64. It publishes them with SHA-256 checksums and generated release notes only after all checks and builds pass. The Windows ARM64 GitHub runner is currently a public preview; the Rust Windows ARM64 target itself is fully supported.
 
 ## Keys
 

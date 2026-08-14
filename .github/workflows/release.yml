@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Rust checks
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
+      - name: Match tag to package version
+        if: github.event_name == 'push'
+        run: sh scripts/check-release-version.sh "$GITHUB_REF_NAME"
+      - name: Run offline checks
+        run: make check
+
+  build-unix:
+    name: Build ${{ matrix.target }}
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-15
+            target: aarch64-apple-darwin
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Rust target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add "${{ matrix.target }}"
+      - name: Build release binary
+        run: cargo build --release --locked --target "${{ matrix.target }}"
+      - name: Package release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="job-watch-${{ matrix.target }}.tar.gz"
+          mkdir -p dist/package
+          cp "target/${{ matrix.target }}/release/job-watch" dist/package/job-watch
+          cp README.md dist/package/README.md
+          chmod 755 dist/package/job-watch
+          tar -czf "dist/$asset" -C dist/package job-watch README.md
+      - name: Upload release archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: dist/job-watch-${{ matrix.target }}.tar.gz
+          archive: false
+          if-no-files-found: error
+
+  build-windows:
+    name: Build ${{ matrix.target }}
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Rust target
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add "${{ matrix.target }}"
+      - name: Build release binary
+        run: cargo build --release --locked --target "${{ matrix.target }}"
+      - name: Package release archive
+        shell: pwsh
+        run: |
+          $asset = "job-watch-${{ matrix.target }}.zip"
+          New-Item -ItemType Directory -Force dist/package | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/job-watch.exe" dist/package/job-watch.exe
+          Copy-Item README.md dist/package/README.md
+          Compress-Archive -Path dist/package/job-watch.exe,dist/package/README.md -DestinationPath "dist/$asset"
+      - name: Upload release archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: dist/job-watch-${{ matrix.target }}.zip
+          archive: false
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs: [build-unix, build-windows]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download release archives
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: job-watch-*
+          path: dist
+          merge-multiple: true
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          test "$(find dist -maxdepth 1 -type f -name 'job-watch-*' | wc -l)" -eq 6
+          cd dist
+          sha256sum job-watch-* > SHA256SUMS
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag \
+            --generate-notes \
+            --title "Job Watch $GITHUB_REF_NAME"
