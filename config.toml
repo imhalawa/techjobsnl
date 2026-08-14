@@ -459,3 +459,14 @@ enabled = true
 [companies.source]
 strategy = "personio"
 base_url = "https://ohpen.jobs.personio.com"
+
+[[companies]]
+id = "finom"
+name = "Finom"
+industry = "Fintech, Business banking, B2B SaaS"
+scale = "500–999 · Large company"
+enabled = true
+[companies.source]
+strategy = "lever"
+api_url = "https://api.eu.lever.co/v0/postings/pnlfin"
+country_filter = "NL"

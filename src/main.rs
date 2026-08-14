@@ -25,7 +25,7 @@ use job_watch::{
     scanner::ScanService,
     sources::{
         JobSource, albert_heijn, ashby, bol, coolblue, ebay, eneco, getnoticed, greenhouse, ing,
-        jibe, personio, rabobank, recruitee, yuki,
+        jibe, lever, personio, rabobank, recruitee, yuki,
     },
     storage::{JobQuery, ScanReadModel, SourceReadModel, Store},
     ui::{App, AppCommand, View, render},
@@ -540,6 +540,13 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     base_url,
                     client.clone(),
                 ))),
+                SourceConfig::Lever {
+                    api_url,
+                    country_filter,
+                } => Ok(Arc::new(
+                    lever::LeverSource::new(&company.id, api_url, client.clone())
+                        .with_country_filter(country_filter.as_deref()),
+                )),
                 SourceConfig::Yuki { feed_url } => Ok(Arc::new(yuki::YukiSource::new(
                     &company.id,
                     feed_url,
@@ -942,7 +949,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 41);
+        assert_eq!(migrated.companies.len(), 42);
         assert!(
             migrated
                 .companies
@@ -1280,7 +1287,8 @@ mod tests {
                 "multisafepay",
                 "act-commodities",
                 "silverflow",
-                "ohpen"
+                "ohpen",
+                "finom"
             ]
         );
 
