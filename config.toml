@@ -563,6 +563,16 @@ strategy = "ns"
 listing_url = "https://www.werkenbijns.nl/vacatures"
 
 [[companies]]
+id = "achmea"
+name = "Achmea"
+industry = "Insurance, Financial services, Healthcare, Pensions"
+scale = "2,000+ · Large company"
+enabled = true
+[companies.source]
+strategy = "achmea"
+listing_url = "https://www.werkenbijachmea.nl/vacatures"
+
+[[companies]]
 id = "chipsoft"
 name = "ChipSoft"
 industry = "Healthcare software, Electronic health records, B2B SaaS"

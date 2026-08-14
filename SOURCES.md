@@ -1,5 +1,12 @@
 # Source and sponsor evidence
 
+## Achmea
+
+- Official source: <https://www.werkenbijachmea.nl/vacatures>. Every page publishes an exact result range and stable total; the adapter verifies all pages, unique official vacancy IDs, matching JobPosting details, official application links, and explicit Netherlands evidence before accepting the scan.
+- Achmea reports more than 18,000 colleagues, including 14,000 in the Netherlands: <https://www.achmea.nl/en/organisation>. The configured `2,000+` band follows the app's EU large-company classification.
+- The board covers Achmea and its insurance and financial-services brands. Language and sponsorship conditions vary by vacancy; check each vacancy before applying.
+- Job details identify the Achmea brand, not necessarily the legal contract entity. Confirm that entity before relying on recognised-sponsor status.
+
 ## ANWB
 
 - Official source: <https://www.werkenbijanwb.nl/fuse/vacancies.json>. The one-response feed exposes all public vacancy IDs and official URLs; the adapter validates every feed row against its JobPosting detail, Netherlands location, publication date, hiring brand, description, and on-page application form.

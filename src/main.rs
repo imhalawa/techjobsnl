@@ -609,6 +609,12 @@ fn build_sources(config: &Config) -> Result<Vec<Arc<dyn JobSource>>> {
                     listing_url,
                     client.clone(),
                 ))),
+                SourceConfig::Achmea { listing_url } => Ok(Arc::new(ns::NsSource::with_profile(
+                    &company.id,
+                    listing_url,
+                    ns::ACHMEA_PROFILE,
+                    client.clone(),
+                ))),
                 SourceConfig::Chipsoft { listing_url } => Ok(Arc::new(
                     chipsoft::ChipsoftSource::new(&company.id, listing_url, client.clone()),
                 )),
@@ -998,7 +1004,7 @@ mod tests {
 
         let migrated = Config::load(&path).unwrap();
         assert_eq!(migrated.filters.new_job_max_age_days, 14);
-        assert_eq!(migrated.companies.len(), 52);
+        assert_eq!(migrated.companies.len(), 53);
         assert!(
             migrated
                 .companies
@@ -1346,6 +1352,7 @@ mod tests {
                 "exact",
                 "afas",
                 "ns",
+                "achmea",
                 "chipsoft",
                 "anwb"
             ]

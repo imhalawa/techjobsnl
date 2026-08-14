@@ -195,6 +195,9 @@ pub enum SourceConfig {
     Ns {
         listing_url: String,
     },
+    Achmea {
+        listing_url: String,
+    },
     Chipsoft {
         listing_url: String,
     },
@@ -242,6 +245,7 @@ impl SourceConfig {
             Self::Exact { .. } => "Exact HTML + JSON-LD",
             Self::Afas { .. } => "AFAS HTML + JSON-LD",
             Self::Ns { .. } => "NS paged HTML + JSON-LD",
+            Self::Achmea { .. } => "Achmea paged HTML + JSON-LD",
             Self::Chipsoft { .. } => "ChipSoft HTML",
             Self::Anwb { .. } => "ANWB JSON + JSON-LD",
             Self::AlbertHeijn { .. } => "Albert Heijn API",
@@ -278,6 +282,7 @@ impl SourceConfig {
             | Self::Exact { listing_url }
             | Self::Afas { listing_url }
             | Self::Ns { listing_url }
+            | Self::Achmea { listing_url }
             | Self::Chipsoft { listing_url }
             | Self::Ing { listing_url }
             | Self::PagedHtml { listing_url, .. } => listing_url,
@@ -399,6 +404,16 @@ fn validate_source(company: &CompanyConfig, index: usize) -> Result<(), ConfigEr
                 return Err(ConfigError::invalid(
                     path("listing_url"),
                     "must be the official NS vacancy URL",
+                ));
+            }
+            Ok(())
+        }
+        SourceConfig::Achmea { listing_url } => {
+            validate_https_url(listing_url, path("listing_url"))?;
+            if listing_url != "https://www.werkenbijachmea.nl/vacatures" {
+                return Err(ConfigError::invalid(
+                    path("listing_url"),
+                    "must be the official Achmea vacancy URL",
                 ));
             }
             Ok(())
