@@ -48,7 +48,7 @@ fi
 printf '%s  %s\n' "$hash" "$asset" > "$temporary_dir/release/SHA256SUMS"
 
 default_output=$(
-    HOME="$temporary_home" XDG_CONFIG_HOME= SHELL=/bin/zsh PATH=/usr/bin \
+    HOME="$temporary_home" XDG_CONFIG_HOME= SHELL=/bin/zsh PATH=/usr/bin:/bin \
     TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
         sh scripts/install.sh
 )
@@ -58,6 +58,7 @@ printf '%s\n' "$default_output" | grep -q '^\[3/6\] Verifying SHA-256 checksum$'
 printf '%s\n' "$default_output" | grep -q '^\[4/6\] Installing to '
 printf '%s\n' "$default_output" | grep -q '^\[5/6\] Configuring command discovery$'
 printf '%s\n' "$default_output" | grep -q '^\[6/6\] Installation complete$'
+printf '%s\n' "$default_output" | grep -Fqx "Added PATH entry to $temporary_home/.zshrc."
 case "$(uname -s)" in
     Linux) expected_config="$temporary_home/.config/techjobsnl" ;;
     Darwin) expected_config="$temporary_home/Library/Application Support/techjobsnl" ;;
@@ -66,18 +67,38 @@ printf '%s\n' "$default_output" | grep -Fqx "Config on first launch: $expected_c
 test -x "$temporary_home/.local/bin/techjobsnl"
 
 second_output=$(
-    HOME="$temporary_home" XDG_CONFIG_HOME= SHELL=/bin/zsh PATH=/usr/bin \
+    HOME="$temporary_home" XDG_CONFIG_HOME= SHELL=/bin/zsh PATH=/usr/bin:/bin \
     TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
         sh scripts/install.sh
 )
 test "$(grep -Fxc 'export PATH="$HOME/.local/bin:$PATH"' "$temporary_home/.zshrc")" -eq 1
 printf '%s\n' "$second_output" | grep -q 'already available'
 
+unterminated_home="$temporary_dir/unterminated-home"
+mkdir -p "$unterminated_home"
+printf '%s' 'export TECHJOBSNL_TEST=1' > "$unterminated_home/.zshrc"
+unterminated_output=$(
+    HOME="$unterminated_home" XDG_CONFIG_HOME= SHELL=/bin/zsh PATH=/usr/bin:/bin \
+    TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
+        sh scripts/install.sh
+)
+printf '%s\n' "$unterminated_output" | grep -Fqx "Added PATH entry to $unterminated_home/.zshrc."
+sh -n "$unterminated_home/.zshrc"
+test "$(grep -Fxc 'export TECHJOBSNL_TEST=1' "$unterminated_home/.zshrc")" -eq 1
+test "$(grep -Fxc 'export PATH="$HOME/.local/bin:$PATH"' "$unterminated_home/.zshrc")" -eq 1
+unterminated_second_output=$(
+    HOME="$unterminated_home" XDG_CONFIG_HOME= SHELL=/bin/zsh PATH=/usr/bin:/bin \
+    TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
+        sh scripts/install.sh
+)
+test "$(grep -Fxc 'export PATH="$HOME/.local/bin:$PATH"' "$unterminated_home/.zshrc")" -eq 1
+printf '%s\n' "$unterminated_second_output" | grep -q 'already available'
+
 custom_home="$temporary_dir/custom-home"
 mkdir -p "$custom_home"
 TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
 TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" \
-HOME="$custom_home" SHELL=/bin/bash PATH=/usr/bin \
+HOME="$custom_home" SHELL=/bin/bash PATH=/usr/bin:/bin \
     sh scripts/install.sh >/dev/null
 test ! -e "$custom_home/.bashrc"
 

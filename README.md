@@ -36,7 +36,7 @@ The latest release provides checksum-verified native archives for macOS, Linux, 
 curl -fsSL https://imhalawa.github.io/techjobsnl/install | sh
 ```
 
-The installer writes to `~/.local/bin` by default and tells you if that directory is not on `PATH`.
+The installer writes to `~/.local/bin` by default. For Bash or Zsh, it adds that directory to `PATH` in `~/.bashrc` or `~/.zshrc`; otherwise, it prints the line to add.
 
 ### Windows
 
@@ -73,7 +73,7 @@ Windows:
 irm https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/uninstall.ps1 | iex
 ```
 
-The uninstallers remove the executable but preserve configuration and job history. The Windows uninstaller also removes its installation directory from the user `PATH`.
+The uninstallers remove the executable but preserve configuration and job history. On macOS and Linux, the installer-added shell `PATH` entry is retained; the Windows uninstaller removes its installation directory from the user `PATH`.
 
 ## How it works
 
