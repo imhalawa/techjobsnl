@@ -108,6 +108,9 @@ case ":$PATH:" in
                 if [ -f "$shell_file" ] && grep -Fqx "$path_line" "$shell_file"; then
                     printf '%s\n' 'PATH entry already available.'
                 else
+                    if [ -s "$shell_file" ] && [ "$(tail -c 1 "$shell_file")" != "" ]; then
+                        printf '\n' >> "$shell_file"
+                    fi
                     printf '%s\n' "$path_line" >> "$shell_file"
                     printf 'Added PATH entry to %s.\n' "$shell_file"
                 fi
