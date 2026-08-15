@@ -33,9 +33,7 @@ The latest release provides checksum-verified native archives for macOS, Linux, 
 ### macOS and Linux
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.sh | sh
-techjobsnl
+curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.sh | sh && "$HOME/.local/bin/techjobsnl"
 ```
 
 The installer writes to `~/.local/bin` by default and tells you if that directory is not on `PATH`.
