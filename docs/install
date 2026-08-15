@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+printf '%s\n' '[bootstrap] Loading the TechJobsNL installer'
+installer=$(curl --proto '=https' --tlsv1.2 -fsSL \
+  https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.sh)
+printf '%s\n' "$installer" | sh
