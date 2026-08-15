@@ -7,6 +7,13 @@ sh -n scripts/check-release-version.sh
 sh -n scripts/install.sh
 sh -n scripts/uninstall.sh
 sh -n docs/install
+obsolete_dash='job''-watch'
+obsolete_underscore='job''_watch'
+obsolete_env='JOB''_WATCH'
+if grep -R -E "$obsolete_dash|$obsolete_underscore|$obsolete_env" Cargo.toml src scripts tests docs README.md >/dev/null; then
+    printf '%s\n' 'obsolete product name remains' >&2
+    exit 1
+fi
 grep -Fq 'https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.sh' docs/install
 for documentation in README.md docs/index.html
 do
@@ -112,12 +119,25 @@ update_output=$(
 test "$("$temporary_dir/bin/techjobsnl")" = installed
 printf '%s\n' "$update_output" | grep -q '^Updated techjobsnl at '
 
-uninstall_output=$(TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" sh scripts/uninstall.sh)
+config_root="$temporary_dir/config"
+mkdir -p "$config_root/techjobsnl"
+printf '%s\n' data > "$config_root/techjobsnl/config.toml"
+uninstall_output=$(
+    XDG_CONFIG_HOME="$config_root" TECHJOBSNL_REMOVE_DATA=yes \
+    TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" sh scripts/uninstall.sh
+)
 test ! -e "$temporary_dir/bin/techjobsnl"
-printf '%s\n' "$uninstall_output" | grep -q 'Configuration and job history were not removed.'
+test ! -e "$config_root/techjobsnl"
+printf '%s\n' "$uninstall_output" | grep -Fqx "Removed configuration and job history at $config_root/techjobsnl"
 printf '%s\n' "$uninstall_output" | grep -Fqx 'Feedback welcome: https://github.com/imhalawa/techjobsnl/issues/new?labels=feedback'
 grep -Fq 'https://github.com/imhalawa/techjobsnl/issues/new?labels=feedback' scripts/uninstall.ps1
+grep -Fq 'Remove configuration and job history at %s? [y/N]' scripts/uninstall.sh
+grep -Fq 'Read-Host "Remove configuration and job history at $DataDir? [y/N]"' scripts/uninstall.ps1
+
+mkdir -p "$config_root/techjobsnl"
+XDG_CONFIG_HOME="$config_root" TECHJOBSNL_REMOVE_DATA=no \
 TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" sh scripts/uninstall.sh >/dev/null
+test -d "$config_root/techjobsnl"
 
 release_workflow=.github/workflows/release.yml
 ci_workflow=.github/workflows/ci.yml
@@ -145,4 +165,4 @@ grep -q 'Download checksum verification failed' scripts/install.ps1
 grep -q 'PROCESSOR_ARCHITEW6432' scripts/install.ps1
 grep -q 'PROCESSOR_ARCHITECTURE' scripts/install.ps1
 ! grep -q 'RuntimeInformation' scripts/install.ps1
-grep -q 'Configuration and job history were not removed.' scripts/uninstall.ps1
+grep -q 'Removed configuration and job history at' scripts/uninstall.ps1
