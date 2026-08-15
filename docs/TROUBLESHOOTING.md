@@ -1,6 +1,6 @@
 # Troubleshooting
 
-TechJobsNL can find jobs through its direct title/company search or through matching evidence for a selected skill or market fact. Start troubleshooting with the exact error and absolute path it prints. Configuration and source failures are designed to include the field, company, or diagnostic that failed.
+Start with the reported error, absolute path, company, or diagnostic.
 
 ## The app does not start
 
@@ -21,11 +21,7 @@ make check
 
 ## `make run` says it requires an interactive terminal
 
-Run it in a real terminal window. `make run` deliberately rejects redirected input or output because the Ratatui interface needs a TTY [interactive terminal].
-
-```bash
-make run
-```
+Run it in a terminal; the Ratatui interface requires a TTY [interactive terminal].
 
 ## Configuration fails to load
 

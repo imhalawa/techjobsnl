@@ -1,6 +1,6 @@
 # User guide
 
-TechJobsNL helps you find Netherlands tech jobs, including vacancies that mention a specific skill. It starts from stored local data and scans only when you request it. The main workflow is: scan sources, review or search eligible jobs, use Analytics to open jobs matching a selected skill, and track applications or saved items.
+Scan supported sources, review vacancies, track jobs, and inspect Analytics evidence.
 
 ## Start the app
 
@@ -38,7 +38,7 @@ Press `Tab` or `Esc` to focus navigation, move with arrow keys or `j`/`k`, then 
 
 ![Active jobs and selected-job details](images/jobs.png)
 
-The job list emphasizes the title and company, with the publication date and meaningful state icons kept secondary. Normal open status is omitted; exceptional closed or reopened state remains visible where it matters. The detail pane shows official metadata, lifecycle dates, application state, skills extracted from the selected job's stored description, and the full posting description. Skills fill each row horizontally and reflow when the pane is resized. The pane reuses cached facts and does not rerun analysis when you change selection; keyboard and mouse-wheel scrolling move one visual line at a time.
+The detail pane shows vacancy metadata, lifecycle and application state, extracted skills, and the stored description. `/` searches title and company; use Analytics to find vacancies by extracted facts.
 
 - `/`: enter search mode. Search matches job title or company, not description text.
 - `↑`/`↓`: move through matching jobs without leaving search mode.
@@ -58,11 +58,10 @@ On terminals narrower than 80 columns, `Enter` opens or closes the selected job'
 
 Press `r` to scan all enabled companies. Scans use the configured concurrency, timeout, retry count, and user agent.
 
-Each company finishes independently:
+Each company finishes independently. See [Architecture](ARCHITECTURE.md#scan-safety) for storage rules.
 
-- **Complete:** the result is trusted. Observed jobs are added or updated, and previously open source IDs absent from the complete result are closed.
-- **Incomplete:** the diagnostic is stored, but no jobs from that company are added, updated, or closed.
-- **Failed:** the failure is stored, but no jobs from that company are added, updated, or closed.
+- **Complete:** apply the result.
+- **Incomplete or Failed:** store the diagnostic without changing that company's jobs.
 
 One failed or incomplete company does not discard successful results from other companies. The footer shows an animated scan loader, current progress, completion feedback, and durable Failed or Incomplete source counts.
 
@@ -72,7 +71,7 @@ The Sources view helps separate a current source failure from old stored jobs. U
 
 ## Use analytics
 
-Analytics supports job discovery as well as market context. Select a skill, role, or other row to narrow the evidence list to matching vacancies, then open the selected job. Results describe only the postings TechJobsNL observed; they are not a complete measure of the Netherlands labour market.
+Select an extracted skill or market fact to see the vacancies that contain the supporting evidence. Results describe only the postings TechJobsNL observed; they are not a complete measure of the Netherlands labour market.
 
 Shared controls:
 
@@ -93,13 +92,13 @@ Shared controls:
 
 ![Analytics overview with skill demand, role demand, recommendations, and evidence](images/analytics-overview.png)
 
-Overview combines hard-skill demand, role demand, career recommendations, and matching posting evidence. Recommendations use observed demand, target roles, and known adjacent skills.
+Overview shows skill and role demand, recommendations, and matching vacancies.
 
 ### Skills
 
 ![Hard-skill demand and matching vacancies](images/analytics-skills.png)
 
-Skills uses **Hard Skills** and **Soft Skills** sub-tabs so the active table keeps the full available width on small terminals. Select a skill to see vacancies that mention it in the evidence list; use `J`/`K` to choose a matching job and `Enter` or `o` to open it. A compact top-10 demand chart appears above the table. Use Left/Right or click a sub-tab to switch. Each sub-tab preserves its own selected row. Press `m` to cycle a saved skill through Known, Learning, Interested, then no status.
+Use Left/Right or click to switch **Hard Skills** and **Soft Skills**. Select a skill to see matching vacancies; use `J`/`K` and `Enter` or `o` to open one. Press `m` to cycle a saved skill through Known, Learning, Interested, then no status.
 
 Skill extraction uses the versioned local bank and exact posting aliases. Unknown words are not automatically promoted to skills.
 
@@ -114,8 +113,6 @@ Use Left/Right to switch between Roles, Seniority, Experience, Work, and Compani
 ## Build a personal library
 
 Select a job or an Analytics recommendation, skill, role, or company and press `*`. Then open Library and choose its matching section.
-
-Each action shows short footer feedback such as **Saved**, **Removed**, **Copied**, **Opened**, **Applied**, or an error. Work that can take time—scanning, job reloads, analytics, and optional AI discovery—shows an animated loader.
 
 Library sections are selected with `1`–`5` or `[`/`]`:
 
@@ -134,7 +131,7 @@ Press `*` to remove the selected library item. In Skills, press `m` to change st
 Select a setting and press `Enter` or Space to edit it:
 
 - **New jobs:** publication-age window in days.
-- **Companies:** open the alphabetically sorted checklist, compare each company's industry and scale, use `/` to search, and press Space or `Enter` to follow or unfollow a company. The choice is saved immediately; jobs from unfollowed companies disappear, and later scans skip them. Following no companies is allowed. Columns fit their visible content, and long metadata wraps when the terminal is narrow.
+- **Companies:** use `/` to search and Space or `Enter` to follow or unfollow a company. Changes save immediately; unfollowed companies are hidden and skipped by later scans. Following none is allowed.
 - **Job types:** six built-in included-title groups plus optional custom regular expressions.
 - **Hide jobs:** five built-in excluded-title groups plus optional custom regular expressions.
 
@@ -145,9 +142,8 @@ Title changes apply on the next scan. Clearing all included title patterns permi
 - Click navigation items, rows, Analytics tabs, Library tabs, Settings fields, or Help.
 - Use the wheel over a list to change selection and over details to scroll.
 - Drag the divider between the job list and details to resize the panes for the current session.
-- Hovering any selectable row applies the configured hover background across the full row.
-- On narrow terminals, job and operational details open as a separate surface so required fields remain readable.
+- On narrow terminals, details open separately.
 
 ## Built-in help
 
-Press `?` to open the context-aware cheat sheet. It presents aligned key/action pairs for navigation and the current view, plus an explicit **Save to Library** workflow. In Analytics it also explains the Hard/Soft Skills sub-tabs. Press `?` or `Esc` to close it.
+Press `?` to open context-aware controls; press `?` or `Esc` to close them.

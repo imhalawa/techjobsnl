@@ -1,30 +1,30 @@
-# TechJobsNL — Tech Job Search for the Netherlands
+# TechJobsNL — Netherlands Tech Vacancies
 
 [![CI](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml)
 [![Release](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/imhalawa/techjobsnl?display_name=tag&sort=semver)](https://github.com/imhalawa/techjobsnl/releases/latest)
 [![License: AGPL-3.0](https://img.shields.io/github/license/imhalawa/techjobsnl)](LICENSE)
 
-**Find tech jobs in the Netherlands by the skills they mention—not only by job title.**
+**Research and track Netherlands tech vacancies from supported company career sources.**
 
-TechJobsNL is an open-source, local-first Rust TUI for finding technology jobs in the Netherlands by company, role, and skill. It scans verified company career sources, keeps job history in SQLite, and links skill-demand analytics back to the exact vacancies behind them.
+TechJobsNL is an open-source, local-first TUI with vacancy history and evidence-linked analytics.
 
 ![TechJobsNL: local job search and evidence-linked skill analytics](docs/images/hero.png)
 
-> **Beta v0.1.0:** the core workflow is tested, but the interface and configuration may still change. Back up your configuration and database before upgrading.
+> **Beta:** interfaces and configuration may change.
 
 [Website](https://imhalawa.github.io/techjobsnl/) · [Install](#install) · [Workflow](#how-it-works) · [Analytics](#evidence-linked-analytics) · [Documentation](#documentation) · [Contributing](#development-and-contributing)
 
 ## What it does
 
-- **Search real vacancies:** review stored descriptions, search by title or company, and open the official posting.
-- **Discover jobs through skills:** select a hard or soft skill to see the exact matching vacancies and text evidence.
-- **Follow specific companies:** search the catalog in Settings and enable or disable sources without editing TOML.
-- **Track the job lifecycle:** mark applications and retain jobs that close or later reopen.
-- **Keep your data local:** configuration, jobs, history, analytics, application state, and saved items stay on your machine.
+- **Review vacancies:** search by company or title, inspect stored postings, and open official URLs.
+- **Explore Analytics:** inspect the vacancies behind extracted skills and market facts.
+- **Follow companies:** choose which supported sources future scans contact.
+- **Track jobs:** save vacancies, mark applications, and retain closed or reopened history.
+- **Keep data local:** configuration, history, analytics, and personal state stay on your machine.
 - **Fail safely:** incomplete and failed company scans preserve the last trusted jobs instead of falsely closing them.
 
-The beta ships with **66 company profiles**, **65 enabled verified sources**, and **35 source strategies**. This is a documented company set, not the whole Netherlands labour market. See [Supported companies](SUPPORTED_COMPANIES.md) and [Source evidence](SOURCES.md).
+Coverage is limited to [supported companies](SUPPORTED_COMPANIES.md), not the full Netherlands labour market.
 
 ## Install
 
@@ -85,25 +85,21 @@ The uninstallers remove the executable but preserve configuration and job histor
 
 ![Active vacancies with the selected job's details](docs/images/jobs.png)
 
-The app supports keyboard and mouse input, responsive layouts, scrolling, clickable rows and tabs, and a draggable job/details divider. Press `?` for controls specific to the current view.
-
-### Choose your companies
-
-Company choices save immediately. Jobs from unfollowed companies are hidden, and later scans skip those sources without starting a scan at the time of the change.
+Press `?` for controls. Company choices save immediately and apply to later scans.
 
 ![Searchable company-following settings](docs/images/settings-companies.png)
 
 ## Evidence-linked analytics
 
-Analytics is built from eligible vacancies stored on your machine. It covers hard and soft skills, roles, seniority, experience, work mode, employment, education, companies, and learn-next recommendations.
+Analytics covers skills, roles, seniority, experience, work mode, employment, education, companies, and recommendations from locally stored vacancies.
 
 | Market overview | Hard-skill demand |
 |---|---|
 | [![Market overview with skill demand, role demand, recommendations, and matching vacancies](docs/images/analytics-overview.png)](docs/images/analytics-overview.png) | [![Hard-skill demand with the vacancies behind the selected result](docs/images/analytics-skills.png)](docs/images/analytics-skills.png) |
 
-Select a skill or market fact to inspect the vacancies behind it. Compact top-10 charts show leading skill and role demand. Counts describe locally observed postings and are not presented as the complete Netherlands market. **Stacks remains visible but disabled while it is work in progress.**
+Results link to matching vacancy evidence and describe only your local dataset. **Stacks is visible but disabled while in development.**
 
-Local matching uses the versioned bank in `assets/software-skills.json`; unknown words are not promoted automatically. Optional Claude or Codex CLI discovery may suggest emerging terms, but strict validation and explicit approval are required before a suggestion affects later extraction. No AI provider is required.
+Optional provider-assisted term discovery is review-gated; no AI provider is required.
 
 ## Local data and safe scans
 
@@ -122,7 +118,7 @@ The default data locations are:
 | macOS | `~/Library/Application Support/techjobsnl/` |
 | Windows | `%APPDATA%\techjobsnl\` |
 
-An older `job-watch/config.toml` is reused automatically if the new path does not exist. Deleting the database permanently removes jobs, history, application markers, diagnostics, analytics state, and library choices. Read [Data and privacy](docs/DATA_AND_PRIVACY.md) before resetting or enabling optional AI discovery.
+Vacancies can be rescanned, but deleting SQLite permanently removes application markers and Library choices. [Back up personal state before resetting](docs/DATA_AND_PRIVACY.md#backup).
 
 ## Build from source
 
@@ -145,8 +141,8 @@ cargo install --locked --git https://github.com/imhalawa/techjobsnl.git --tag v0
 | Guide | Use it for |
 |---|---|
 | [User guide](docs/USER_GUIDE.md) | Views, workflows, keyboard and mouse controls, Analytics, and Settings |
-| [Configuration](docs/CONFIGURATION.md) | Paths, filters, themes, keys, company profiles, and all 35 source strategies |
-| [Supported companies](SUPPORTED_COMPANIES.md) | The 65 enabled companies, disabled source, and roadmap |
+| [Configuration](docs/CONFIGURATION.md) | Paths, filters, themes, keys, company profiles, and source strategies |
+| [Supported companies](SUPPORTED_COMPANIES.md) | Supported, disabled, and roadmap companies |
 | [Source evidence](SOURCES.md) | Official endpoints, completeness evidence, live checks, and employer caveats |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Startup, scans, sources, browser, clipboard, Analytics, and reset |
 | [Data and privacy](docs/DATA_AND_PRIVACY.md) | Stored data, network behavior, optional AI use, backup, and deletion |
@@ -161,9 +157,7 @@ make check      # formatting, Clippy, release checks, and offline tests
 make test-live  # ignored tests that contact external career sites
 ```
 
-CI checks formatting, Clippy, offline tests, and a release build on Linux, macOS, and Windows for every pull request and push to `main`. Version tags matching `v*` publish checksum-verified archives for all three operating systems and both supported architectures.
-
-Live tests are separate because career sites, vacancy counts, rate limits, and page contracts can change without a code change. Read [Contributing](CONTRIBUTING.md) before changing a source adapter.
+Live tests are separate because external sources change. Read [Contributing](CONTRIBUTING.md) before changing an adapter.
 
 ## Scope and independence
 
@@ -179,6 +173,6 @@ The source code is licensed under the [GNU Affero General Public License v3.0 on
 
 ## Support
 
-If TechJobsNL is useful to you, you can support its continued open-source development:
+Support the open-source project:
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-Support-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/imhalawa)

@@ -1,6 +1,6 @@
 # Architecture
 
-TechJobsNL is a local job finder built as a single Rust binary with a shared library. Users can review jobs directly or select an extracted skill or market fact to see matching posting evidence. The code keeps source collection, filtering, storage, analytics, and terminal rendering separate so failures remain local and testable.
+TechJobsNL has a terminal UI and shared library. Source collection, filtering, storage, analytics, and rendering have separate failure and test boundaries.
 
 ## High-level design
 
@@ -20,7 +20,7 @@ flowchart LR
 
 `src/main.rs` is the composition root [the place that connects the parts]. It builds source adapters from configuration, starts background work, applies `AppCommand` effects, reloads stored read models, and owns terminal startup and shutdown.
 
-The terminal UI does not call career sites directly. Scans go through `ScanService` and a `JobSource` adapter; job discovery and analytics read normalized local records from SQLite.
+The terminal UI does not call career sites directly. Scans go through `ScanService` and a `JobSource` adapter; vacancy collection writes normalized records to SQLite, while evidence-linked exploration and analytics read them.
 
 ## Runtime flow
 
@@ -111,7 +111,7 @@ Local analytics is the default. The bundled JSON assets define canonical softwar
 
 Extraction records exact evidence from posting text and does not promote unknown words. Cached facts are reused while the content hash and extractor version remain unchanged.
 
-The UI reuses these facts in two places: the selected job's detail pane lists its extracted skills, and selecting a skill or market row filters the evidence list to open vacancies whose stored facts match that selection and the shared Analytics filters. Changing the selected job does not run extraction again.
+The job detail and Analytics views reuse cached facts; changing selection does not rerun extraction.
 
 ```mermaid
 flowchart LR
@@ -135,7 +135,7 @@ Optional Claude or Codex CLI discovery can propose emerging terms. The result mu
 
 The event loop renders immediately and moves blocking database reloads, analytics calculation, optional discovery, and scans to background tasks. Analytics results include a revision so a result computed for an old filter state can be discarded.
 
-The renderer supports wide split panes, narrow detail surfaces, keyboard control, mouse selection, scrollbars, and theme overrides. Selectable rows share one hover/pressed style so mouse feedback stays consistent across views. `AppCommand` separates UI intent from effects such as writing SQLite, saving filters or company choices, rebuilding future scan inputs, opening a URL, or copying text.
+`AppCommand` separates UI intent from effects such as writing SQLite, saving configuration, rebuilding scan inputs, opening URLs, and copying text.
 
 ## Verification boundaries
 
@@ -143,7 +143,5 @@ The renderer supports wide split panes, narrow detail surfaces, keyboard control
 - Integration tests cover adapters using stored fixtures and a fake-source end-to-end scan lifecycle.
 - Ignored live tests contact official sources to detect external contract drift.
 - `make check` runs formatting, Clippy with warnings denied, Makefile checks, and all deterministic offline tests.
-
-Live tests are separate because external counts, availability, rate limits, and page contracts can change without a code change.
 
 See [Project structure](PROJECT_STRUCTURE.md) for file ownership and [Contributing](../CONTRIBUTING.md) for the change workflow.

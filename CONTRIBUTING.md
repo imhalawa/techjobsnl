@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions should keep TechJobsNL reliable as a local job finder. Prefer the smallest change that preserves source completeness, local data, clear evidence, and the existing user workflow.
+Prefer the smallest change that preserves source completeness, local data, evidence, and existing behavior.
 
 ## Before changing code
 

@@ -1,6 +1,6 @@
 # Supported companies and roadmap
 
-These companies supply the official vacancies used for direct job review and skill-based job discovery in TechJobsNL. Coverage is limited to enabled, verified sources.
+Current supported and roadmap companies. Coverage is limited to enabled, verified sources.
 
 Release snapshot: **2026-08-14**.
 
@@ -122,4 +122,4 @@ Order follows the release priority. A company moves to supported only after impl
 | 32 | Planon | Its live NL roles use unsupported Talentsoft. |
 | 33 | ilionx | Its official site is live, but a complete Teamtailor JSON feed is not proved. |
 
-Detailed first-party evidence and caveats are in [SOURCES.md](SOURCES.md). Delivery history is in [COMPANY_SOURCE_QUEUE.md](COMPANY_SOURCE_QUEUE.md).
+Detailed first-party evidence and caveats are in [SOURCES.md](SOURCES.md).

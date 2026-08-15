@@ -1,6 +1,6 @@
 # Source and sponsor evidence
 
-These official-source checks support TechJobsNL's main job-finding workflow. The shipped beta has **65 enabled verified companies and one disabled source**. Skill-based results use the descriptions collected from these sources; they cover observed postings, not every Netherlands tech vacancy. Counts and live checks below are dated snapshots, not availability guarantees.
+Evidence for supported sources. The dated counts and checks below are snapshots, not availability guarantees or full Netherlands market coverage.
 
 ## Brand New Day
 
