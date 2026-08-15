@@ -1,6 +1,6 @@
 # Project structure
 
-TechJobsNL is one Rust package with a library and terminal binary. The structure follows runtime responsibilities rather than technical layers with empty wrappers.
+TechJobsNL is one Rust package with a library and terminal binary.
 
 ```text
 techjobsnl/
@@ -21,8 +21,6 @@ techjobsnl/
 ├── docs/                    # User, design, operations, and privacy documentation
 ├── SOURCES.md               # Source contracts, live evidence, and employer caveats
 ├── SUPPORTED_COMPANIES.md   # Current support snapshot and roadmap
-├── COMPANY_SOURCE_QUEUE.md  # Delivery record for the researched backlog
-├── CANDIDATE_SOURCE_COMPATIBILITY.md # Historical source research snapshot
 ├── CONTRIBUTING.md          # Development and pull request workflow
 ├── scripts/                 # Install and release-version scripts
 ├── .github/workflows/       # Three-OS CI and six-target release publishing

@@ -1,6 +1,6 @@
 # Configuration
 
-TechJobsNL uses one TOML configuration file for its local job-finding workflow. The shipped [config.toml](../config.toml) is the source for built-in defaults, eligible jobs, skill analytics, and the company catalog.
+TechJobsNL uses one TOML file. Shipped defaults are in [config.toml](../config.toml).
 
 ## File location and updates
 

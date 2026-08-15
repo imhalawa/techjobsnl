@@ -1,8 +1,6 @@
 # Data and privacy
 
-TechJobsNL is a local-first vacancy research tool. Jobs, analytics facts, application state, and personal library data remain on your machine.
-
-Network requests only happen when the user starts a scan, opens an official vacancy URL, or enables optional provider discovery.
+Jobs and personal state remain local. Network requests occur only for scans, opened vacancy URLs, and enabled provider discovery.
 
 ## What is stored
 
@@ -46,12 +44,12 @@ Your CLI provider may have its own account, retention, and privacy terms. Do not
 
 ## Backup
 
-Close TechJobsNL before copying its files. Back up both:
+Close TechJobsNL, then back up both:
 
 1. `config.toml`
 2. `.data/techjobsnl.sqlite3`
 
-Keeping both preserves custom filters, company settings, jobs, history, applied markers, analytics state, and library choices.
+Vacancies can be rescanned. The backup preserves configuration, applied markers, analytics state, Library choices, and history that sources may no longer expose.
 
 ## Reset or delete local data
 

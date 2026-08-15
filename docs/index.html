@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TechJobsNL — Netherlands Tech Vacancies from Official Company Sources</title>
-  <meta name="description" content="Local-first Rust TUI for discovering and tracking Netherlands tech vacancies from verified company career sources, with evidence-linked analytics.">
+  <title>TechJobsNL — Netherlands Tech Vacancies</title>
+  <meta name="description" content="Open-source Rust TUI for tracking Netherlands tech vacancies from supported company sources.">
   <meta name="theme-color" content="#f6f2e8">
   <link rel="canonical" href="https://imhalawa.github.io/techjobsnl/">
-  <meta property="og:title" content="TechJobsNL — Netherlands Tech Vacancies from Official Company Sources">
-  <meta property="og:description" content="Local-first Rust TUI for discovering and tracking Netherlands tech vacancies from verified company career sources, with evidence-linked analytics.">
+  <meta property="og:title" content="TechJobsNL — Netherlands Tech Vacancies">
+  <meta property="og:description" content="Track vacancies locally and inspect evidence-linked analytics.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://imhalawa.github.io/techjobsnl/">
   <meta property="og:image" content="https://imhalawa.github.io/techjobsnl/images/hero.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="TechJobsNL — Netherlands Tech Vacancies from Official Company Sources">
-  <meta name="twitter:description" content="Local-first Rust TUI for discovering and tracking Netherlands tech vacancies from verified company career sources, with evidence-linked analytics.">
+  <meta name="twitter:title" content="TechJobsNL — Netherlands Tech Vacancies">
+  <meta name="twitter:description" content="Open-source Rust TUI for local vacancy research.">
   <meta name="twitter:image" content="https://imhalawa.github.io/techjobsnl/images/hero.png">
   <script type="application/ld+json">
   {
@@ -26,12 +26,12 @@
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Windows, Linux, macOS",
     "isAccessibleForFree": true,
-    "description": "TechJobsNL is a local-first Rust TUI for discovering and tracking Netherlands technology vacancies from verified company career sources. It stores vacancies locally, tracks their lifecycle, and provides evidence-linked analytics over the jobs it has observed."
+    "description": "Open-source Rust TUI for tracking Netherlands tech vacancies from supported company sources."
   }
   </script>
   <style>
     :root{--bg:#f6f2e8;--surface:#fffdf8;--surface-2:#edf4fb;--text:#10233f;--muted:#5f6f83;--line:#d9e1e9;--blue:#2457d6;--blue-2:#1745b7;--teal:#1d8a88;--orange:#d9772b;--shadow:0 24px 60px rgba(25,46,76,.12)}
-    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 85% 8%,#dcecff 0,transparent 28%),linear-gradient(180deg,#faf7ef 0,var(--bg) 100%);line-height:1.6}a{color:inherit}.wrap{width:min(1160px,calc(100% - 40px));margin:auto}.nav{display:flex;align-items:center;justify-content:space-between;padding:24px 0}.brand{font-weight:800;letter-spacing:-.03em;font-size:1.15rem;text-decoration:none}.brand span{color:var(--blue)}.navlinks{display:flex;gap:24px;align-items:center}.navlinks a{text-decoration:none;color:var(--muted);font-weight:650;font-size:.94rem}.hero{display:grid;grid-template-columns:1.02fr .98fr;gap:56px;align-items:center;padding:72px 0 82px}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:7px 11px;border:1px solid #cddbef;border-radius:999px;background:rgba(255,255,255,.58);color:var(--blue-2);font-size:.84rem;font-weight:750}.dot{width:7px;height:7px;border-radius:50%;background:var(--teal)}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{font-size:clamp(3rem,7vw,5.6rem);margin:20px 0 22px;max-width:760px}h1 em{font-style:normal;color:var(--blue)}.lead{font-size:1.18rem;color:var(--muted);max-width:650px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:13px 18px;border-radius:12px;text-decoration:none;font-weight:760;border:1px solid transparent}.btn.primary{background:var(--blue);color:white;box-shadow:0 12px 28px rgba(36,87,214,.22)}.btn.primary:hover{background:var(--blue-2)}.btn.secondary{background:rgba(255,255,255,.7);border-color:var(--line)}.proof{display:flex;gap:18px;flex-wrap:wrap;margin-top:28px;color:var(--muted);font-size:.9rem}.proof strong{color:var(--text)}.mock{position:relative}.mock:before{content:"";position:absolute;inset:8% -6% -7% 10%;background:linear-gradient(135deg,rgba(36,87,214,.16),rgba(29,138,136,.08));filter:blur(30px);border-radius:40px}.mock img{position:relative;width:100%;display:block;border-radius:20px;border:1px solid rgba(80,99,121,.2);box-shadow:var(--shadow);transform:perspective(1200px) rotateY(-4deg) rotateX(1deg)}section{padding:84px 0}.section-head{max-width:720px;margin-bottom:34px}.kicker{font-size:.82rem;text-transform:uppercase;letter-spacing:.14em;color:var(--blue);font-weight:800}h2{font-size:clamp(2.15rem,4vw,3.5rem);margin:8px 0 14px}.section-head p{color:var(--muted);font-size:1.06rem}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.card{padding:24px;border:1px solid var(--line);border-radius:18px;background:rgba(255,253,248,.86);box-shadow:0 10px 26px rgba(33,51,78,.05)}.card .num{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--surface-2);color:var(--blue);font-weight:850}.card h3{margin:18px 0 8px;font-size:1.15rem;letter-spacing:-.02em}.card p{margin:0;color:var(--muted);font-size:.95rem}.product{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center}.shot{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:12px;box-shadow:0 18px 42px rgba(30,49,72,.08)}.shot img{width:100%;display:block;border-radius:12px}.copyblock{padding:24px}.copyblock p{color:var(--muted)}.ticks{display:grid;gap:12px;margin-top:22px}.tick{display:flex;gap:10px;align-items:flex-start}.tick b{color:var(--teal)}.install{background:linear-gradient(135deg,#10233f,#173661);color:white;border-radius:28px;padding:44px;display:grid;grid-template-columns:.85fr 1.15fr;gap:36px;align-items:center;box-shadow:var(--shadow)}.install h2{margin-top:0}.install p{color:#c9d5e5}.terminal{background:#091522;border:1px solid rgba(255,255,255,.13);border-radius:16px;padding:20px;color:#dbe9ff;font:500 .88rem/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:auto}.terminal .prompt{color:#6ed5ce}.terminal .cmd{color:#f2f6ff}.footer{padding:34px 0 50px;color:var(--muted);font-size:.9rem;display:flex;justify-content:space-between;gap:24px;border-top:1px solid var(--line)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 85% 8%,#dcecff 0,transparent 28%),linear-gradient(180deg,#faf7ef 0,var(--bg) 100%);line-height:1.6}a{color:inherit}.wrap{width:min(1160px,calc(100% - 40px));margin:auto}.nav{display:flex;align-items:center;justify-content:space-between;padding:24px 0}.brand{font-weight:800;letter-spacing:-.03em;font-size:1.15rem;text-decoration:none}.brand span{color:var(--blue)}.navlinks{display:flex;gap:24px;align-items:center}.navlinks a{text-decoration:none;color:var(--muted);font-weight:650;font-size:.94rem}.hero{display:grid;grid-template-columns:1.02fr .98fr;gap:56px;align-items:center;padding:72px 0 82px}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:7px 11px;border:1px solid #cddbef;border-radius:999px;background:rgba(255,255,255,.58);color:var(--blue-2);font-size:.84rem;font-weight:750}.dot{width:7px;height:7px;border-radius:50%;background:var(--teal)}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{font-size:clamp(3rem,7vw,5.6rem);margin:20px 0 22px;max-width:760px}h1 em{font-style:normal;color:var(--blue)}.lead{font-size:1.18rem;color:var(--muted);max-width:650px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:13px 18px;border-radius:12px;text-decoration:none;font-weight:760;border:1px solid transparent}.btn.primary{background:var(--blue);color:white;box-shadow:0 12px 28px rgba(36,87,214,.22)}.btn.primary:hover{background:var(--blue-2)}.btn.secondary{background:rgba(255,255,255,.7);border-color:var(--line)}.mock{position:relative}.mock:before{content:"";position:absolute;inset:8% -6% -7% 10%;background:linear-gradient(135deg,rgba(36,87,214,.16),rgba(29,138,136,.08));filter:blur(30px);border-radius:40px}.mock img{position:relative;width:100%;display:block;border-radius:20px;border:1px solid rgba(80,99,121,.2);box-shadow:var(--shadow);transform:perspective(1200px) rotateY(-4deg) rotateX(1deg)}section{padding:84px 0}.kicker{font-size:.82rem;text-transform:uppercase;letter-spacing:.14em;color:var(--blue);font-weight:800}h2{font-size:clamp(2.15rem,4vw,3.5rem);margin:8px 0 14px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.card{padding:24px;border:1px solid var(--line);border-radius:18px;background:rgba(255,253,248,.86);box-shadow:0 10px 26px rgba(33,51,78,.05)}.card .num{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--surface-2);color:var(--blue);font-weight:850}.card h3{margin:18px 0 8px;font-size:1.15rem;letter-spacing:-.02em}.card p{margin:0;color:var(--muted);font-size:.95rem}.product{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center}.shot{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:12px;box-shadow:0 18px 42px rgba(30,49,72,.08)}.shot img{width:100%;display:block;border-radius:12px}.copyblock{padding:24px}.copyblock p{color:var(--muted)}.install{background:linear-gradient(135deg,#10233f,#173661);color:white;border-radius:28px;padding:44px;display:grid;grid-template-columns:.85fr 1.15fr;gap:36px;align-items:center;box-shadow:var(--shadow)}.install h2{margin-top:0}.install p{color:#c9d5e5}.terminal{background:#091522;border:1px solid rgba(255,255,255,.13);border-radius:16px;padding:20px;color:#dbe9ff;font:500 .88rem/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:auto}.terminal .prompt{color:#6ed5ce}.terminal .cmd{color:#f2f6ff}.footer{padding:34px 0 50px;color:var(--muted);font-size:.9rem;display:flex;justify-content:space-between;gap:24px;border-top:1px solid var(--line)}
     @media(max-width:900px){.hero,.product,.install{grid-template-columns:1fr}.hero{padding-top:46px}.mock{max-width:760px}.grid{grid-template-columns:1fr 1fr}.navlinks a:not(.github){display:none}}@media(max-width:580px){.wrap{width:min(100% - 24px,1160px)}.grid{grid-template-columns:1fr}h1{font-size:3.25rem}.hero{gap:36px;padding-bottom:46px}section{padding:60px 0}.install{padding:28px}.footer{flex-direction:column}}
   </style>
 </head>
@@ -52,16 +52,11 @@
     <div class="wrap hero">
       <div>
         <div class="eyebrow"><span class="dot"></span> Open source · Local first · Built in Rust</div>
-        <h1>Find, understand, and track Netherlands tech vacancies from <em>official company sources</em>.</h1>
-        <p class="lead">TechJobsNL is a local-first terminal application for exploring technology vacancies from verified company career sources. It keeps your job research local, tracks vacancy history, and connects market insights back to the postings behind them.</p>
+        <h1>Research Netherlands tech vacancies from <em>supported company sources</em>.</h1>
+        <p class="lead">Open-source Rust TUI for local vacancy tracking and evidence-linked analytics.</p>
         <div class="actions">
           <a class="btn primary" href="#install">Install TechJobsNL</a>
           <a class="btn secondary" href="https://github.com/imhalawa/techjobsnl">View on GitHub</a>
-        </div>
-        <div class="proof">
-          <span><strong>SQLite</strong> local cache</span>
-          <span><strong>Official</strong> career sources</span>
-          <span><strong>Evidence-linked</strong> analytics</span>
         </div>
       </div>
       <div class="mock">
@@ -71,16 +66,11 @@
 
     <section id="features">
       <div class="wrap">
-        <div class="section-head">
-          <div class="kicker">A focused job-search tool</div>
-          <h2>Search the market without turning your job hunt into another browser tab.</h2>
-          <p>TechJobsNL is designed for developers who want a fast, inspectable workflow around real company vacancies rather than another opaque recommendation feed.</p>
-        </div>
         <div class="grid">
-          <article class="card"><span class="num">01</span><h3>Official company sources</h3><p>Scan supported employer career sources instead of relying on an opaque job feed.</p></article>
+          <article class="card"><span class="num">01</span><h3>Supported sources</h3><p>Scan selected company career sources.</p></article>
           <article class="card"><span class="num">02</span><h3>Vacancy history</h3><p>Track active, new, applied, saved, closed, and reopened vacancies.</p></article>
-          <article class="card"><span class="num">03</span><h3>Evidence-linked analytics</h3><p>Explore skills, roles, and market patterns while keeping every result connected to the vacancies behind it.</p></article>
-          <article class="card"><span class="num">04</span><h3>Local-first workflow</h3><p>Your database, preferences, and job-search history stay on your machine.</p></article>
+          <article class="card"><span class="num">03</span><h3>Evidence-linked analytics</h3><p>Trace extracted facts to matching vacancies.</p></article>
+          <article class="card"><span class="num">04</span><h3>Local-first</h3><p>Keep job research and personal state on your machine.</p></article>
         </div>
       </div>
     </section>
@@ -90,23 +80,13 @@
         <div class="shot"><img src="images/jobs.png" alt="Active Netherlands tech vacancies in the TechJobsNL terminal interface"></div>
         <div class="copyblock">
           <div class="kicker">Job browser</div>
-          <h2>Keep active vacancies, details, and your next action in one place.</h2>
-          <p>Browse stored jobs, search by company or title, open the official posting, save interesting roles, and mark applications without leaving the terminal workflow.</p>
-          <div class="ticks">
-            <div class="tick"><b>✓</b><span>Active, new, applied, and historical job states</span></div>
-            <div class="tick"><b>✓</b><span>Selected-job details alongside the vacancy list</span></div>
-            <div class="tick"><b>✓</b><span>Company following controls for focused future scans</span></div>
-          </div>
+          <h2>Review and track vacancies.</h2>
+          <p>Search by company or title, inspect postings, save jobs, and mark applications.</p>
         </div>
         <div class="copyblock">
           <div class="kicker">Evidence-linked analytics</div>
-          <h2>TechJobsNL turns stored vacancies into structured insights.</h2>
-          <p>Select a skill, role, or market signal and inspect the matching vacancies that created it.</p>
-          <div class="ticks">
-            <div class="tick"><b>✓</b><span>Hard- and soft-skill demand</span></div>
-            <div class="tick"><b>✓</b><span>Role and seniority patterns</span></div>
-            <div class="tick"><b>✓</b><span>Evidence-backed recommendations based on observed vacancies and your saved goals</span></div>
-          </div>
+          <h2>Inspect the evidence.</h2>
+          <p>Select a skill, role, or market fact to see the matching vacancies.</p>
         </div>
         <div class="shot"><img src="images/analytics-overview.png" alt="TechJobsNL evidence-linked Netherlands tech job market analytics"></div>
       </div>
@@ -117,7 +97,7 @@
         <div>
           <div class="kicker" style="color:#8fb3ff">Install</div>
           <h2>Run TechJobsNL locally.</h2>
-          <p>Native release archives are available for macOS, Linux, and Windows. Your configuration, job history, analytics, and application state stay on your machine.</p>
+          <p>Native releases are available for macOS, Linux, and Windows.</p>
           <a class="btn secondary" style="background:#fff;color:#10233f" href="https://github.com/imhalawa/techjobsnl/releases/latest">Latest release</a>
         </div>
         <div class="terminal" aria-label="Install commands">
