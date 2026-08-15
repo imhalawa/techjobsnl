@@ -63,7 +63,19 @@ jobs:
         shell: pwsh
         run: |
           bash tests/release_test.sh
-          $null = [scriptblock]::Create((Get-Content scripts/install.ps1 -Raw))
+          $installer = Get-Content scripts/install.ps1 -Raw
+          $null = [scriptblock]::Create($installer)
+          foreach ($message in @(
+            "[1/6] Detected Windows",
+            "[2/6] Downloading",
+            "[3/6] Verifying SHA-256 checksum",
+            "[4/6] Installing to",
+            "[5/6] Configuring command discovery",
+            "[6/6] Installation complete",
+            "Config on first launch:"
+          )) {
+            if (-not $installer.Contains($message)) { throw "Windows installer is missing: $message" }
+          }
           $null = [scriptblock]::Create((Get-Content scripts/uninstall.ps1 -Raw))
           $testInstallDir = Join-Path $env:RUNNER_TEMP "techjobsnl-uninstall-test"
           New-Item -ItemType Directory -Force $testInstallDir | Out-Null
