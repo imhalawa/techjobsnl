@@ -115,6 +115,8 @@ printf '%s\n' "$update_output" | grep -q '^Updated techjobsnl at '
 uninstall_output=$(TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" sh scripts/uninstall.sh)
 test ! -e "$temporary_dir/bin/techjobsnl"
 printf '%s\n' "$uninstall_output" | grep -q 'Configuration and job history were not removed.'
+printf '%s\n' "$uninstall_output" | grep -Fqx 'Feedback welcome: https://github.com/imhalawa/techjobsnl/issues/new?labels=feedback'
+grep -Fq 'https://github.com/imhalawa/techjobsnl/issues/new?labels=feedback' scripts/uninstall.ps1
 TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" sh scripts/uninstall.sh >/dev/null
 
 release_workflow=.github/workflows/release.yml
