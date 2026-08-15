@@ -6,8 +6,8 @@ version=${TECHJOBSNL_VERSION:-${JOB_WATCH_VERSION:-latest}}
 install_dir=${TECHJOBSNL_INSTALL_DIR:-${JOB_WATCH_INSTALL_DIR:-"$HOME/.local/bin"}}
 
 case "$(uname -s)" in
-    Linux) os=unknown-linux-gnu ;;
-    Darwin) os=apple-darwin ;;
+    Linux) platform=Linux; os=unknown-linux-gnu ;;
+    Darwin) platform=Darwin; os=apple-darwin ;;
     *)
         printf '%s\n' 'unsupported operating system; use the Windows installer on Windows' >&2
         exit 1
@@ -22,6 +22,8 @@ case "$(uname -m)" in
         exit 1
         ;;
 esac
+
+printf '[1/6] Detected %s %s\n' "$platform" "$arch"
 
 asset="techjobsnl-$arch-$os.tar.gz"
 if [ -n "${TECHJOBSNL_DOWNLOAD_BASE:-${JOB_WATCH_DOWNLOAD_BASE:-}}" ]; then
@@ -51,9 +53,11 @@ download() {
     fi
 }
 
+printf '[2/6] Downloading %s\n' "$asset"
 download "$download_base/$asset" "$temporary_dir/$asset"
 download "$download_base/SHA256SUMS" "$temporary_dir/SHA256SUMS"
 
+printf '%s\n' '[3/6] Verifying SHA-256 checksum'
 expected=$(awk -v asset="$asset" '$2 == asset || $2 == "*" asset { print $1; exit }' "$temporary_dir/SHA256SUMS")
 if [ -z "$expected" ]; then
     printf 'SHA256SUMS has no entry for %s\n' "$asset" >&2
@@ -72,6 +76,7 @@ if [ "$actual" != "$expected" ]; then
     exit 1
 fi
 
+printf '[4/6] Installing to %s\n' "$install_dir"
 tar -xzf "$temporary_dir/$asset" -C "$temporary_dir" techjobsnl
 mkdir -p "$install_dir"
 action=Installed
@@ -84,7 +89,39 @@ chmod 755 "$temporary_binary"
 mv "$temporary_binary" "$install_dir/techjobsnl"
 
 printf '%s techjobsnl at %s/techjobsnl\n' "$action" "$install_dir"
+
+printf '%s\n' '[5/6] Configuring command discovery'
+default_install_dir="$HOME/.local/bin"
 case ":$PATH:" in
-    *":$install_dir:"*) ;;
-    *) printf 'Add %s to PATH before running techjobsnl.\n' "$install_dir" ;;
+    *":$install_dir:"*)
+        printf '%s\n' 'PATH entry already available.'
+        ;;
+    *)
+        if [ "$install_dir" = "$default_install_dir" ]; then
+            case "${SHELL:-}" in
+                */bash) shell_file="$HOME/.bashrc" ;;
+                */zsh) shell_file="$HOME/.zshrc" ;;
+                *) shell_file= ;;
+            esac
+            if [ -n "$shell_file" ]; then
+                path_line='export PATH="$HOME/.local/bin:$PATH"'
+                if [ -f "$shell_file" ] && grep -Fqx "$path_line" "$shell_file"; then
+                    printf '%s\n' 'PATH entry already available.'
+                else
+                    printf '%s\n' "$path_line" >> "$shell_file"
+                    printf 'Added PATH entry to %s.\n' "$shell_file"
+                fi
+            else
+                printf 'Add this line to your shell profile: export PATH="%s:$PATH"\n' "$install_dir"
+            fi
+        else
+            printf 'Add this line to your shell profile: export PATH="%s:$PATH"\n' "$install_dir"
+        fi
+        ;;
 esac
+printf '%s\n' '[6/6] Installation complete'
+case "$os" in
+    unknown-linux-gnu) config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/techjobsnl" ;;
+    apple-darwin) config_dir="$HOME/Library/Application Support/techjobsnl" ;;
+esac
+printf 'Config on first launch: %s\n' "$config_dir"

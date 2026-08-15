@@ -14,6 +14,8 @@ fi
 
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/techjobsnl-release-test.XXXXXX")
 trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
+temporary_home="$temporary_dir/home"
+mkdir -p "$temporary_home"
 
 case "$(uname -s)" in
     Linux) os=unknown-linux-gnu ;;
@@ -38,9 +40,35 @@ else
 fi
 printf '%s  %s\n' "$hash" "$asset" > "$temporary_dir/release/SHA256SUMS"
 
+default_output=$(
+    HOME="$temporary_home" SHELL=/bin/zsh PATH=/usr/bin \
+    TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
+        sh scripts/install.sh
+)
+printf '%s\n' "$default_output" | grep -q '^\[1/6\] Detected '
+printf '%s\n' "$default_output" | grep -q '^\[2/6\] Downloading '
+printf '%s\n' "$default_output" | grep -q '^\[3/6\] Verifying SHA-256 checksum$'
+printf '%s\n' "$default_output" | grep -q '^\[4/6\] Installing to '
+printf '%s\n' "$default_output" | grep -q '^\[5/6\] Configuring command discovery$'
+printf '%s\n' "$default_output" | grep -q '^\[6/6\] Installation complete$'
+printf '%s\n' "$default_output" | grep -q '^Config on first launch: '
+test -x "$temporary_home/.local/bin/techjobsnl"
+
+second_output=$(
+    HOME="$temporary_home" SHELL=/bin/zsh PATH=/usr/bin \
+    TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
+        sh scripts/install.sh
+)
+test "$(grep -Fxc 'export PATH="$HOME/.local/bin:$PATH"' "$temporary_home/.zshrc")" -eq 1
+printf '%s\n' "$second_output" | grep -q 'already available'
+
+custom_home="$temporary_dir/custom-home"
+mkdir -p "$custom_home"
 TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
 TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" \
+HOME="$custom_home" SHELL=/bin/bash PATH=/usr/bin \
     sh scripts/install.sh >/dev/null
+test ! -e "$custom_home/.bashrc"
 
 test "$("$temporary_dir/bin/techjobsnl")" = installed
 printf stale > "$temporary_dir/bin/techjobsnl"
