@@ -1,4 +1,4 @@
-# TechJobsNL
+# TechJobsNL — Tech Job Search for the Netherlands
 
 [![CI](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/ci.yml)
 [![Release](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml/badge.svg)](https://github.com/imhalawa/techjobsnl/actions/workflows/release.yml)
@@ -7,13 +7,13 @@
 
 **Find tech jobs in the Netherlands by the skills they mention—not only by job title.**
 
-TechJobsNL is a local-first terminal job finder written in Rust. It scans verified company career sources, keeps job history in SQLite, and links skill-demand analytics back to the vacancies behind them.
+TechJobsNL is an open-source, local-first Rust TUI for finding technology jobs in the Netherlands by company, role, and skill. It scans verified company career sources, keeps job history in SQLite, and links skill-demand analytics back to the exact vacancies behind them.
 
 ![TechJobsNL: local job search and evidence-linked skill analytics](docs/images/hero.png)
 
 > **Beta v0.1.0:** the core workflow is tested, but the interface and configuration may still change. Back up your configuration and database before upgrading.
 
-[Install](#install) · [Workflow](#how-it-works) · [Analytics](#evidence-linked-analytics) · [Documentation](#documentation) · [Contributing](#development-and-contributing)
+[Website](https://imhalawa.github.io/techjobsnl/) · [Install](#install) · [Workflow](#how-it-works) · [Analytics](#evidence-linked-analytics) · [Documentation](#documentation) · [Contributing](#development-and-contributing)
 
 ## What it does
 
