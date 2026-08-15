@@ -1,6 +1,6 @@
 # Project structure
 
-TechJobsNL is one Rust package with a library and terminal binary.
+TechJobsNL is one package with a terminal UI and shared library.
 
 ```text
 techjobsnl/

@@ -1,6 +1,6 @@
 # Architecture
 
-TechJobsNL is a Rust binary with a shared library. Source collection, filtering, storage, analytics, and rendering have separate failure and test boundaries.
+TechJobsNL has a terminal UI and shared library. Source collection, filtering, storage, analytics, and rendering have separate failure and test boundaries.
 
 ## High-level design
 

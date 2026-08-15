@@ -7,7 +7,7 @@
 
 **Research and track Netherlands tech vacancies from supported company career sources.**
 
-TechJobsNL is an open-source, local-first Rust TUI with vacancy history and evidence-linked analytics.
+TechJobsNL is an open-source, local-first TUI with vacancy history and evidence-linked analytics.
 
 ![TechJobsNL: local job search and evidence-linked skill analytics](docs/images/hero.png)
 
