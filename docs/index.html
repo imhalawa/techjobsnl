@@ -1,22 +1,139 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TechJobsNL - Find Tech Jobs in the Netherlands by Skills</title>
-<meta name="description" content="TechJobsNL is an open-source Rust terminal job search tool that finds Netherlands tech jobs by skills, companies, and roles from official career sources.">
-<link rel="canonical" href="https://imhalawa.github.io/techjobsnl/">
-<meta property="og:title" content="TechJobsNL - Netherlands Tech Job Search">
-<meta property="og:description" content="Find tech jobs in the Netherlands by the skills companies mention.">
-<meta property="og:type" content="website">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"TechJobsNL","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, Linux, macOS","description":"Open-source Rust terminal application for finding technology jobs in the Netherlands by skills, companies, and roles."}</script>
-<style>body{font-family:Inter,system-ui,sans-serif;max-width:1000px;margin:auto;padding:48px;color:#10233f;background:#f8f5ed}h1{font-size:48px}a{color:#2563eb}.card{background:white;padding:24px;border-radius:20px;margin:24px 0}</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TechJobsNL — Find Tech Jobs in the Netherlands by Skills</title>
+  <meta name="description" content="TechJobsNL is an open-source Rust TUI for finding tech jobs in the Netherlands by skills, companies, and roles from official company career sources.">
+  <meta name="theme-color" content="#f6f2e8">
+  <link rel="canonical" href="https://imhalawa.github.io/techjobsnl/">
+  <meta property="og:title" content="TechJobsNL — Netherlands Tech Job Search">
+  <meta property="og:description" content="Find tech jobs in the Netherlands by the skills companies mention, then trace every insight back to real vacancies.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://imhalawa.github.io/techjobsnl/">
+  <meta property="og:image" content="https://imhalawa.github.io/techjobsnl/images/hero.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="TechJobsNL — Netherlands Tech Job Search">
+  <meta name="twitter:description" content="Open-source, local-first tech job search for the Netherlands.">
+  <meta name="twitter:image" content="https://imhalawa.github.io/techjobsnl/images/hero.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "TechJobsNL",
+    "url": "https://imhalawa.github.io/techjobsnl/",
+    "codeRepository": "https://github.com/imhalawa/techjobsnl",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows, Linux, macOS",
+    "isAccessibleForFree": true,
+    "description": "Open-source, local-first Rust terminal application for finding technology jobs in the Netherlands by skills, companies, and roles from official company career sources."
+  }
+  </script>
+  <style>
+    :root{--bg:#f6f2e8;--surface:#fffdf8;--surface-2:#edf4fb;--text:#10233f;--muted:#5f6f83;--line:#d9e1e9;--blue:#2457d6;--blue-2:#1745b7;--teal:#1d8a88;--orange:#d9772b;--shadow:0 24px 60px rgba(25,46,76,.12)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 85% 8%,#dcecff 0,transparent 28%),linear-gradient(180deg,#faf7ef 0,var(--bg) 100%);line-height:1.6}a{color:inherit}.wrap{width:min(1160px,calc(100% - 40px));margin:auto}.nav{display:flex;align-items:center;justify-content:space-between;padding:24px 0}.brand{font-weight:800;letter-spacing:-.03em;font-size:1.15rem;text-decoration:none}.brand span{color:var(--blue)}.navlinks{display:flex;gap:24px;align-items:center}.navlinks a{text-decoration:none;color:var(--muted);font-weight:650;font-size:.94rem}.hero{display:grid;grid-template-columns:1.02fr .98fr;gap:56px;align-items:center;padding:72px 0 82px}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:7px 11px;border:1px solid #cddbef;border-radius:999px;background:rgba(255,255,255,.58);color:var(--blue-2);font-size:.84rem;font-weight:750}.dot{width:7px;height:7px;border-radius:50%;background:var(--teal)}h1,h2,h3{line-height:1.08;letter-spacing:-.045em}h1{font-size:clamp(3rem,7vw,5.6rem);margin:20px 0 22px;max-width:760px}h1 em{font-style:normal;color:var(--blue)}.lead{font-size:1.18rem;color:var(--muted);max-width:650px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:13px 18px;border-radius:12px;text-decoration:none;font-weight:760;border:1px solid transparent}.btn.primary{background:var(--blue);color:white;box-shadow:0 12px 28px rgba(36,87,214,.22)}.btn.primary:hover{background:var(--blue-2)}.btn.secondary{background:rgba(255,255,255,.7);border-color:var(--line)}.proof{display:flex;gap:18px;flex-wrap:wrap;margin-top:28px;color:var(--muted);font-size:.9rem}.proof strong{color:var(--text)}.mock{position:relative}.mock:before{content:"";position:absolute;inset:8% -6% -7% 10%;background:linear-gradient(135deg,rgba(36,87,214,.16),rgba(29,138,136,.08));filter:blur(30px);border-radius:40px}.mock img{position:relative;width:100%;display:block;border-radius:20px;border:1px solid rgba(80,99,121,.2);box-shadow:var(--shadow);transform:perspective(1200px) rotateY(-4deg) rotateX(1deg)}section{padding:84px 0}.section-head{max-width:720px;margin-bottom:34px}.kicker{font-size:.82rem;text-transform:uppercase;letter-spacing:.14em;color:var(--blue);font-weight:800}h2{font-size:clamp(2.15rem,4vw,3.5rem);margin:8px 0 14px}.section-head p{color:var(--muted);font-size:1.06rem}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.card{padding:24px;border:1px solid var(--line);border-radius:18px;background:rgba(255,253,248,.86);box-shadow:0 10px 26px rgba(33,51,78,.05)}.card .num{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--surface-2);color:var(--blue);font-weight:850}.card h3{margin:18px 0 8px;font-size:1.15rem;letter-spacing:-.02em}.card p{margin:0;color:var(--muted);font-size:.95rem}.product{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center}.shot{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:12px;box-shadow:0 18px 42px rgba(30,49,72,.08)}.shot img{width:100%;display:block;border-radius:12px}.copyblock{padding:24px}.copyblock p{color:var(--muted)}.ticks{display:grid;gap:12px;margin-top:22px}.tick{display:flex;gap:10px;align-items:flex-start}.tick b{color:var(--teal)}.install{background:linear-gradient(135deg,#10233f,#173661);color:white;border-radius:28px;padding:44px;display:grid;grid-template-columns:.85fr 1.15fr;gap:36px;align-items:center;box-shadow:var(--shadow)}.install h2{margin-top:0}.install p{color:#c9d5e5}.terminal{background:#091522;border:1px solid rgba(255,255,255,.13);border-radius:16px;padding:20px;color:#dbe9ff;font:500 .88rem/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:auto}.terminal .prompt{color:#6ed5ce}.terminal .cmd{color:#f2f6ff}.footer{padding:34px 0 50px;color:var(--muted);font-size:.9rem;display:flex;justify-content:space-between;gap:24px;border-top:1px solid var(--line)}
+    @media(max-width:900px){.hero,.product,.install{grid-template-columns:1fr}.hero{padding-top:46px}.mock{max-width:760px}.grid{grid-template-columns:1fr 1fr}.navlinks a:not(.github){display:none}}@media(max-width:580px){.wrap{width:min(100% - 24px,1160px)}.grid{grid-template-columns:1fr}h1{font-size:3.25rem}.hero{gap:36px;padding-bottom:46px}section{padding:60px 0}.install{padding:28px}.footer{flex-direction:column}}
+  </style>
 </head>
 <body>
-<h1>Find Netherlands tech jobs by the skills they mention</h1>
-<p>TechJobsNL is an open-source Rust terminal job search tool. It scans official company career sources, stores job history locally, and connects skill demand back to real vacancies.</p>
-<p><a href="https://github.com/imhalawa/techjobsnl">View source on GitHub</a></p>
-<div class="card"><h2>Why TechJobsNL?</h2><ul><li>Search real company vacancies</li><li>Discover roles through required skills</li><li>Keep your job data local with SQLite</li><li>Explore evidence-linked analytics</li></ul></div>
-<img src="images/hero.png" alt="TechJobsNL terminal job search interface" style="max-width:100%">
+  <header class="wrap">
+    <nav class="nav" aria-label="Primary navigation">
+      <a class="brand" href="#top">techjobs<span>nl</span></a>
+      <div class="navlinks">
+        <a href="#features">Features</a>
+        <a href="#product">Product</a>
+        <a href="#install">Install</a>
+        <a class="github" href="https://github.com/imhalawa/techjobsnl">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <div class="wrap hero">
+      <div>
+        <div class="eyebrow"><span class="dot"></span> Open source · Local first · Built in Rust</div>
+        <h1>Find tech jobs in the Netherlands by the <em>skills</em> they mention.</h1>
+        <p class="lead">TechJobsNL scans selected official company career sources, lets you explore vacancies from your terminal, and connects skill-demand analytics back to the exact jobs behind every result.</p>
+        <div class="actions">
+          <a class="btn primary" href="#install">Install TechJobsNL</a>
+          <a class="btn secondary" href="https://github.com/imhalawa/techjobsnl">View on GitHub</a>
+        </div>
+        <div class="proof">
+          <span><strong>SQLite</strong> local cache</span>
+          <span><strong>Official</strong> career sources</span>
+          <span><strong>Evidence-linked</strong> analytics</span>
+        </div>
+      </div>
+      <div class="mock">
+        <img src="images/hero.png" alt="TechJobsNL terminal interface for browsing Netherlands technology vacancies and skill analytics">
+      </div>
+    </div>
+
+    <section id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="kicker">A focused job-search tool</div>
+          <h2>Search the market without turning your job hunt into another browser tab.</h2>
+          <p>TechJobsNL is designed for developers who want a fast, inspectable workflow around real company vacancies rather than another opaque recommendation feed.</p>
+        </div>
+        <div class="grid">
+          <article class="card"><span class="num">01</span><h3>Official sources</h3><p>Scan vacancies directly from selected company career sites using documented source strategies.</p></article>
+          <article class="card"><span class="num">02</span><h3>Skill-based discovery</h3><p>Find roles through technologies and skills mentioned in job descriptions, not only job titles.</p></article>
+          <article class="card"><span class="num">03</span><h3>Local history</h3><p>Keep jobs, application state, saved items, and scan history locally in SQLite.</p></article>
+          <article class="card"><span class="num">04</span><h3>Traceable analytics</h3><p>Select a market signal and inspect the matching vacancies and evidence behind the count.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="product">
+      <div class="wrap product">
+        <div class="shot"><img src="images/jobs.png" alt="Active Netherlands tech vacancies in the TechJobsNL terminal interface"></div>
+        <div class="copyblock">
+          <div class="kicker">Job browser</div>
+          <h2>Keep active vacancies, details, and your next action in one place.</h2>
+          <p>Browse stored jobs, search by company or title, open the official posting, save interesting roles, and mark applications without leaving the terminal workflow.</p>
+          <div class="ticks">
+            <div class="tick"><b>✓</b><span>Active, new, applied, and historical job states</span></div>
+            <div class="tick"><b>✓</b><span>Selected-job details alongside the vacancy list</span></div>
+            <div class="tick"><b>✓</b><span>Company following controls for focused future scans</span></div>
+          </div>
+        </div>
+        <div class="copyblock">
+          <div class="kicker">Market analytics</div>
+          <h2>See demand, then inspect the evidence.</h2>
+          <p>Analytics covers skills, roles, seniority, experience, work mode, employment, education, companies, and learn-next recommendations from the vacancies stored on your machine.</p>
+          <div class="ticks">
+            <div class="tick"><b>✓</b><span>Hard- and soft-skill demand</span></div>
+            <div class="tick"><b>✓</b><span>Role and seniority patterns</span></div>
+            <div class="tick"><b>✓</b><span>Matching vacancies behind selected results</span></div>
+          </div>
+        </div>
+        <div class="shot"><img src="images/analytics-overview.png" alt="TechJobsNL evidence-linked Netherlands tech job market analytics"></div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="wrap install">
+        <div>
+          <div class="kicker" style="color:#8fb3ff">Install</div>
+          <h2>Run TechJobsNL locally.</h2>
+          <p>Native release archives are available for macOS, Linux, and Windows. Your configuration, job history, analytics, and application state stay on your machine.</p>
+          <a class="btn secondary" style="background:#fff;color:#10233f" href="https://github.com/imhalawa/techjobsnl/releases/latest">Latest release</a>
+        </div>
+        <div class="terminal" aria-label="Install commands">
+          <div><span class="prompt">macOS / Linux $</span></div>
+          <div class="cmd">curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.sh | sh</div>
+          <br>
+          <div><span class="prompt">Windows PowerShell &gt;</span></div>
+          <div class="cmd">irm https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.ps1 | iex</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <span>TechJobsNL · Independent open-source project</span>
+    <span>Rust · Ratatui · SQLite · AGPL-3.0</span>
+  </footer>
 </body>
 </html>
