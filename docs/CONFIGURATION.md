@@ -8,8 +8,6 @@ TechJobsNL uses one TOML file. Shipped defaults are in [config.toml](../config.t
 - macOS: `~/Library/Application Support/techjobsnl/config.toml`
 - Windows: `%APPDATA%\techjobsnl\config.toml`
 
-If the new path does not exist, TechJobsNL reuses an existing `job-watch/config.toml` so upgrades keep their configuration and database history.
-
 On first start, the app creates the file. Later starts merge newly shipped company profiles while preserving each existing company's `enabled` choice and unrelated user configuration. Invalid configuration stops startup and reports the absolute file path and failing field.
 
 `database_path` is resolved relative to the directory containing the user configuration file.

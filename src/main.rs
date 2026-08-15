@@ -16,7 +16,7 @@ use crossterm::{
     execute,
 };
 use futures_util::StreamExt;
-use job_watch::{
+use techjobsnl::{
     analytics::{JobFacts, SkillSuggestion, SuggestionStatus},
     config::{Config, FiltersConfig, SourceConfig},
     domain::{JobKey, JobRecord, ScanEvent},
@@ -193,24 +193,12 @@ fn user_config_path() -> Result<PathBuf> {
     let home = env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
     let xdg = env::var_os("XDG_CONFIG_HOME").map(PathBuf::from);
     let appdata = env::var_os("APPDATA").map(PathBuf::from);
-    let current = config_path_for(
+    Ok(config_path_for(
         current_platform(),
         home.as_deref(),
         xdg.as_deref(),
         appdata.as_deref(),
-    )?;
-    Ok(prefer_existing_config(current))
-}
-
-fn prefer_existing_config(current: PathBuf) -> PathBuf {
-    if current.is_file() {
-        return current;
-    }
-    let legacy = current
-        .parent()
-        .and_then(Path::parent)
-        .map(|base| base.join("job-watch/config.toml"));
-    legacy.filter(|path| path.is_file()).unwrap_or(current)
+    )?)
 }
 
 fn config_path_for(
@@ -805,7 +793,7 @@ fn job_query(view: View) -> JobQuery {
 fn load_jobs(
     store: &Arc<Mutex<Store>>,
     query: JobQuery,
-    analytics_config: &job_watch::config::AnalyticsConfig,
+    analytics_config: &techjobsnl::config::AnalyticsConfig,
 ) -> rusqlite::Result<ReloadData> {
     let store = store.lock().unwrap();
     let jobs = store.list_jobs(query)?;
@@ -1114,7 +1102,8 @@ mod tests {
     };
 
     use chrono::{TimeZone, Utc};
-    use job_watch::{
+    use serde_json::json;
+    use techjobsnl::{
         config::{
             AnalyticsConfig, CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig,
             SourceConfig, UiConfig,
@@ -1130,14 +1119,13 @@ mod tests {
         storage::{JobQuery, Store},
         ui::{App, AppCommand},
     };
-    use serde_json::json;
     use tokio::sync::mpsc;
 
     use super::{
         CommandEffect, Platform, abort_scan, apply_reload, browser_command, build_sources,
         config_path_for, copy_url_with, ensure_default_config, execute_command, finish_scan,
-        finish_with_restore, handle_runtime_scan_event, initialize, load_jobs,
-        prefer_existing_config, save_companies, save_filters, start_scan, sync_default_companies,
+        finish_with_restore, handle_runtime_scan_event, initialize, load_jobs, save_companies,
+        save_filters, start_scan, sync_default_companies,
     };
 
     #[test]
@@ -1171,17 +1159,6 @@ mod tests {
         ensure_default_config(&path).unwrap();
 
         assert_eq!(std::fs::read_to_string(path).unwrap(), "user changes");
-    }
-
-    #[test]
-    fn existing_legacy_config_is_reused() {
-        let directory = tempfile::tempdir().unwrap();
-        let current = directory.path().join("techjobsnl/config.toml");
-        let legacy = directory.path().join("job-watch/config.toml");
-        std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
-        std::fs::write(&legacy, "existing config").unwrap();
-
-        assert_eq!(prefer_existing_config(current), legacy);
     }
 
     #[test]
@@ -1839,7 +1816,7 @@ mod tests {
         assert!(active.is_none());
         let mut finished = false;
         while let Ok(event) = rx.try_recv() {
-            finished |= matches!(event, job_watch::domain::ScanEvent::RunFinished { .. });
+            finished |= matches!(event, techjobsnl::domain::ScanEvent::RunFinished { .. });
         }
         assert!(finished);
         assert!(start_scan(&mut active, scan_service, tx));

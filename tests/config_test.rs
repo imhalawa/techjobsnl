@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use job_watch::config::{
+use techjobsnl::config::{
     AnalyticsConfig, AnalyticsProvider, CompanyConfig, Config, FiltersConfig, KeybindingsConfig,
     ScanConfig, SourceConfig, ThemeOverrides, UiConfig,
 };

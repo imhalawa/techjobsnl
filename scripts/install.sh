@@ -1,9 +1,9 @@
 #!/bin/sh
 set -eu
 
-repository=${TECHJOBSNL_REPOSITORY:-${JOB_WATCH_REPOSITORY:-imhalawa/techjobsnl}}
-version=${TECHJOBSNL_VERSION:-${JOB_WATCH_VERSION:-latest}}
-install_dir=${TECHJOBSNL_INSTALL_DIR:-${JOB_WATCH_INSTALL_DIR:-"$HOME/.local/bin"}}
+repository=${TECHJOBSNL_REPOSITORY:-imhalawa/techjobsnl}
+version=${TECHJOBSNL_VERSION:-latest}
+install_dir=${TECHJOBSNL_INSTALL_DIR:-"$HOME/.local/bin"}
 
 case "$(uname -s)" in
     Linux) platform=Linux; os=unknown-linux-gnu ;;
@@ -26,8 +26,8 @@ esac
 printf '[1/6] Detected %s %s\n' "$platform" "$arch"
 
 asset="techjobsnl-$arch-$os.tar.gz"
-if [ -n "${TECHJOBSNL_DOWNLOAD_BASE:-${JOB_WATCH_DOWNLOAD_BASE:-}}" ]; then
-    download_base=${TECHJOBSNL_DOWNLOAD_BASE:-$JOB_WATCH_DOWNLOAD_BASE}
+if [ -n "${TECHJOBSNL_DOWNLOAD_BASE:-}" ]; then
+    download_base=$TECHJOBSNL_DOWNLOAD_BASE
 elif [ "$version" = latest ]; then
     download_base="https://github.com/$repository/releases/latest/download"
 else

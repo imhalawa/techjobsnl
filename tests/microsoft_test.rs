@@ -1,13 +1,13 @@
 use std::{collections::HashSet, time::Duration};
 
-use job_watch::{
+use serde_json::{Value, json};
+use techjobsnl::{
     domain::SourceScan,
     sources::{
         JobSource,
         microsoft::{MicrosoftSource, parse_microsoft_pages},
     },
 };
-use serde_json::{Value, json};
 
 const SEARCH_URL: &str = "https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com&query=&location=Netherlands&start=0&hl=en";
 

@@ -6,7 +6,8 @@ use std::{
     time::Duration,
 };
 
-use job_watch::{
+use serde_json::Value;
+use techjobsnl::{
     domain::{ObservedJob, SourceErrorKind, SourceScan},
     sources::{
         JobSource,
@@ -14,7 +15,6 @@ use job_watch::{
         http::send_text,
     },
 };
-use serde_json::Value;
 
 const BASE_URL: &str = "https://www.werkenbijabnamro.nl";
 const TOPICUS_BASE_URL: &str = "https://www.werkenbijtopicus.nl";
@@ -491,7 +491,7 @@ fn details() -> Vec<String> {
 fn parse_fixture(
     pages: Vec<String>,
     details: Vec<String>,
-) -> Result<Vec<ObservedJob>, job_watch::sources::SourceError> {
+) -> Result<Vec<ObservedJob>, techjobsnl::sources::SourceError> {
     parse_getnoticed_pages(
         "abn-amro",
         BASE_URL,
@@ -508,7 +508,7 @@ fn detail_refs(details: &[String]) -> Vec<&str> {
     details.iter().map(String::as_str).collect()
 }
 
-fn assert_schema(result: Result<Vec<ObservedJob>, job_watch::sources::SourceError>) {
+fn assert_schema(result: Result<Vec<ObservedJob>, techjobsnl::sources::SourceError>) {
     let error = result.unwrap_err();
     assert_eq!(error.kind, SourceErrorKind::Schema);
     assert!(!error.retryable);
@@ -521,7 +521,7 @@ fn set_json(raw: &mut String, pointer: &str, value: Value) {
 }
 
 fn first_job_posting(html: &str) -> Value {
-    job_watch::sources::json_ld::job_posting_value(html, "fixture").unwrap()
+    techjobsnl::sources::json_ld::job_posting_value(html, "fixture").unwrap()
 }
 
 fn mutate_job_posting(html: &mut String, mutation: impl FnOnce(&mut Value)) {

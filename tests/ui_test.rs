@@ -2,7 +2,14 @@ use std::collections::HashMap;
 
 use chrono::{TimeZone, Utc};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use job_watch::{
+use ratatui::{
+    Terminal,
+    backend::TestBackend,
+    buffer::Buffer,
+    style::{Color, Modifier},
+};
+use serde_json::json;
+use techjobsnl::{
     analytics::{SkillKind, SkillSuggestion, SuggestionStatus},
     config::{
         AnalyticsConfig, CompanyConfig, Config, FiltersConfig, KeybindingsConfig, ScanConfig,
@@ -15,13 +22,6 @@ use job_watch::{
     storage::{ScanOutcome, ScanReadModel, SourceHealth, SourceReadModel},
     ui::{AnalyticsTab, App, AppCommand, IconSet, InputMode, MouseTarget, Theme, View, render},
 };
-use ratatui::{
-    Terminal,
-    backend::TestBackend,
-    buffer::Buffer,
-    style::{Color, Modifier},
-};
-use serde_json::json;
 
 fn rendered(app: &App, width: u16, height: u16) -> String {
     rendered_buffer(app, width, height)

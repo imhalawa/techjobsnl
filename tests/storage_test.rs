@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, TimeZone, Utc};
-use job_watch::{
+use rusqlite::Connection;
+use serde_json::json;
+use std::collections::{BTreeMap, BTreeSet};
+use techjobsnl::{
     config::{AnalyticsConfig, CompanyConfig, SourceConfig},
     domain::{ClassifiedJob, Eligibility, JobKey, ObservedJob, ScanFailure, SourceErrorKind},
     insights::{AnalyticsFilters, LibraryState, SkillStatus},
     storage::{JobQuery, ScanOutcome, SourceHealth, Store},
 };
-use rusqlite::Connection;
-use serde_json::json;
-use std::collections::{BTreeMap, BTreeSet};
 
 fn at(hour: u32) -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 8, 11, hour, 0, 0).unwrap()

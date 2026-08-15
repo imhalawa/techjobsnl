@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use job_watch::{
+use techjobsnl::{
     config::Config,
     domain::{SourceErrorKind, SourceScan},
     filter::EligibilityFilter,
