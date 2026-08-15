@@ -41,8 +41,7 @@ The installer writes to `~/.local/bin` by default and tells you if that director
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.ps1 | iex
-techjobsnl
+irm https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.ps1 | iex; if ($?) { & "$env:LOCALAPPDATA\Programs\techjobsnl\bin\techjobsnl.exe" }
 ```
 
 The installer writes to `%LOCALAPPDATA%\Programs\techjobsnl\bin` and adds that directory to the user `PATH`. Open a new terminal if `techjobsnl` is not immediately available.
