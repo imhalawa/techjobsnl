@@ -75,7 +75,7 @@ Windows:
 irm https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/uninstall.ps1 | iex
 ```
 
-The uninstallers remove the executable but preserve configuration and job history. On macOS and Linux, the installer-added shell `PATH` entry is retained; the Windows uninstaller removes its installation directory from the user `PATH`.
+The uninstallers remove the executable, then ask whether to remove configuration and job history. On macOS and Linux, the installer-added shell `PATH` entry is retained; the Windows uninstaller removes its installation directory from the user `PATH`.
 
 ## How it works
 

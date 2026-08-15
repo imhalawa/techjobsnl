@@ -84,14 +84,21 @@ jobs:
           $null = [scriptblock]::Create((Get-Content scripts/uninstall.ps1 -Raw))
           $testInstallDir = Join-Path $env:RUNNER_TEMP ("techjobsnl-uninstall-test-" + [guid]::NewGuid())
           $originalUserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+          $originalAppData = $env:APPDATA
           try {
             New-Item -ItemType Directory -Force $testInstallDir | Out-Null
             Set-Content (Join-Path $testInstallDir "techjobsnl.exe") "test"
+            $env:APPDATA = Join-Path $testInstallDir "appdata"
+            New-Item -ItemType Directory -Force (Join-Path $env:APPDATA "techjobsnl") | Out-Null
+            Set-Content (Join-Path $env:APPDATA "techjobsnl\config.toml") "test"
             $testUserPath = if ($originalUserPath) { "$originalUserPath;$testInstallDir" } else { $testInstallDir }
             [Environment]::SetEnvironmentVariable("Path", $testUserPath, "User")
-            & scripts/uninstall.ps1 -InstallDir $testInstallDir
+            & scripts/uninstall.ps1 -InstallDir $testInstallDir -RemoveData yes
             if (Test-Path (Join-Path $testInstallDir "techjobsnl.exe")) {
               throw "Windows uninstaller did not remove techjobsnl.exe"
+            }
+            if (Test-Path (Join-Path $env:APPDATA "techjobsnl")) {
+              throw "Windows uninstaller did not remove configuration and job history"
             }
             $remainingUserPath = [Environment]::GetEnvironmentVariable("Path", "User")
             if (($remainingUserPath -split ";") | Where-Object { $_.TrimEnd([char]'\') -ieq $testInstallDir.TrimEnd([char]'\') }) {
@@ -99,6 +106,7 @@ jobs:
             }
           } finally {
             [Environment]::SetEnvironmentVariable("Path", $originalUserPath, "User")
+            $env:APPDATA = $originalAppData
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $testInstallDir
           }
 
