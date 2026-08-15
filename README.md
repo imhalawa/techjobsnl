@@ -7,7 +7,11 @@
 
 **Find, understand, and track Netherlands tech vacancies from official company sources.**
 
-TechJobsNL is an open-source, local-first Rust TUI for researching technology vacancies in the Netherlands. It scans the company career sources you follow when you request it, stores vacancy history locally, and connects analytics back to the postings that produced each result.
+TechJobsNL is an open-source, local-first Rust TUI for researching technology vacancies in the Netherlands.
+
+It scans supported company career sources when you request it, stores vacancy history locally, and connects analytics back to the postings that produced each result.
+
+Explore roles, track applications, follow companies, and understand which skills and technologies appear across the vacancies you care about.
 
 ![TechJobsNL: local job search and evidence-linked skill analytics](docs/images/hero.png)
 
@@ -17,14 +21,14 @@ TechJobsNL is an open-source, local-first Rust TUI for researching technology va
 
 ## What it does
 
-- **Review official vacancies:** browse stored postings, search by title or company, inspect the description, and open the official vacancy.
-- **Explore evidence-linked analytics:** select a skill, role, or market fact to see the matching vacancies and supporting posting evidence.
-- **Follow specific companies:** choose supported employers in Settings; future scans contact only the sources you enable.
-- **Track the vacancy lifecycle:** mark applications, save jobs, retain closed vacancies, and recognize jobs that later reopen.
-- **Keep your data local:** configuration, vacancies, history, analytics, application state, and Library items stay on your machine.
-- **Fail safely:** incomplete and failed company scans preserve the last trusted vacancies instead of falsely closing them.
+- **Review vacancies:** review vacancies collected from supported company career sources. Search by company or title, inspect the stored posting, and open the official vacancy.
+- **Explore Analytics:** find vacancies connected to extracted skills and inspect the evidence behind each result.
+- **Follow companies:** choose which supported companies to follow. Future scans only contact the sources you enable.
+- **Track the lifecycle:** track applications, saved jobs, closed vacancies, and jobs that later reopen.
+- **Keep your data local:** your configuration, database, job history, analytics state, and personal library stay on your machine.
+- **Fail safely:** incomplete and failed company scans preserve the last trusted jobs instead of falsely closing them.
 
-The beta ships with **66 company profiles**, **65 enabled verified sources**, and **35 source strategies**. This is a documented set of verified sources, not the whole Netherlands labour market. See [Supported companies](SUPPORTED_COMPANIES.md) and [Source evidence](SOURCES.md).
+The beta ships with **66 company profiles**, **65 enabled verified sources**, and **35 source strategies**. This is a documented company set, not the whole Netherlands labour market. See [Supported companies](SUPPORTED_COMPANIES.md) and [Source evidence](SOURCES.md).
 
 ## Install
 
@@ -95,13 +99,27 @@ Company choices save immediately. Jobs from unfollowed companies are hidden, and
 
 ## Evidence-linked analytics
 
-Analytics is built from eligible vacancies stored on your machine. It covers hard and soft skills, roles, seniority, experience, work mode, employment, education, companies, and learn-next recommendations.
+Analytics is built from vacancies stored locally by TechJobsNL.
+
+It covers:
+
+- hard and soft skills
+- roles
+- seniority
+- experience
+- work mode
+- employment type
+- education
+- companies
+- recommendations
 
 | Market overview | Hard-skill demand |
 |---|---|
 | [![Market overview with skill demand, role demand, recommendations, and matching vacancies](docs/images/analytics-overview.png)](docs/images/analytics-overview.png) | [![Hard-skill demand with the vacancies behind the selected result](docs/images/analytics-skills.png)](docs/images/analytics-skills.png) |
 
-Select a skill or market fact to inspect the vacancies and posting evidence behind it. Compact top-10 charts show leading skill and role demand in the local dataset. These counts describe vacancies TechJobsNL has observed; they are not presented as the complete Netherlands market. **Stacks remains visible but disabled while it is work in progress.**
+Every result can be traced back to matching vacancy evidence.
+
+Analytics describes observed vacancies in your dataset, not the complete Netherlands labour market. **Stacks remains visible but disabled while it is work in progress.**
 
 Local matching uses the versioned bank in `assets/software-skills.json`; unknown words are not promoted automatically. Optional Claude or Codex CLI discovery may suggest emerging terms, but strict validation and explicit approval are required before a suggestion affects later extraction. No AI provider is required.
 

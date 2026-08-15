@@ -5,9 +5,9 @@ Yes, you can list TechJobsNL in your Projects section if you built or materially
 ## Recommended entry
 
 **TechJobsNL — Rust, Tokio, Ratatui, SQLite, Reqwest**
-Local-first Rust terminal workflow for researching and tracking Netherlands technology vacancies from verified official company career sources, with evidence-linked analytics.
+Local terminal job finder for discovering and tracking Netherlands technology vacancies from official company career sources, including jobs that mention a selected skill.
 
-- Built a Rust terminal workflow for 66 company profiles across 35 official-source strategies, with in-app company selection, title/company search, evidence-linked vacancy exploration through extracted skills and market facts, country/title filters, applied tracking, vacancy history, and responsive keyboard/mouse navigation.
+- Built a Rust terminal workflow for 66 company profiles across 35 official-source strategies, with in-app company selection, title/company search, skill-based job discovery, country/title filters, applied tracking, vacancy history, and responsive keyboard/mouse navigation.
 - Designed complete/incomplete/failed scan semantics so partial source responses cannot falsely close jobs; isolated company failures with bounded concurrency, retries, timeouts, and SQLite transactions.
 - Implemented explainable local analytics for skills, roles, seniority, experience, work mode, and recommendations, backed by exact posting evidence and deterministic offline tests; kept the unfinished Stacks interface disabled during beta.
 
@@ -15,7 +15,7 @@ Local-first Rust terminal workflow for researching and tracking Netherlands tech
 
 **TechJobsNL — Rust, Ratatui, SQLite**
 
-- Built a local Rust terminal workflow for verified company career sources, with safe scan lifecycle handling, application and vacancy-history tracking, and evidence-linked analytics over observed postings.
+- Built a local terminal job finder for 66 company profiles with skill-based discovery, safe scan lifecycle handling, applied/history tracking, and evidence-backed job-market analytics.
 
 ## Claims to avoid
 

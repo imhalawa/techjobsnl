@@ -1,6 +1,8 @@
 # Data and privacy
 
-TechJobsNL is a local-first vacancy research tool. Vacancies, application state, configuration, extracted facts, analytics state, and the personal Library stay on your machine. Network access happens only for a user-requested source scan, opening an official vacancy URL, or optional Claude or Codex discovery.
+TechJobsNL is a local-first vacancy research tool. Jobs, analytics facts, application state, and personal library data remain on your machine.
+
+Network requests only happen when the user starts a scan, opens an official vacancy URL, or enables optional provider discovery.
 
 ## What is stored
 
@@ -20,7 +22,7 @@ Default database path: `.data/techjobsnl.sqlite3`, relative to the user configur
 
 - Startup loads stored data and does not scan automatically.
 - Pressing `r` contacts the official endpoints of enabled companies.
-- Opening an official vacancy uses its URL in the system browser.
+- Opening a job uses its official URL in the system browser.
 - No analytics provider is required; `provider = "local"` makes no AI CLI call.
 
 TechJobsNL does not prove that every external careers endpoint has the same privacy policy. Review the companies and URLs in [SOURCES.md](../SOURCES.md) if that matters for your environment.

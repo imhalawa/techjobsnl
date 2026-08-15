@@ -1,6 +1,13 @@
 # User guide
 
-TechJobsNL helps you research and track Netherlands technology vacancies from supported official company career sources. It starts from stored local data and scans only when you request it. The main workflow is: scan the companies you follow, review or search stored vacancies, use Analytics to inspect patterns and matching posting evidence, and track applications or saved items.
+TechJobsNL helps you research Netherlands technology vacancies from supported company career sources.
+
+The workflow is:
+
+1. Scan enabled sources when you request a refresh.
+2. Review stored vacancies.
+3. Track applications and saved jobs.
+4. Use Analytics to explore patterns and inspect evidence from matching vacancies.
 
 ## Start the app
 
@@ -40,6 +47,10 @@ Press `Tab` or `Esc` to focus navigation, move with arrow keys or `j`/`k`, then 
 
 The job list emphasizes the title and company, with the publication date and meaningful state icons kept secondary. Normal open status is omitted; exceptional closed or reopened state remains visible where it matters. The detail pane shows official metadata, lifecycle dates, application state, skills extracted from the selected job's stored description, and the full posting description. Skills fill each row horizontally and reflow when the pane is resized. The pane reuses cached facts and does not rerun analysis when you change selection; keyboard and mouse-wheel scrolling move one visual line at a time.
 
+The `/` search matches job title and company.
+
+Skill discovery happens through Analytics, where extracted facts are linked back to the vacancies that contain them.
+
 - `/`: enter search mode. Search matches job title or company, not description text.
 - `↑`/`↓`: move through matching jobs without leaving search mode.
 - `Enter`: keep the current search and return to normal controls.
@@ -72,7 +83,7 @@ The Sources view helps separate a current source failure from old stored jobs. U
 
 ## Use analytics
 
-Analytics supports evidence-linked vacancy exploration as well as market context. Select a skill, role, or other row to narrow the evidence list to matching vacancies, then inspect or open the selected job. Results describe only eligible postings TechJobsNL observed; they are not a complete measure of the Netherlands labour market.
+Select an extracted skill or market fact to see the vacancies that contain the supporting evidence. Results describe only the postings TechJobsNL observed; they are not a complete measure of the Netherlands labour market.
 
 Shared controls:
 
@@ -99,7 +110,7 @@ Overview combines hard-skill demand, role demand, career recommendations, and ma
 
 ![Hard-skill demand and matching vacancies](images/analytics-skills.png)
 
-Skills uses **Hard Skills** and **Soft Skills** sub-tabs so the active table keeps the full available width on small terminals. Select a skill to see vacancies whose extracted facts contain matching evidence. Use `J`/`K` to choose a vacancy and `Enter` or `o` to open it. A compact top-10 demand chart appears above the table. Use Left/Right or click a sub-tab to switch. Each sub-tab preserves its own selected row. Press `m` to cycle a saved skill through Known, Learning, Interested, then no status.
+Skills uses **Hard Skills** and **Soft Skills** sub-tabs so the active table keeps the full available width on small terminals. Select a skill to see vacancies that mention it in the evidence list; use `J`/`K` to choose a matching job and `Enter` or `o` to open it. A compact top-10 demand chart appears above the table. Use Left/Right or click a sub-tab to switch. Each sub-tab preserves its own selected row. Press `m` to cycle a saved skill through Known, Learning, Interested, then no status.
 
 Skill extraction uses the versioned local bank and exact posting aliases. Unknown words are not automatically promoted to skills.
 
