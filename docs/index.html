@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TechJobsNL — Find Tech Jobs in the Netherlands by Skills</title>
-  <meta name="description" content="TechJobsNL is an open-source Rust TUI for finding tech jobs in the Netherlands by skills, companies, and roles from official company career sources.">
+  <title>TechJobsNL — Netherlands Tech Vacancies from Official Company Sources</title>
+  <meta name="description" content="Local-first Rust TUI for discovering and tracking Netherlands tech vacancies from verified company career sources, with evidence-linked analytics.">
   <meta name="theme-color" content="#f6f2e8">
   <link rel="canonical" href="https://imhalawa.github.io/techjobsnl/">
-  <meta property="og:title" content="TechJobsNL — Netherlands Tech Job Search">
-  <meta property="og:description" content="Find tech jobs in the Netherlands by the skills companies mention, then trace every insight back to real vacancies.">
+  <meta property="og:title" content="TechJobsNL — Netherlands Tech Vacancies from Official Company Sources">
+  <meta property="og:description" content="Research and track Netherlands tech vacancies from official company sources, with local history and evidence-linked analytics.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://imhalawa.github.io/techjobsnl/">
   <meta property="og:image" content="https://imhalawa.github.io/techjobsnl/images/hero.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="TechJobsNL — Netherlands Tech Job Search">
-  <meta name="twitter:description" content="Open-source, local-first tech job search for the Netherlands.">
+  <meta name="twitter:title" content="TechJobsNL — Netherlands Tech Vacancies">
+  <meta name="twitter:description" content="Local-first vacancy research and evidence-linked analytics from official company career sources.">
   <meta name="twitter:image" content="https://imhalawa.github.io/techjobsnl/images/hero.png">
   <script type="application/ld+json">
   {
@@ -26,7 +26,7 @@
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Windows, Linux, macOS",
     "isAccessibleForFree": true,
-    "description": "Open-source, local-first Rust terminal application for finding technology jobs in the Netherlands by skills, companies, and roles from official company career sources."
+    "description": "Local-first Rust terminal application for researching and tracking Netherlands technology vacancies from verified official company career sources, with evidence-linked analytics."
   }
   </script>
   <style>
@@ -52,63 +52,63 @@
     <div class="wrap hero">
       <div>
         <div class="eyebrow"><span class="dot"></span> Open source · Local first · Built in Rust</div>
-        <h1>Find tech jobs in the Netherlands by the <em>skills</em> they mention.</h1>
-        <p class="lead">TechJobsNL scans selected official company career sources, lets you explore vacancies from your terminal, and connects skill-demand analytics back to the exact jobs behind every result.</p>
+        <h1>Find, understand, and track Netherlands tech vacancies from <em>official company sources</em>.</h1>
+        <p class="lead">TechJobsNL is a local-first Rust terminal application that stores vacancy history on your machine and connects analytics back to the postings behind each result.</p>
         <div class="actions">
           <a class="btn primary" href="#install">Install TechJobsNL</a>
           <a class="btn secondary" href="https://github.com/imhalawa/techjobsnl">View on GitHub</a>
         </div>
         <div class="proof">
-          <span><strong>SQLite</strong> local cache</span>
-          <span><strong>Official</strong> career sources</span>
+          <span><strong>Local</strong> SQLite data</span>
+          <span><strong>Verified</strong> career sources</span>
           <span><strong>Evidence-linked</strong> analytics</span>
         </div>
       </div>
       <div class="mock">
-        <img src="images/hero.png" alt="TechJobsNL terminal interface for browsing Netherlands technology vacancies and skill analytics">
+        <img src="images/hero.png" alt="TechJobsNL terminal interface for reviewing Netherlands technology vacancies from official company sources">
       </div>
     </div>
 
     <section id="features">
       <div class="wrap">
         <div class="section-head">
-          <div class="kicker">A focused job-search tool</div>
-          <h2>Search the market without turning your job hunt into another browser tab.</h2>
-          <p>TechJobsNL is designed for developers who want a fast, inspectable workflow around real company vacancies rather than another opaque recommendation feed.</p>
+          <div class="kicker">A focused vacancy research workflow</div>
+          <h2>From official company sources to evidence you can inspect.</h2>
+          <p>You choose which supported companies to follow. TechJobsNL scans them when requested, stores eligible vacancies locally, and keeps every analytics result connected to the postings behind it.</p>
         </div>
         <div class="grid">
-          <article class="card"><span class="num">01</span><h3>Official sources</h3><p>Scan vacancies directly from selected company career sites using documented source strategies.</p></article>
-          <article class="card"><span class="num">02</span><h3>Skill-based discovery</h3><p>Find roles through technologies and skills mentioned in job descriptions, not only job titles.</p></article>
-          <article class="card"><span class="num">03</span><h3>Local history</h3><p>Keep jobs, application state, saved items, and scan history locally in SQLite.</p></article>
-          <article class="card"><span class="num">04</span><h3>Traceable analytics</h3><p>Select a market signal and inspect the matching vacancies and evidence behind the count.</p></article>
+          <article class="card"><span class="num">01</span><h3>Official company sources</h3><p>Scan supported employer career sources instead of relying on an opaque aggregated feed.</p></article>
+          <article class="card"><span class="num">02</span><h3>Vacancy lifecycle</h3><p>Track active, new, applied, saved, closed, and reopened vacancies without losing useful history.</p></article>
+          <article class="card"><span class="num">03</span><h3>Evidence-linked analytics</h3><p>Explore skills, roles, and market patterns, then inspect the vacancies and posting evidence behind each result.</p></article>
+          <article class="card"><span class="num">04</span><h3>Local-first data</h3><p>Keep vacancies, preferences, analytics state, and job-search history in SQLite on your machine.</p></article>
         </div>
       </div>
     </section>
 
     <section id="product">
       <div class="wrap product">
-        <div class="shot"><img src="images/jobs.png" alt="Active Netherlands tech vacancies in the TechJobsNL terminal interface"></div>
+        <div class="shot"><img src="images/jobs.png" alt="Active Netherlands technology vacancies and selected posting details in TechJobsNL"></div>
         <div class="copyblock">
-          <div class="kicker">Job browser</div>
-          <h2>Keep active vacancies, details, and your next action in one place.</h2>
-          <p>Browse stored jobs, search by company or title, open the official posting, save interesting roles, and mark applications without leaving the terminal workflow.</p>
+          <div class="kicker">Vacancy workflow</div>
+          <h2>Keep vacancies, history, and your next action in one place.</h2>
+          <p>Browse stored jobs, search by company or title, inspect the posting, open the official vacancy, save interesting roles, and mark applications from the terminal.</p>
           <div class="ticks">
-            <div class="tick"><b>✓</b><span>Active, new, applied, and historical job states</span></div>
-            <div class="tick"><b>✓</b><span>Selected-job details alongside the vacancy list</span></div>
-            <div class="tick"><b>✓</b><span>Company following controls for focused future scans</span></div>
+            <div class="tick"><b>✓</b><span>Active, new, applied, closed, and reopened vacancy states</span></div>
+            <div class="tick"><b>✓</b><span>Selected-vacancy details beside the list</span></div>
+            <div class="tick"><b>✓</b><span>Company following controls for future scans</span></div>
           </div>
         </div>
         <div class="copyblock">
-          <div class="kicker">Market analytics</div>
-          <h2>See demand, then inspect the evidence.</h2>
+          <div class="kicker">Evidence-linked analytics</div>
+          <h2>See an observed pattern, then inspect the postings behind it.</h2>
           <p>Analytics covers skills, roles, seniority, experience, work mode, employment, education, companies, and learn-next recommendations from the vacancies stored on your machine.</p>
           <div class="ticks">
-            <div class="tick"><b>✓</b><span>Hard- and soft-skill demand</span></div>
-            <div class="tick"><b>✓</b><span>Role and seniority patterns</span></div>
+            <div class="tick"><b>✓</b><span>Hard- and soft-skill evidence</span></div>
+            <div class="tick"><b>✓</b><span>Role, seniority, and work-pattern context</span></div>
             <div class="tick"><b>✓</b><span>Matching vacancies behind selected results</span></div>
           </div>
         </div>
-        <div class="shot"><img src="images/analytics-overview.png" alt="TechJobsNL evidence-linked Netherlands tech job market analytics"></div>
+        <div class="shot"><img src="images/analytics-overview.png" alt="Evidence-linked analytics with matching Netherlands technology vacancies in TechJobsNL"></div>
       </div>
     </section>
 
@@ -117,7 +117,7 @@
         <div>
           <div class="kicker" style="color:#8fb3ff">Install</div>
           <h2>Run TechJobsNL locally.</h2>
-          <p>Native release archives are available for macOS, Linux, and Windows. Your configuration, job history, analytics, and application state stay on your machine.</p>
+          <p>Native releases are available for macOS, Linux, and Windows. Your configuration, vacancy history, analytics, and application state stay on your machine.</p>
           <a class="btn secondary" style="background:#fff;color:#10233f" href="https://github.com/imhalawa/techjobsnl/releases/latest">Latest release</a>
         </div>
         <div class="terminal" aria-label="Install commands">

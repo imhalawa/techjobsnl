@@ -1,6 +1,6 @@
 # User guide
 
-TechJobsNL helps you find Netherlands tech jobs, including vacancies that mention a specific skill. It starts from stored local data and scans only when you request it. The main workflow is: scan sources, review or search eligible jobs, use Analytics to open jobs matching a selected skill, and track applications or saved items.
+TechJobsNL helps you research and track Netherlands technology vacancies from supported official company career sources. It starts from stored local data and scans only when you request it. The main workflow is: scan the companies you follow, review or search stored vacancies, use Analytics to inspect patterns and matching posting evidence, and track applications or saved items.
 
 ## Start the app
 
@@ -72,7 +72,7 @@ The Sources view helps separate a current source failure from old stored jobs. U
 
 ## Use analytics
 
-Analytics supports job discovery as well as market context. Select a skill, role, or other row to narrow the evidence list to matching vacancies, then open the selected job. Results describe only the postings TechJobsNL observed; they are not a complete measure of the Netherlands labour market.
+Analytics supports evidence-linked vacancy exploration as well as market context. Select a skill, role, or other row to narrow the evidence list to matching vacancies, then inspect or open the selected job. Results describe only eligible postings TechJobsNL observed; they are not a complete measure of the Netherlands labour market.
 
 Shared controls:
 
@@ -99,7 +99,7 @@ Overview combines hard-skill demand, role demand, career recommendations, and ma
 
 ![Hard-skill demand and matching vacancies](images/analytics-skills.png)
 
-Skills uses **Hard Skills** and **Soft Skills** sub-tabs so the active table keeps the full available width on small terminals. Select a skill to see vacancies that mention it in the evidence list; use `J`/`K` to choose a matching job and `Enter` or `o` to open it. A compact top-10 demand chart appears above the table. Use Left/Right or click a sub-tab to switch. Each sub-tab preserves its own selected row. Press `m` to cycle a saved skill through Known, Learning, Interested, then no status.
+Skills uses **Hard Skills** and **Soft Skills** sub-tabs so the active table keeps the full available width on small terminals. Select a skill to see vacancies whose extracted facts contain matching evidence. Use `J`/`K` to choose a vacancy and `Enter` or `o` to open it. A compact top-10 demand chart appears above the table. Use Left/Right or click a sub-tab to switch. Each sub-tab preserves its own selected row. Press `m` to cycle a saved skill through Known, Learning, Interested, then no status.
 
 Skill extraction uses the versioned local bank and exact posting aliases. Unknown words are not automatically promoted to skills.
 

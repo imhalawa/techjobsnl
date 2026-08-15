@@ -1,6 +1,6 @@
 # Architecture
 
-TechJobsNL is a local job finder built as a single Rust binary with a shared library. Users can review jobs directly or select an extracted skill or market fact to see matching posting evidence. The code keeps source collection, filtering, storage, analytics, and terminal rendering separate so failures remain local and testable.
+TechJobsNL is a local vacancy research workflow built as a single Rust binary with a shared library. Users can review stored vacancies directly or select an extracted skill or market fact to inspect matching posting evidence. The code keeps source collection, filtering, storage, analytics, and terminal rendering separate so failures remain local and testable.
 
 ## High-level design
 
@@ -20,7 +20,7 @@ flowchart LR
 
 `src/main.rs` is the composition root [the place that connects the parts]. It builds source adapters from configuration, starts background work, applies `AppCommand` effects, reloads stored read models, and owns terminal startup and shutdown.
 
-The terminal UI does not call career sites directly. Scans go through `ScanService` and a `JobSource` adapter; job discovery and analytics read normalized local records from SQLite.
+The terminal UI does not call career sites directly. Scans go through `ScanService` and a `JobSource` adapter; vacancy exploration and analytics read normalized local records from SQLite.
 
 ## Runtime flow
 
