@@ -101,3 +101,17 @@ jobs:
             [Environment]::SetEnvironmentVariable("Path", $originalUserPath, "User")
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $testInstallDir
           }
+
+      - name: Check Windows PowerShell 5.1 installer compatibility
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $installer = Get-Content scripts/install.ps1 -Raw
+          $null = [scriptblock]::Create($installer)
+          if ($installer.Contains("RuntimeInformation")) {
+            throw "Installer uses RuntimeInformation, which is not reliable across Windows PowerShell 5.1 runtimes"
+          }
+          $architecture = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+          if ($architecture -notin @("AMD64", "ARM64")) {
+            throw "Unsupported Windows runner architecture: $architecture"
+          }
