@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use chrono::{TimeZone, Utc};
-use job_watch::{
+use serde_json::json;
+use techjobsnl::{
     config::FiltersConfig,
     domain::ObservedJob,
     filter::{EligibilityFilter, FilterError},
 };
-use serde_json::json;
 
 type FilterCase = (
     ObservedJob,

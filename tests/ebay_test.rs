@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use job_watch::{
+use techjobsnl::{
     domain::{ObservedJob, SourceErrorKind, SourceScan},
     sources::{
         JobSource,
@@ -190,7 +190,7 @@ async fn ebay_live_returns_complete_unique_netherlands_jobs() {
     println!("eBay: {} Netherlands jobs", observations.len());
 }
 
-fn parse_fixtures() -> Result<Vec<ObservedJob>, job_watch::sources::SourceError> {
+fn parse_fixtures() -> Result<Vec<ObservedJob>, techjobsnl::sources::SourceError> {
     let listings = listing_fixtures();
     let details = detail_fixtures();
     parse_ebay_pages(
@@ -242,7 +242,7 @@ fn assert_listing_error(listings: &[&str]) {
     ));
 }
 
-fn assert_schema_error(result: Result<Vec<ObservedJob>, job_watch::sources::SourceError>) {
+fn assert_schema_error(result: Result<Vec<ObservedJob>, techjobsnl::sources::SourceError>) {
     let error = result.unwrap_err();
     assert_eq!(error.kind, SourceErrorKind::Schema);
     assert!(!error.retryable);

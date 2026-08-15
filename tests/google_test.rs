@@ -1,13 +1,13 @@
 use std::{collections::HashSet, time::Duration};
 
-use job_watch::{
+use serde_json::{Value, json};
+use techjobsnl::{
     domain::SourceScan,
     sources::{
         JobSource,
         google::{GoogleSource, parse_google_pages},
     },
 };
-use serde_json::{Value, json};
 
 const SEARCH_URL: &str = "https://www.google.com/about/careers/applications/jobs/results/?company=Google&location=Netherlands&sort_by=date";
 

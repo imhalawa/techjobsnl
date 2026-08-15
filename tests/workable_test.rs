@@ -1,6 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
-use job_watch::{
+use techjobsnl::{
     domain::SourceScan,
     sources::{
         JobSource,

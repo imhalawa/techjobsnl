@@ -1,6 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
-use job_watch::{
+use techjobsnl::{
     domain::{ObservedJob, SourceErrorKind, SourceScan},
     sources::{
         JobSource,
@@ -224,7 +224,7 @@ fn ing_details() -> Vec<String> {
 fn parse_fixture(
     listings: Vec<String>,
     details: Vec<String>,
-) -> Result<Vec<ObservedJob>, job_watch::sources::SourceError> {
+) -> Result<Vec<ObservedJob>, techjobsnl::sources::SourceError> {
     let listings = listings.iter().map(String::as_str).collect::<Vec<_>>();
     let details = details.iter().map(String::as_str).collect::<Vec<_>>();
     parse_ing_pages("ing", LISTING_URL, &listings, &details)
@@ -237,7 +237,7 @@ fn set_listing_attr(html: &mut String, name: &str, value: &str) {
     html.replace_range(start..end, value);
 }
 
-fn assert_schema_error(result: Result<Vec<ObservedJob>, job_watch::sources::SourceError>) {
+fn assert_schema_error(result: Result<Vec<ObservedJob>, techjobsnl::sources::SourceError>) {
     let error = result.unwrap_err();
     assert_eq!(error.kind, SourceErrorKind::Schema);
     assert!(!error.retryable);

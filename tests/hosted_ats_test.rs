@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use job_watch::{
+use techjobsnl::{
     config::Config,
     domain::{ObservedJob, SourceErrorKind, SourceScan},
     filter::EligibilityFilter,
@@ -389,7 +389,7 @@ async fn hosted_candidate_batch_live_returns_complete_unique_netherlands_jobs() 
         ),
         (
             "Miro",
-            Box::new(job_watch::sources::ashby::AshbySource::new(
+            Box::new(techjobsnl::sources::ashby::AshbySource::new(
                 "miro",
                 "miro",
                 client.clone(),
@@ -397,7 +397,7 @@ async fn hosted_candidate_batch_live_returns_complete_unique_netherlands_jobs() 
         ),
         (
             "Checkout.com",
-            Box::new(job_watch::sources::ashby::AshbySource::new(
+            Box::new(techjobsnl::sources::ashby::AshbySource::new(
                 "checkout-com",
                 "checkout.com",
                 client.clone(),
@@ -568,7 +568,7 @@ fn assert_jibe_fixture_error(pages: Vec<serde_json::Value>) {
     ));
 }
 
-fn assert_schema_error(result: Result<Vec<ObservedJob>, job_watch::sources::SourceError>) {
+fn assert_schema_error(result: Result<Vec<ObservedJob>, techjobsnl::sources::SourceError>) {
     let error = result.unwrap_err();
     assert_eq!(error.kind, SourceErrorKind::Schema);
     assert!(!error.retryable);

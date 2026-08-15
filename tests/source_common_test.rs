@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use job_watch::{
+use techjobsnl::{
     domain::SourceErrorKind,
     sources::{
         http::send_text,

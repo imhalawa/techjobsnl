@@ -7,7 +7,8 @@ use std::{
     time::Duration,
 };
 
-use job_watch::{
+use serde_json::json;
+use techjobsnl::{
     config::{CompanyConfig, FiltersConfig, ScanConfig, SourceConfig},
     domain::{JobKey, ObservedJob, ScanEvent, SourceErrorKind, SourceScan},
     filter::EligibilityFilter,
@@ -15,7 +16,6 @@ use job_watch::{
     sources::{JobSource, SourceError},
     storage::{JobQuery, Store},
 };
-use serde_json::json;
 use tokio::sync::mpsc;
 
 struct CompleteSource {

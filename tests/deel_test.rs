@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use job_watch::{
+use techjobsnl::{
     domain::SourceScan,
     sources::{
         JobSource,

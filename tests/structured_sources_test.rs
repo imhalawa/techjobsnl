@@ -1,7 +1,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use futures_util::{StreamExt, stream};
-use job_watch::{
+use techjobsnl::{
     domain::{ObservedJob, SourceErrorKind, SourceScan},
     sources::{
         JobSource,
@@ -195,7 +195,7 @@ fn bol_fixtures() -> Vec<serde_json::Value> {
 
 fn parse_fixture_pages(
     pages: Vec<serde_json::Value>,
-) -> Result<Vec<ObservedJob>, job_watch::sources::SourceError> {
+) -> Result<Vec<ObservedJob>, techjobsnl::sources::SourceError> {
     let raw = pages
         .iter()
         .map(serde_json::Value::to_string)
@@ -204,7 +204,7 @@ fn parse_fixture_pages(
     parse_bol_pages("bol", "https://careers.bol.com", &refs)
 }
 
-fn assert_schema_error(result: Result<Vec<ObservedJob>, job_watch::sources::SourceError>) {
+fn assert_schema_error(result: Result<Vec<ObservedJob>, techjobsnl::sources::SourceError>) {
     let error = result.unwrap_err();
     assert_eq!(error.kind, SourceErrorKind::Schema);
     assert!(!error.retryable);

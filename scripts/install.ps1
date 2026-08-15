@@ -1,10 +1,10 @@
 param(
-    [string]$Version = $(if ($env:TECHJOBSNL_VERSION) { $env:TECHJOBSNL_VERSION } else { $env:JOB_WATCH_VERSION }),
-    [string]$InstallDir = $(if ($env:TECHJOBSNL_INSTALL_DIR) { $env:TECHJOBSNL_INSTALL_DIR } else { $env:JOB_WATCH_INSTALL_DIR })
+    [string]$Version = $env:TECHJOBSNL_VERSION,
+    [string]$InstallDir = $env:TECHJOBSNL_INSTALL_DIR
 )
 
 $ErrorActionPreference = "Stop"
-$Repository = if ($env:TECHJOBSNL_REPOSITORY) { $env:TECHJOBSNL_REPOSITORY } elseif ($env:JOB_WATCH_REPOSITORY) { $env:JOB_WATCH_REPOSITORY } else { "imhalawa/techjobsnl" }
+$Repository = if ($env:TECHJOBSNL_REPOSITORY) { $env:TECHJOBSNL_REPOSITORY } else { "imhalawa/techjobsnl" }
 if (-not $Version) { $Version = "latest" }
 if (-not $InstallDir) { $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\techjobsnl\bin" }
 
@@ -20,8 +20,6 @@ Write-Host "[1/6] Detected Windows $Architecture"
 $Asset = "techjobsnl-$Target.zip"
 $DownloadBase = if ($env:TECHJOBSNL_DOWNLOAD_BASE) {
     $env:TECHJOBSNL_DOWNLOAD_BASE.TrimEnd("/")
-} elseif ($env:JOB_WATCH_DOWNLOAD_BASE) {
-    $env:JOB_WATCH_DOWNLOAD_BASE.TrimEnd("/")
 } elseif ($Version -eq "latest") {
     "https://github.com/$Repository/releases/latest/download"
 } else {

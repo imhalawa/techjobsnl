@@ -3,7 +3,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use job_watch::{
+use ratatui::{Terminal, backend::TestBackend};
+use serde_json::json;
+use techjobsnl::{
     config::{CompanyConfig, Config, SourceConfig},
     domain::{JobKey, ObservedJob, SourceErrorKind, SourceScan},
     filter::EligibilityFilter,
@@ -12,8 +14,6 @@ use job_watch::{
     storage::{JobQuery, Store},
     ui::{App, render},
 };
-use ratatui::{Terminal, backend::TestBackend};
-use serde_json::json;
 use tokio::sync::mpsc;
 
 #[derive(Clone)]
