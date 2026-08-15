@@ -41,7 +41,7 @@ fi
 printf '%s  %s\n' "$hash" "$asset" > "$temporary_dir/release/SHA256SUMS"
 
 default_output=$(
-    HOME="$temporary_home" SHELL=/bin/zsh PATH=/usr/bin \
+    HOME="$temporary_home" XDG_CONFIG_HOME= SHELL=/bin/zsh PATH=/usr/bin \
     TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
         sh scripts/install.sh
 )
@@ -51,11 +51,15 @@ printf '%s\n' "$default_output" | grep -q '^\[3/6\] Verifying SHA-256 checksum$'
 printf '%s\n' "$default_output" | grep -q '^\[4/6\] Installing to '
 printf '%s\n' "$default_output" | grep -q '^\[5/6\] Configuring command discovery$'
 printf '%s\n' "$default_output" | grep -q '^\[6/6\] Installation complete$'
-printf '%s\n' "$default_output" | grep -q '^Config on first launch: '
+case "$(uname -s)" in
+    Linux) expected_config="$temporary_home/.config/techjobsnl" ;;
+    Darwin) expected_config="$temporary_home/Library/Application Support/techjobsnl" ;;
+esac
+printf '%s\n' "$default_output" | grep -Fqx "Config on first launch: $expected_config"
 test -x "$temporary_home/.local/bin/techjobsnl"
 
 second_output=$(
-    HOME="$temporary_home" SHELL=/bin/zsh PATH=/usr/bin \
+    HOME="$temporary_home" XDG_CONFIG_HOME= SHELL=/bin/zsh PATH=/usr/bin \
     TECHJOBSNL_DOWNLOAD_BASE="file://$temporary_dir/release" \
         sh scripts/install.sh
 )
