@@ -8,10 +8,11 @@ $Repository = if ($env:TECHJOBSNL_REPOSITORY) { $env:TECHJOBSNL_REPOSITORY } els
 if (-not $Version) { $Version = "latest" }
 if (-not $InstallDir) { $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\techjobsnl\bin" }
 
-$Architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
-$Target = switch ($Architecture) {
-    "X64" { "x86_64-pc-windows-msvc" }
-    "Arm64" { "aarch64-pc-windows-msvc" }
+$Architecture = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+if (-not $Architecture) { throw "Unable to detect CPU architecture" }
+$Target = switch ($Architecture.ToUpperInvariant()) {
+    "AMD64" { "x86_64-pc-windows-msvc" }
+    "ARM64" { "aarch64-pc-windows-msvc" }
     default { throw "Unsupported CPU architecture: $Architecture" }
 }
 Write-Host "[1/6] Detected Windows $Architecture"

@@ -140,4 +140,7 @@ grep -q 'pull_request:' "$ci_workflow"
 grep -q 'cargo test --locked --all-targets' "$ci_workflow"
 grep -q 'cargo build --locked --release' "$ci_workflow"
 grep -q 'Download checksum verification failed' scripts/install.ps1
+grep -q 'PROCESSOR_ARCHITEW6432' scripts/install.ps1
+grep -q 'PROCESSOR_ARCHITECTURE' scripts/install.ps1
+! grep -q 'RuntimeInformation' scripts/install.ps1
 grep -q 'Configuration and job history were not removed.' scripts/uninstall.ps1
