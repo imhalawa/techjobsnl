@@ -120,24 +120,29 @@ test "$("$temporary_dir/bin/techjobsnl")" = installed
 printf '%s\n' "$update_output" | grep -q '^Updated techjobsnl at '
 
 config_root="$temporary_dir/config"
-mkdir -p "$config_root/techjobsnl"
-printf '%s\n' data > "$config_root/techjobsnl/config.toml"
+data_home="$temporary_dir/data-home"
+case "$(uname -s)" in
+    Linux) data_dir="$config_root/techjobsnl" ;;
+    Darwin) data_dir="$data_home/Library/Application Support/techjobsnl" ;;
+esac
+mkdir -p "$data_dir"
+printf '%s\n' data > "$data_dir/config.toml"
 uninstall_output=$(
-    XDG_CONFIG_HOME="$config_root" TECHJOBSNL_REMOVE_DATA=yes \
+    HOME="$data_home" XDG_CONFIG_HOME="$config_root" TECHJOBSNL_REMOVE_DATA=yes \
     TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" sh scripts/uninstall.sh
 )
 test ! -e "$temporary_dir/bin/techjobsnl"
-test ! -e "$config_root/techjobsnl"
-printf '%s\n' "$uninstall_output" | grep -Fqx "Removed configuration and job history at $config_root/techjobsnl"
+test ! -e "$data_dir"
+printf '%s\n' "$uninstall_output" | grep -Fqx "Removed configuration and job history at $data_dir"
 printf '%s\n' "$uninstall_output" | grep -Fqx 'Feedback welcome: https://github.com/imhalawa/techjobsnl/issues/new?labels=feedback'
 grep -Fq 'https://github.com/imhalawa/techjobsnl/issues/new?labels=feedback' scripts/uninstall.ps1
 grep -Fq 'Remove configuration and job history at %s? [y/N]' scripts/uninstall.sh
 grep -Fq 'Read-Host "Remove configuration and job history at $DataDir? [y/N]"' scripts/uninstall.ps1
 
-mkdir -p "$config_root/techjobsnl"
-XDG_CONFIG_HOME="$config_root" TECHJOBSNL_REMOVE_DATA=no \
+mkdir -p "$data_dir"
+HOME="$data_home" XDG_CONFIG_HOME="$config_root" TECHJOBSNL_REMOVE_DATA=no \
 TECHJOBSNL_INSTALL_DIR="$temporary_dir/bin" sh scripts/uninstall.sh >/dev/null
-test -d "$config_root/techjobsnl"
+test -d "$data_dir"
 
 release_workflow=.github/workflows/release.yml
 ci_workflow=.github/workflows/ci.yml
