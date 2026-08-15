@@ -63,6 +63,11 @@ jobs:
         shell: pwsh
         run: |
           bash tests/release_test.sh
+          $bootstrap = Get-Content docs/install.ps1 -Raw
+          $null = [scriptblock]::Create($bootstrap)
+          if (-not $bootstrap.Contains("https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.ps1")) {
+            throw "Windows bootstrap is missing the canonical installer URL"
+          }
           $installer = Get-Content scripts/install.ps1 -Raw
           $null = [scriptblock]::Create($installer)
           foreach ($message in @(

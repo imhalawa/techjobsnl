@@ -33,7 +33,7 @@ The latest release provides checksum-verified native archives for macOS, Linux, 
 ### macOS and Linux
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.sh | sh && "$HOME/.local/bin/techjobsnl"
+curl -fsSL https://imhalawa.github.io/techjobsnl/install | sh
 ```
 
 The installer writes to `~/.local/bin` by default and tells you if that directory is not on `PATH`.
@@ -41,7 +41,7 @@ The installer writes to `~/.local/bin` by default and tells you if that director
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.ps1 | iex; if ($?) { & "$env:LOCALAPPDATA\Programs\techjobsnl\bin\techjobsnl.exe" }
+irm https://imhalawa.github.io/techjobsnl/install.ps1 | iex
 ```
 
 The installer writes to `%LOCALAPPDATA%\Programs\techjobsnl\bin` and adds that directory to the user `PATH`. Open a new terminal if `techjobsnl` is not immediately available.

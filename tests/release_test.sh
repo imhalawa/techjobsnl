@@ -6,6 +6,13 @@ cd "$(dirname "$0")/.."
 sh -n scripts/check-release-version.sh
 sh -n scripts/install.sh
 sh -n scripts/uninstall.sh
+sh -n docs/install
+grep -Fq 'https://raw.githubusercontent.com/imhalawa/techjobsnl/main/scripts/install.sh' docs/install
+for documentation in README.md docs/index.html
+do
+    grep -Fq 'curl -fsSL https://imhalawa.github.io/techjobsnl/install | sh' "$documentation"
+    grep -Fq 'irm https://imhalawa.github.io/techjobsnl/install.ps1 | iex' "$documentation"
+done
 sh scripts/check-release-version.sh v0.1.0 >/dev/null
 if sh scripts/check-release-version.sh v9.9.9 >/dev/null 2>&1; then
     printf '%s\n' 'release version check accepted the wrong tag' >&2
