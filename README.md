@@ -85,7 +85,7 @@ The uninstallers remove the executable but preserve configuration and job histor
 
 ![Active vacancies with the selected job's details](docs/images/jobs.png)
 
-Press `?` for controls. Company choices save immediately and apply to later scans.
+In **Settings → Companies**, use `/` to search and Space or `Enter` to follow companies. Choices save immediately and apply to later scans.
 
 ![Searchable company-following settings](docs/images/settings-companies.png)
 
