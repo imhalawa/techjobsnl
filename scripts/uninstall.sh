@@ -12,3 +12,4 @@ else
 fi
 
 printf '%s\n' 'Configuration and job history were not removed.'
+printf '%s\n' 'Feedback welcome: https://github.com/imhalawa/techjobsnl/issues/new?labels=feedback'

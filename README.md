@@ -56,9 +56,11 @@ Because the beta binaries are not code-signed, macOS Gatekeeper or Windows Smart
 
 To install a specific release, set `TECHJOBSNL_VERSION=v0.1.0` on macOS/Linux or `$env:TECHJOBSNL_VERSION = "v0.1.0"` on Windows before running the installer. `TECHJOBSNL_INSTALL_DIR` changes the destination.
 
-### Update or uninstall
+### Update
 
 Run the installer again to update the executable. Configuration, job history, and application state are preserved.
+
+### Uninstall
 
 macOS and Linux:
 

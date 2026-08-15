@@ -26,3 +26,4 @@ if ($UserPath) {
 }
 
 Write-Host "Configuration and job history were not removed."
+Write-Host "Feedback welcome: https://github.com/imhalawa/techjobsnl/issues/new?labels=feedback"
