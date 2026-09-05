@@ -44,6 +44,72 @@ public sealed class ProjectGraphTests
     }
 
     [Fact]
+    [Trait("TaskId", "V0.1.0-002")]
+    public void ProjectGraph_ForbiddenReferences_AreRejected()
+    {
+        var forbidden = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["TechJobsNL.Core"] = ["TechJobsNL.Runtime", "TechJobsNL.App", "TechJobsNL.Tui", "Dapper", "Avalonia"],
+            ["TechJobsNL.App"] = ["TechJobsNL.Tui"],
+            ["TechJobsNL.Tui"] = ["TechJobsNL.App"],
+            ["TechJobsNL.Adapters.Providers"] = ["TechJobsNL.Adapters.Analytics.Local"]
+        };
+
+        foreach (var (owner, references) in forbidden)
+        {
+            foreach (var referenced in references)
+            {
+                var fixture = $"<Project><ItemGroup><ProjectReference Include=\"{referenced}\" /></ItemGroup></Project>";
+                Assert.False(IsAllowedReference(owner, referenced, fixture), $"Forbidden fixture was accepted: {owner} -> {referenced}");
+            }
+        }
+    }
+
+    [Fact]
+    [Trait("TaskId", "V0.1.0-002")]
+    public void Repository_ProjectGraph_AndConventions_AreEnforced()
+    {
+        var root = FindRepositoryRoot();
+        var props = XDocument.Load(Path.Combine(root.FullName, "Directory.Build.props"));
+        var propertyGroup = props.Root?.Element("PropertyGroup");
+
+        Assert.Equal("net10.0", propertyGroup?.Element("TargetFramework")?.Value);
+        Assert.Equal("14.0", propertyGroup?.Element("LangVersion")?.Value);
+        Assert.Equal("enable", propertyGroup?.Element("Nullable")?.Value);
+        Assert.Equal("true", propertyGroup?.Element("TreatWarningsAsErrors")?.Value);
+        Assert.Equal("true", propertyGroup?.Element("Deterministic")?.Value);
+        Assert.True(File.Exists(Path.Combine(root.FullName, ".editorconfig")));
+
+        foreach (var sourceFile in Directory.EnumerateFiles(Path.Combine(root.FullName, "src"), "*.cs", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(root.FullName, sourceFile).Replace('\\', '/');
+            if (relative.Split('/').Any(part => part is "bin" or "obj"))
+            {
+                continue;
+            }
+
+            var project = relative.Split('/')[1];
+            var expectedNamespace = project.Replace(".", ".");
+            var text = File.ReadAllText(sourceFile);
+            Assert.Contains($"namespace {expectedNamespace};", text, StringComparison.Ordinal);
+        }
+    }
+
+    private static bool IsAllowedReference(string owner, string referenced, string projectXml)
+    {
+        var document = XDocument.Parse(projectXml);
+        var actual = document.Descendants("ProjectReference")
+            .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
+            .Concat(document.Descendants("PackageReference").Select(element => element.Attribute("Include")?.Value ?? string.Empty));
+        return actual.Contains(referenced, StringComparer.Ordinal) && owner switch
+        {
+            "TechJobsNL.Core" => referenced is "TechJobsNL.Core",
+            "TechJobsNL.App" or "TechJobsNL.Tui" => referenced is "TechJobsNL.Runtime",
+            _ => referenced is "TechJobsNL.Core"
+        };
+    }
+
+    [Fact]
     [Trait("TaskId", "V0.1.0-001")]
     public void ProjectGraph_Clients_AreEmptyExecutableShells()
     {
