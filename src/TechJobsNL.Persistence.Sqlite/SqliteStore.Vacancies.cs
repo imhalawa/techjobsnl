@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using Dapper;
 using TechJobsNL.Core.Domain;
+using TechJobsNL.Core.Profiles;
 
 namespace TechJobsNL.Persistence.Sqlite;
 
@@ -25,6 +26,14 @@ public sealed partial class SqliteStore
             row.SourceOpen != 0, row.IsNew != 0, ParseRequired(row.FirstSeenAt), ParseRequired(row.LastSeenAt), ParseTime(row.ClosedAt), ParseTime(row.ReopenedAt), ParseTime(row.AppliedAt))).ToArray();
     }
 
+    public async Task<IReadOnlyList<VacancySnapshotEvidence>> GetVacancySnapshotsAsync(CancellationToken cancellationToken)
+    {
+        const string sql = "select company_id CompanyId, source_id SourceId, content_hash ContentHash, captured_at CapturedAt, title Title from job_snapshots order by captured_at, company_id, source_id, content_hash;";
+        var rows = await _connection.QueryAsync<SnapshotRow>(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return rows.Select(static row => new VacancySnapshotEvidence(new VacancyKey(new CompanyId(row.CompanyId), new SourceId(row.SourceId)), row.ContentHash, ParseRequired(row.CapturedAt), row.Title)).ToArray();
+    }
+
     private static ImmutableArray<string> ParseStrings(string json) => JsonSerializer.Deserialize<ImmutableArray<string>>(json, CompatibleJson);
     private sealed record VacancyRow(string CompanyId, string SourceId, string Title, string? Department, string? Team, string? EmploymentType, string LocationsJson, string CountriesJson, string JobUrl, string ApplyUrl, string Description, string RawPayload, string? PublishedAt, long Eligible, string EligibilityReason, long SourceOpen, long IsNew, string FirstSeenAt, string LastSeenAt, string? ClosedAt, string? ReopenedAt, string? AppliedAt);
+    private sealed record SnapshotRow(string CompanyId, string SourceId, string ContentHash, string CapturedAt, string Title);
 }

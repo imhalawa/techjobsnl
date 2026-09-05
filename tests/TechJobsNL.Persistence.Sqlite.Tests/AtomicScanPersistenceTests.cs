@@ -9,6 +9,28 @@ namespace TechJobsNL.Persistence.Sqlite.Tests;
 public sealed class AtomicScanPersistenceTests
 {
     [Fact]
+    [Trait("TaskId", "V0.1.0-015")]
+    public async Task VacancySnapshotEvidence_AfterRestart_ReproducesMeaningfulFeedInputs()
+    {
+        var path = TemporaryPath();
+        try
+        {
+            await using (var store = await OpenAsync(path))
+            {
+                await store.SynchronizeCompaniesAsync([Company("alpha")], TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("first", Company("alpha"), [Vacancy("one")], At(8), At(9), TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("raw", Company("alpha"), [Vacancy("one", rawPayload: "{\"changed\":true}")], At(9), At(10), TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("changed", Company("alpha"), [Vacancy("one", "Principal Engineer")], At(10), At(11), TestContext.Current.CancellationToken);
+            }
+
+            await using var reopened = await OpenAsync(path);
+            var evidence = await reopened.GetVacancySnapshotsAsync(TestContext.Current.CancellationToken);
+            evidence.Select(item => item.Title).Should().Equal("Engineer one", "Principal Engineer");
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
     [Trait("TaskId", "V0.1.0-014")]
     public async Task GetAllVacanciesAsync_AfterRestart_RehydratesCompleteDetails()
     {
