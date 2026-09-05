@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 namespace TechJobsNL.Persistence.Sqlite;
 
 /// <summary>Owns an open SQLite connection after its compatible schema has been verified.</summary>
-public sealed class SqliteStore : IAsyncDisposable
+public sealed partial class SqliteStore : IAsyncDisposable
 {
     private readonly SqliteConnection _connection;
 
