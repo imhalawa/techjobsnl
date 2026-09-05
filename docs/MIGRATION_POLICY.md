@@ -56,28 +56,17 @@ Rust product the behavioral reference, and constrains every change to an agreed 
 - Count a feature as migrated only when its task acceptance criteria, deterministic tests, and declared platform checks
   pass.
 
-## Task boundaries
+## Incremental delivery and tasks
 
-- Each implementation task owns one independently reviewable behavior or foundation change.
-- Each task states scope, exclusions, dependencies, Rust references, acceptance criteria, validation commands, expected
-  artifacts, and the sufficient agent/model capability.
-- Keep commits small, conventional, buildable, and limited to the assigned task.
-- Add the smallest deterministic test that proves the requested behavior or parity.
-- Create follow-up task proposals for newly discovered work instead of expanding the active task.
-- Update private Project task state or release metadata only when the orchestrator assigns that responsibility.
+Each release owns a small declared journey; full migration parity remains the final `GOAL.md` gate.
+Core and presentation may be delivered together. Unsupported capabilities stay explicit: an unavailable
+adapter never reports an empty Complete result and never removes retained company configuration or data.
 
-## Task execution
-
-1. Read the assigned task, its dependencies, acceptance criteria, and linked Rust references.
-2. Confirm every dependency is merged into `era`.
-3. Inspect the relevant archive code, tests, fixtures, and documentation.
-4. Establish the required deterministic test or validation evidence.
-5. Implement only the assigned scope using `docs/DOTNET_CONVENTIONS.md` and the target dependency direction.
-6. Run focused checks followed by every validation command named by the task.
-7. Report acceptance-criterion evidence, remaining risks, and discovered follow-up work separately.
-
-A task is complete when every acceptance criterion has evidence, required deterministic tests pass, formatting and
-architecture checks pass, no unrelated files changed, and the resulting commit is conventional and buildable.
+`docs/ISSUE_TEMPLATE.md` owns concise task packets; `Workflow.md` owns execution; `docs/RELEASE_PROCESS.md`
+owns shipping. Read task-named Rust files/cases, then expand only for a specific unresolved behavior.
+Preserve all original scope, acceptance criteria, validation commands, artifacts, and review duties through
+private traceability when splitting tasks. Completed work stays credited; Active work keeps its original contract.
+Use the session-authorized git workflow from current `era`; task branches or isolated worktrees target `era`.
 
 ## Policy retirement
 

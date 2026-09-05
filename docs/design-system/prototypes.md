@@ -1,17 +1,13 @@
-# Release prototypes
+# Interaction validation
 
-Every unshipped release keeps its prototype plan and review evidence in its private release Project draft item. Draft task
-decomposition may identify prototype questions and journeys early, but applicable prototypes must be accepted before a task
-becomes Ready. A prototype validates the complete promised journey, major states, terminology, information hierarchy, and
-design-system fit. Shipping publishes only the safe approval record at `releases/<version>/prototype/README.md`.
+Use a prototype to resolve a named interaction question. Size it to the question and store its artifact pointer,
+decisions, review evidence, and approval in the private release Project draft item.
 
-The prototype record includes its artifact location, realistic synthetic data, required journeys and states, screenshots or
-recordings, review decisions, rejected alternatives, approval, and unresolved implementation constraints. It contains no
-credentials, personal data, licensed source payloads, or confidential third-party material.
+A straightforward standard-control journey may be validated in the working app when no inherited prototype
+acceptance requirement applies. Check relevant populated, empty, loading, failure, offline, keyboard, and
+recovery states. Explicit prototype, rejected-alternative, approval, and visual-evidence obligations already
+recorded in tasks remain owned by the traceability plan; replanning does not silently waive them.
 
-Prototype fidelity should answer the release's uncertain interaction questions and stop there. Production architecture,
-persistence, and provider behavior remain proven by implementation tasks and tests.
-
-The GitHub repository is public. Keep confidential prototype artifacts locally or in an access-controlled design workspace;
-mirror their private planning and review record only as Project draft items under `docs/PLANNING_PRIVACY.md`. Never place a
-confidential artifact or its substantive design content in a public commit, pull request, or repository issue.
+Keep unshipped artifacts private under `docs/PLANNING_PRIVACY.md`. Shipping publishes only a safe validation
+record in `releases/<version>/prototype/README.md`. Prototypes answer interaction questions; implementation
+tests prove production persistence, providers, and shared behavior.

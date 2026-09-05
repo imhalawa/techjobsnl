@@ -24,17 +24,30 @@ contains:
 
 Private release promises, rejected designs, and task bodies remain in Project draft items after shipping.
 
-## Lifecycle
+## Lifecycle and sizing
 
-The Project's release Lifecycle is `Draft`, `Planned`, `Current`, `Shipped`, or `Superseded`. Exactly zero or one release is
-Current. Draft task decomposition may occur at any time. A task becomes Ready only when its release is Planned, applicable
-prototype is Accepted, dependencies resolve, and every acceptance criterion has planned evidence. Only Ready tasks from the
-Current release may be implemented.
+Lifecycle is Draft, Planned, Current, Shipped, or Superseded. Exactly zero or one release is Current.
+Project fields own lifecycle; avoid duplicating mutable status in bodies. A release delivers one useful journey,
+normally through two to four new short tasks. Integrated foundations are credited rather than reimplemented.
 
-Task bodies follow [`ISSUE_TEMPLATE.md`](ISSUE_TEMPLATE.md). They remain Project draft items through Task State `Done` and
-archival.
+Detail Current-release tasks only. Keep near-future releases as outcome sketches and distant requirements in
+traceable delivery sketches. Every original requirement remains owned, including non-AC scope and evidence.
+Split a broad release into smaller journeys rather than deleting requirements to meet a task-count target.
+
+A task becomes Ready when its release is Planned or Current, dependencies are integrated, applicable design
+decisions are resolved, and acceptance checks are specified. Only Ready tasks from Current are executable.
+Prototype approval is required where an inherited obligation or unresolved interaction decision calls for it;
+use `docs/design-system/prototypes.md`. Core-wide completion is not a universal prerequisite for presentation.
+
+Declare platform coverage per release. Interim subsets do not waive eventual Windows/Linux/macOS commitments.
+Retain original private records and map every transferred obligation before archiving unstarted work. Superseded
+does not mean delivered. Completed evidence and Active task contracts remain intact.
 
 ## Shipping
+
+Run focused task checks during implementation and the full deterministic suite, formatting, and architecture
+checks once on the candidate. Repeat after relevant changes/failures. Existing mandatory task-specific checks
+remain binding or must be explicitly assigned to a named acceptance task; reuse evidence only for unchanged code.
 
 A release becomes Shipped only when every promised journey works, acceptance evidence is approved, required checks pass,
 upgrade and rollback behavior are proven, release notes match the build, defect totals are current, and every supported

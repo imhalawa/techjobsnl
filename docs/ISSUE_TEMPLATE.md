@@ -1,177 +1,44 @@
-# Migration task contract
+# Small task packet
 
-Use this contract for every private task Project draft item. One task owns one independently reviewable outcome and normally
-produces one conventional commit.
-
-Populate these Project fields with the same values as the body: Record Type `Task`, Release, Task ID, Sequence, Task State,
-Kind, Area, Risk, Minimum Model, Reasoning Effort, and Depends On.
-
-## Title
-
-`[v<version>] <imperative, outcome-focused title>`
-
-## Body
+Aim for 200–400 words and one observable outcome. Fields own identity/state; the body owns behavior/evidence.
+Required execution metadata: stable Task ID, delivery release, Task State, dependencies and integrated hashes.
+Preserve existing IDs and historical fields. The private Project README identifies the current delivery field.
 
 ```markdown
-## Identity
-
-| Field | Value |
-| --- | --- |
-| Task ID | `V<version>-NNN` |
-| Release | `v<version>` |
-| Kind | Foundation / Feature / Adapter / Migration / UX / Test / Documentation / Bug |
-| Primary area | Core / App / Tui / Runtime / Providers / Analytics / AiExperience / Persistence / Platform / Build |
-| Risk | Low / Medium / High / Critical |
-| Minimum model | `gpt-5.6-luna` / `gpt-5.6-terra` / `gpt-5.6-sol` |
-| Reasoning effort | Low / Medium |
-| Depends on | `None` or stable task IDs |
-| Can run in parallel with | `None` or stable task IDs |
-
 ## Outcome
+One user-visible result, or a small prerequisite for that result.
 
-<One paragraph describing the independently observable result.>
+## Change
+Exact expected files/modules. One sentence of important exclusions.
 
-## User or system value
+## Context
+Exact interfaces, reference files/test cases, and relevant policy sections. Read only these initially.
 
-<Why this outcome advances the release promise.>
+## Accept
+- Observable success condition → named test or inspection.
+- Relevant failure/data-preservation condition → negative-path evidence.
+- Restart/integration condition when applicable → evidence.
 
-## Required context
+## Check
+Exact focused commands, affected-project checks, and required manual checks.
 
-- `AGENTS.md`
-- Private release Project draft item: <title and specific sections>
-- Private task Project draft item: <stable task ID>
-- `docs/ARCHITECTURE.md`: <specific sections>
-- `docs/architecture.mermaid`: <specific nodes or flows>
-- `docs/DOTNET_CONVENTIONS.md`
-- `docs/MIGRATION_POLICY.md`
-- Rust implementation: <exact files>
-- Rust tests or fixtures: <exact files>
-
-## Dependencies
-
-- Required merged tasks: <task IDs or None>
-- Required interfaces or artifacts: <exact contracts>
-- Readiness evidence: <how to verify dependencies>
-
-## In scope
-
-- <owned behavior>
-- <owned interface or adapter>
-- <owned deterministic tests>
-- <owned documentation or migration artifact>
-
-## Excluded
-
-- <adjacent behavior owned elsewhere>
-- <future-release concern>
-- <unrequired refactor>
-
-## Design and implementation guidance
-
-### Ownership
-
-- Owning project and module: <name>
-- Interface and seam: <Core-owned contract>
-- Adapter: <implementation project or None>
-- Consumers: <named callers>
-
-### Required behavior
-
-- <domain rule or state transition>
-- <failure behavior>
-- <ordering or concurrency behavior when applicable>
-
-### Compatibility and safety
-
-| Concern | Requirement |
-| --- | --- |
-| Existing SQLite data | <impact, migration, or None> |
-| Existing TOML configuration | <impact, migration, or None> |
-| Network behavior | <when contact is permitted or None> |
-| Source trust | <identity, completeness, and URL rules or None> |
-| Privacy and secrets | <requirements or None> |
-| Recovery and rollback | <required path or None> |
-
-## Expected change surface
-
-- <project or file family>
-- <test or fixture family>
-- <documentation artifact when required>
-
-## Acceptance criteria
-
-- [ ] **AC-1:** <observable binary condition>
-- [ ] **AC-2:** <observable binary condition>
-- [ ] **AC-3:** <failure or safety condition>
-- [ ] **AC-4:** <persistence, restart, parity, or journey condition when applicable>
-
-## Planned evidence
-
-| Criterion | Evidence |
-| --- | --- |
-| AC-1 | <test, artifact, or reproducible inspection> |
-| AC-2 | <test, artifact, or reproducible inspection> |
-| AC-3 | <negative-path test> |
-| AC-4 | <migration, restart, parity, or journey test> |
-
-## Validation commands
-
-1. <smallest focused test>
-2. <owning-project tests>
-3. <format, analyzer, and architecture checks>
-4. <release-required validation>
-
-## Completion report
-
-- Acceptance criteria and evidence
-- Commands and exact results
-- Files changed
-- Compatibility or migration impact
-- Remaining risks
-- Follow-up task proposals
-- Commit hash
-
-## Stop conditions
-
-- A dependency is not merged into `era`.
-- Rust behavior contradicts the task or its references.
-- An acceptance criterion requires another release's scope.
-- Safe data compatibility or rollback cannot be demonstrated.
-- The implementation requires a new dependency direction.
-- Required credentials or a human product decision are missing.
+## Evidence
+On completion: result, validation, integrated commit, required review, material risk or None.
 ```
 
-Every heading is required. Write `None` where a branch does not apply rather than removing it. Acceptance criteria state
-observable results; implementation activity belongs under guidance or expected change surface.
+Use two to four criteria in new packets. Preserve every inherited acceptance criterion verbatim in its source
+record and map it to a destination; split broad criteria into verifiable sub-obligations without weakening them.
+The packet includes the exact inherited obligations it executes. Executors need not open the whole legacy task.
+Non-AC scope, commands, artifacts, invariants, and review duties also need an owner; an AC-only mapping is insufficient.
 
-## Sizing gate
+Detail only Current-release work. Future release sketches retain source references and requirements without
+speculative task decomposition. Split multiple useful outcomes, multiple new source strategies, or unresolved
+design decisions. A short investigation answers one named unknown and produces a decision or repro.
 
-Split a task when it contains more than one independently useful outcome, multiple provider strategies beyond one shared
-provider contract, both a reusable contract and several production adapters, unrelated schema and UI changes, or more than
-one independently reviewable migration. A vertical slice may cross Core, persistence, Runtime, and App only when every
-change proves one small user journey.
+Draft: scope/evidence not ready. Ready: concrete dependencies integrated and checks specified. Active: owned.
+Review: awaiting required review. Blocked: names missing prerequisite. Done: validated/integrated with required
+reviews. Removed: superseded or intentionally dropped, with traceability. Archival preserves private records.
+Built-in Status: Todo for Draft/Ready; In Progress for Active/Review/Blocked; Done for Done/Removed.
 
-## Model assignment
-
-Use the lowest sufficient tier. Terra Medium is the default; assigning Sol requires a task-specific reason.
-
-| Tier | Use for | Model | Effort |
-| --- | --- | --- | --- |
-| Mechanical | Documentation, boilerplate, fixture registration, cleanup, or a tightly specified isolated change | `gpt-5.6-luna` | Low |
-| Implementation | Rust translation, adapters against established interfaces, deterministic tests, normal Core/App work, persistence, or a bounded vertical slice | `gpt-5.6-terra` | Medium |
-| Lead | Cross-project coordination, unresolved Rust contradictions, risky migration/cutover work, or final integration review | `gpt-5.6-sol` | Medium |
-
-Sol Medium is the ceiling for planned migration work. Split a task whose uncertainty appears to require more reasoning rather
-than escalating the model or effort.
-
-## Workflow mapping
-
-| Task State | Built-in Status | Meaning |
-| --- | --- | --- |
-| Draft | Todo | Decomposition is still being reviewed. |
-| Ready | Todo | All readiness gates pass; waiting for the Current release. |
-| Active | In Progress | One agent owns implementation. |
-| Review | In Progress | Implementation is complete and evidence is under review. |
-| Blocked | In Progress | A named stop condition prevents progress. |
-| Done | Done | Acceptance evidence is approved and the commit is integrated. |
-| Removed | Done | Retained planning record; intentionally not implemented. |
+Use the session's configured model unless a packet states a justified capability requirement. Routine work
+does not require a separate reviewer session. Retained explicit review obligations remain binding.

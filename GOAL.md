@@ -17,6 +17,13 @@ The migration succeeds when:
 - Supported Windows, Linux, and macOS builds and tests pass.
 - The .NET implementation is accepted as the primary release.
 
+## Incremental delivery
+
+These are final migration conditions, not prerequisites for every intermediate release. Deliver small usable
+journeys while retaining the archived application. The private Project maps every deferred requirement and
+acceptance criterion to later delivery. Partial coverage must be explicit and preserve existing data.
+Product expansion does not block restoring Rust parity; all agreed scope remains in the private roadmap.
+
 ## Lifecycle
 
 This is a temporary mission file. The final migration-closing task must delete `GOAL.md` after every completion condition
