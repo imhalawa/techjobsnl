@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Tomlyn" />
     <ProjectReference Include="../TechJobsNL.Adapters.AiExperience.DeepSeek/TechJobsNL.Adapters.AiExperience.DeepSeek.csproj" />
     <ProjectReference Include="../TechJobsNL.Adapters.Analytics.Local/TechJobsNL.Adapters.Analytics.Local.csproj" />
     <ProjectReference Include="../TechJobsNL.Adapters.Platform/TechJobsNL.Adapters.Platform.csproj" />

@@ -363,7 +363,8 @@
           "TechJobsNL.Adapters.Platform": "[1.0.0, )",
           "TechJobsNL.Adapters.Providers": "[1.0.0, )",
           "TechJobsNL.Core": "[1.0.0, )",
-          "TechJobsNL.Persistence.Sqlite": "[1.0.0, )"
+          "TechJobsNL.Persistence.Sqlite": "[1.0.0, )",
+          "Tomlyn": "[2.10.1, )"
         }
       },
       "Dapper": {
@@ -439,6 +440,12 @@
         "requested": "[2.1.13, )",
         "resolved": "2.1.13",
         "contentHash": "D2UAuiGxFYBqeRXjjjGgvJ5UQifzn6wefmSqeKU7XcNGKLbJRP6X7kcPZ6opOBJGdCIlgbSxTvDpBbLvsN594A=="
+      },
+      "Tomlyn": {
+        "type": "CentralTransitive",
+        "requested": "[2.10.1, )",
+        "resolved": "2.10.1",
+        "contentHash": "ykjOY3IpYmC4SpPcAZRTl/w2jTmhPMDydHq8xcV7tTBAQ22nKBsOkPqauIrZlMjHm03cmKfV23UOPscKp+J4Og=="
       }
     }
   }
