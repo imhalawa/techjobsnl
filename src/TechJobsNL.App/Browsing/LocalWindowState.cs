@@ -7,4 +7,5 @@ public sealed record LocalWindowState(bool IsLoading, bool IsFailed, ImmutableAr
 {
     public bool IsEmpty => !IsLoading && !IsFailed && Vacancies.IsEmpty;
     public bool HasVacancies => !Vacancies.IsEmpty;
+    public bool ShowStatusMessage => !HasVacancies && !IsFailed;
 }

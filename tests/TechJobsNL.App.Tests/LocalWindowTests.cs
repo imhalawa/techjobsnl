@@ -62,7 +62,7 @@ public sealed class LocalWindowTests
         model.State.IsLoading.Should().BeFalse();
         model.State.IsFailed.Should().BeTrue();
         model.State.IsEmpty.Should().BeFalse();
-        var message = window.FindControl<TextBlock>("StateMessage");
+        var message = window.FindControl<TextBlock>("ErrorMessage");
         Assert.NotNull(message);
         message.IsVisible.Should().BeTrue();
         message.Text.Should().Contain("configuration");
@@ -116,17 +116,19 @@ public sealed class LocalWindowTests
 
     private sealed class EmptySource : ILocalWindowSource
     {
-        public Task<LocalWindowLoadResult> LoadAsync(CancellationToken cancellationToken) =>
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public Task<LocalWindowLoadResult> LoadAsync(string search, CancellationToken cancellationToken) =>
             Task.FromResult<LocalWindowLoadResult>(new LocalWindowLoadResult.Ready(ImmutableArray<RetainedVacancy>.Empty));
     }
 
     private sealed class PendingSource : ILocalWindowSource
     {
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         public TaskCompletionSource<LocalWindowLoadResult> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public CancellationToken Token { get; private set; }
         public int Calls { get; private set; }
 
-        public Task<LocalWindowLoadResult> LoadAsync(CancellationToken cancellationToken)
+        public Task<LocalWindowLoadResult> LoadAsync(string search, CancellationToken cancellationToken)
         {
             Calls++;
             Token = cancellationToken;
@@ -141,10 +143,11 @@ public sealed class LocalWindowTests
 
     private sealed class FixedSource : ILocalWindowSource
     {
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         private readonly LocalWindowLoadResult _result;
 
         public FixedSource(LocalWindowLoadResult result) { _result = result; }
 
-        public Task<LocalWindowLoadResult> LoadAsync(CancellationToken cancellationToken) => Task.FromResult(_result);
+        public Task<LocalWindowLoadResult> LoadAsync(string search, CancellationToken cancellationToken) => Task.FromResult(_result);
     }
 }

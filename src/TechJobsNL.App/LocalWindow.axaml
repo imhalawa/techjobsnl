@@ -9,12 +9,19 @@
     <StackPanel Spacing="8" Margin="0,0,0,24">
       <TextBlock Text="Vacancies" FontSize="28" FontWeight="SemiBold" />
       <TextBlock Text="Browse vacancies retained on this device." TextWrapping="Wrap" />
+      <TextBox x:Name="SearchBox" Text="{Binding SearchText, Mode=TwoWay}" PlaceholderText="Search title or company"
+               AutomationProperties.Name="Search title or company" Margin="0,8,0,0" />
     </StackPanel>
-    <ProgressBar Grid.Row="1" IsIndeterminate="True" IsVisible="{Binding State.IsLoading}" Margin="0,0,0,16" />
-    <Grid Grid.Row="2">
+    <StackPanel Grid.Row="1" Spacing="8">
+      <ProgressBar IsIndeterminate="True" IsVisible="{Binding State.IsLoading}" Margin="0,0,0,16" />
+      <TextBlock x:Name="ErrorMessage" Text="{Binding State.Message}" IsVisible="{Binding State.IsFailed}" TextWrapping="Wrap" Margin="0,0,0,16" />
+    </StackPanel>
+    <Grid Grid.Row="2" ColumnDefinitions="2*,24,3*">
+      <Grid>
       <TextBlock x:Name="StateMessage" Text="{Binding State.Message}" TextWrapping="Wrap"
-                 IsVisible="{Binding !State.HasVacancies}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                 IsVisible="{Binding State.ShowStatusMessage}" VerticalAlignment="Center" HorizontalAlignment="Center" />
       <ListBox x:Name="VacancyList" ItemsSource="{Binding State.Vacancies}" IsVisible="{Binding State.HasVacancies}"
+               SelectedItem="{Binding SelectedVacancy, Mode=TwoWay}"
                AutomationProperties.Name="Retained vacancies">
         <ListBox.Styles>
           <Style Selector="ListBoxItem" x:DataType="v:RetainedVacancy">
@@ -36,6 +43,21 @@
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
+      </Grid>
+      <Grid Grid.Column="2">
+        <TextBlock x:Name="EmptySelection" Text="Select a vacancy to view its details." TextWrapping="Wrap"
+                   IsVisible="{Binding !HasSelection}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+        <ScrollViewer x:Name="DetailPane" IsVisible="{Binding HasSelection}" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="12" Margin="0,0,12,0">
+            <TextBlock x:Name="DetailTitle" Text="{Binding SelectedVacancy.Title}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock x:Name="DetailCompany" Text="{Binding SelectedVacancy.CompanyName}" TextWrapping="Wrap" />
+            <TextBlock Text="Official vacancy URL" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <SelectableTextBlock x:Name="DetailUrl" Text="{Binding SelectedVacancy.JobUrl}" TextWrapping="Wrap" />
+            <TextBlock Text="Description" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <SelectableTextBlock x:Name="DetailDescription" Text="{Binding SelectedVacancy.Description}" TextWrapping="Wrap" />
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
     </Grid>
     <TextBlock Grid.Row="3" Text="Local data · available offline" Margin="0,16,0,0" FontSize="12" />
   </Grid>
