@@ -23,6 +23,15 @@ public sealed partial class LocalWindow : Window
         DataContext = model;
         Opened += OnOpened;
         Closing += OnClosing;
+        this.FindControl<Button>("MinimizeButton")!.Click += (_, _) => WindowState = WindowState.Minimized;
+        this.FindControl<Button>("MaximizeButton")!.Click += (_, _) =>
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        this.FindControl<Button>("CloseButton")!.Click += (_, _) => Close();
+        PropertyChanged += (_, args) =>
+        {
+            if (args.Property == WindowStateProperty)
+                this.FindControl<Button>("MaximizeButton")!.Content = WindowState == WindowState.Maximized ? "❐" : "□";
+        };
         this.FindControl<TextBox>("SearchBox")!.AddHandler(KeyDownEvent, OnSearchKeyDown, RoutingStrategies.Tunnel);
     }
 

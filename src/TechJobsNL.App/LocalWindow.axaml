@@ -1,64 +1,117 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:b="using:TechJobsNL.App.Browsing"
-        xmlns:v="clr-namespace:TechJobsNL.Core.Vacancies;assembly=TechJobsNL.Core"
-        x:Class="TechJobsNL.App.LocalWindow" x:DataType="b:LocalWindowViewModel"
-        Title="TechJobsNL" Width="1000" Height="700" MinWidth="560" MinHeight="400"
-        WindowStartupLocation="CenterScreen">
-  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="24">
-    <StackPanel Spacing="8" Margin="0,0,0,24">
-      <TextBlock Text="Vacancies" FontSize="28" FontWeight="SemiBold" />
-      <TextBlock Text="Browse vacancies retained on this device." TextWrapping="Wrap" />
-      <TextBox x:Name="SearchBox" Text="{Binding SearchText, Mode=TwoWay}" PlaceholderText="Search title or company"
-               AutomationProperties.Name="Search title or company" Margin="0,8,0,0" />
-    </StackPanel>
-    <StackPanel Grid.Row="1" Spacing="8">
-      <ProgressBar IsIndeterminate="True" IsVisible="{Binding State.IsLoading}" Margin="0,0,0,16" />
-      <TextBlock x:Name="ErrorMessage" Text="{Binding State.Message}" IsVisible="{Binding State.IsFailed}" TextWrapping="Wrap" Margin="0,0,0,16" />
-    </StackPanel>
-    <Grid Grid.Row="2" ColumnDefinitions="2*,24,3*">
-      <Grid>
-      <TextBlock x:Name="StateMessage" Text="{Binding State.Message}" TextWrapping="Wrap"
-                 IsVisible="{Binding State.ShowStatusMessage}" VerticalAlignment="Center" HorizontalAlignment="Center" />
-      <ListBox x:Name="VacancyList" ItemsSource="{Binding State.Vacancies}" IsVisible="{Binding State.HasVacancies}"
-               SelectedItem="{Binding SelectedVacancy, Mode=TwoWay}"
-               AutomationProperties.Name="Retained vacancies">
-        <ListBox.Styles>
-          <Style Selector="ListBoxItem" x:DataType="v:RetainedVacancy">
-            <Setter Property="BorderThickness" Value="2" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
-            <Setter Property="AutomationProperties.HelpText" Value="{Binding CompanyName}" />
-          </Style>
-          <Style Selector="ListBoxItem:focus">
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
-          </Style>
-        </ListBox.Styles>
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="v:RetainedVacancy">
-            <StackPanel Spacing="4" Margin="8,10">
-              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding CompanyName}" TextWrapping="Wrap" />
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:b="using:TechJobsNL.App.Browsing" xmlns:v="clr-namespace:TechJobsNL.Core.Vacancies;assembly=TechJobsNL.Core"
+        xmlns:chrome="using:Avalonia.Controls.Chrome" x:Class="TechJobsNL.App.LocalWindow" x:DataType="b:LocalWindowViewModel"
+        Title="TechJobsNL" Width="1240" Height="800" MinWidth="880" MinHeight="580"
+        FontSize="14" Foreground="#0B1220" Background="White" RequestedThemeVariant="Light"
+        WindowDecorations="None" ExtendClientAreaToDecorationsHint="True" WindowStartupLocation="CenterScreen">
+  <Window.Styles>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#64748B" /></Style>
+    <Style Selector="TextBox"><Setter Property="CornerRadius" Value="6" /></Style>
+    <Style Selector="Button.caption">
+      <Setter Property="Width" Value="46" /><Setter Property="Height" Value="40" />
+      <Setter Property="Padding" Value="0" /><Setter Property="CornerRadius" Value="0" />
+      <Setter Property="BorderThickness" Value="0" /><Setter Property="Background" Value="Transparent" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" /><Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ListBox#Navigation ListBoxItem"><Setter Property="Padding" Value="12,10" /></Style>
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="#EDF3FF" /><Setter Property="Foreground" Value="#0B1220" />
+    </Style>
+    <Style Selector="ListBox#VacancyList ListBoxItem" x:DataType="v:RetainedVacancy">
+      <Setter Property="Padding" Value="20,14" />
+      <Setter Property="BorderThickness" Value="2" /><Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
+      <Setter Property="AutomationProperties.HelpText" Value="{Binding CompanyName}" />
+    </Style>
+    <Style Selector="ListBox#VacancyList ListBoxItem:focus"><Setter Property="BorderBrush" Value="#2563EB" /></Style>
+    <Style Selector="StackPanel.closed TextBlock"><Setter Property="Foreground" Value="#64748B" /></Style>
+  </Window.Styles>
+  <Border BorderBrush="#DAE1EA" BorderThickness="1">
+    <Grid RowDefinitions="40,*">
+      <Grid ColumnDefinitions="*,Auto" Background="#F8FAFC">
+        <Border Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+          <TextBlock Text="TechJobsNL" FontSize="12" Classes="muted" Margin="18,0" VerticalAlignment="Center" IsHitTestVisible="False" />
+        </Border>
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button x:Name="MinimizeButton" Content="—" Classes="caption" AutomationProperties.Name="Minimize"
+                  ToolTip.Tip="Minimize" chrome:WindowDecorationProperties.ElementRole="MinimizeButton" />
+          <Button x:Name="MaximizeButton" Content="□" Classes="caption" AutomationProperties.Name="Maximize or restore"
+                  ToolTip.Tip="Maximize or restore" chrome:WindowDecorationProperties.ElementRole="MaximizeButton" />
+          <Button x:Name="CloseButton" Content="×" Classes="caption" AutomationProperties.Name="Close"
+                  ToolTip.Tip="Close" chrome:WindowDecorationProperties.ElementRole="CloseButton" />
+        </StackPanel>
+      </Grid>
+      <Grid Grid.Row="1" ColumnDefinitions="180,*">
+        <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="0,0,1,0">
+          <DockPanel Margin="12,24">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="8,0,0,30">
+              <Border Background="#0B1220" CornerRadius="5" Padding="6,3"><TextBlock Text="T↗" Foreground="White" /></Border>
+              <TextBlock Text="TechJobsNL" FontWeight="Bold" VerticalAlignment="Center" />
             </StackPanel>
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
-      </Grid>
-      <Grid Grid.Column="2">
-        <TextBlock x:Name="EmptySelection" Text="Select a vacancy to view its details." TextWrapping="Wrap"
-                   IsVisible="{Binding !HasSelection}" VerticalAlignment="Center" HorizontalAlignment="Center" />
-        <ScrollViewer x:Name="DetailPane" IsVisible="{Binding HasSelection}" HorizontalScrollBarVisibility="Disabled">
-          <StackPanel Spacing="12" Margin="0,0,12,0">
-            <TextBlock x:Name="DetailTitle" Text="{Binding SelectedVacancy.Title}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
-            <TextBlock x:Name="DetailCompany" Text="{Binding SelectedVacancy.CompanyName}" TextWrapping="Wrap" />
-            <TextBlock Text="Official vacancy URL" FontWeight="SemiBold" Margin="0,8,0,0" />
-            <SelectableTextBlock x:Name="DetailUrl" Text="{Binding SelectedVacancy.JobUrl}" TextWrapping="Wrap" />
-            <TextBlock Text="Description" FontWeight="SemiBold" Margin="0,8,0,0" />
-            <SelectableTextBlock x:Name="DetailDescription" Text="{Binding SelectedVacancy.Description}" TextWrapping="Wrap" />
+            <TextBlock DockPanel.Dock="Bottom" Text="Local workspace" Classes="muted" FontSize="11" Margin="8,8,0,0" />
+            <ListBox x:Name="Navigation" Background="Transparent" BorderThickness="0" SelectedIndex="0" AutomationProperties.Name="Navigation">
+              <ListBoxItem Content="Vacancies" />
+            </ListBox>
+          </DockPanel>
+        </Border>
+        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,Auto" MaxWidth="1440">
+          <Grid ColumnDefinitions="*,Auto" Margin="24,20">
+            <TextBlock Text="Vacancies" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBox x:Name="SearchBox" Grid.Column="1" Width="240" Text="{Binding SearchText, Mode=TwoWay}"
+                     PlaceholderText="Search title or company" AutomationProperties.Name="Search title or company" />
+          </Grid>
+          <StackPanel Grid.Row="1" Spacing="8" Margin="24,0">
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding State.IsLoading}" Margin="0,0,0,16" />
+            <TextBlock x:Name="ErrorMessage" Text="{Binding State.Message}" IsVisible="{Binding State.IsFailed}" TextWrapping="Wrap" Margin="0,0,0,16" />
           </StackPanel>
-        </ScrollViewer>
+          <Grid Grid.Row="2" ColumnDefinitions="*,5,*">
+            <Grid MinWidth="220">
+              <TextBlock x:Name="StateMessage" Text="{Binding State.Message}" TextWrapping="Wrap" Margin="24"
+                         IsVisible="{Binding State.ShowStatusMessage}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+              <ListBox x:Name="VacancyList" Background="White" BorderThickness="0,1,0,0" BorderBrush="#E2E8F0"
+                       ItemsSource="{Binding State.Vacancies}" IsVisible="{Binding State.HasVacancies}"
+                       SelectedItem="{Binding SelectedVacancy, Mode=TwoWay}" AutomationProperties.Name="Retained vacancies">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="v:RetainedVacancy">
+                    <StackPanel Spacing="4" Classes.closed="{Binding !SourceOpen}">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding CompanyName}" Classes="muted" TextWrapping="Wrap" />
+                      <TextBlock Text="Closed" IsVisible="{Binding !SourceOpen}" FontSize="12" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </Grid>
+            <GridSplitter x:Name="PaneDivider" Grid.Column="1" ResizeDirection="Columns" Background="#E2E8F0" AutomationProperties.Name="Resize vacancy and detail panes" />
+            <Border Grid.Column="2" MinWidth="240" Background="#FCFDFE" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0">
+              <Grid>
+                <TextBlock x:Name="EmptySelection" Text="Select a vacancy to view its details." TextWrapping="Wrap" Margin="24"
+                           Classes="muted" IsVisible="{Binding !HasSelection}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                <ScrollViewer x:Name="DetailPane" IsVisible="{Binding HasSelection}" HorizontalScrollBarVisibility="Disabled">
+                  <StackPanel Spacing="16" Margin="24">
+                    <TextBlock x:Name="DetailTitle" Text="{Binding SelectedVacancy.Title}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock x:Name="DetailCompany" Text="{Binding SelectedVacancy.CompanyName}" Classes="muted" TextWrapping="Wrap" />
+                    <TextBlock Text="Closed vacancy" Classes="muted" IsVisible="{Binding !SelectedVacancy.SourceOpen}" />
+                    <TextBlock Text="Official vacancy URL" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <SelectableTextBlock x:Name="DetailUrl" Text="{Binding SelectedVacancy.JobUrl}" TextWrapping="Wrap" />
+                    <TextBlock Text="Description" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <SelectableTextBlock x:Name="DetailDescription" Text="{Binding SelectedVacancy.Description}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </ScrollViewer>
+              </Grid>
+            </Border>
+          </Grid>
+          <TextBlock Grid.Row="3" Text="Local data · available offline" Classes="muted" Margin="24,10" FontSize="11" />
+        </Grid>
       </Grid>
+      <Border Grid.RowSpan="2" Background="Transparent" Height="4" VerticalAlignment="Top" chrome:WindowDecorationProperties.ElementRole="ResizeN" />
+      <Border Grid.RowSpan="2" Background="Transparent" Height="4" VerticalAlignment="Bottom" chrome:WindowDecorationProperties.ElementRole="ResizeS" />
+      <Border Grid.RowSpan="2" Background="Transparent" Width="4" HorizontalAlignment="Left" chrome:WindowDecorationProperties.ElementRole="ResizeW" />
+      <Border Grid.RowSpan="2" Background="Transparent" Width="4" HorizontalAlignment="Right" chrome:WindowDecorationProperties.ElementRole="ResizeE" />
+      <Border Grid.RowSpan="2" Background="Transparent" Width="4" Height="4" HorizontalAlignment="Left" VerticalAlignment="Top" chrome:WindowDecorationProperties.ElementRole="ResizeNW" />
+      <Border Grid.RowSpan="2" Background="Transparent" Width="4" Height="4" HorizontalAlignment="Right" VerticalAlignment="Top" chrome:WindowDecorationProperties.ElementRole="ResizeNE" />
+      <Border Grid.RowSpan="2" Background="Transparent" Width="4" Height="4" HorizontalAlignment="Left" VerticalAlignment="Bottom" chrome:WindowDecorationProperties.ElementRole="ResizeSW" />
+      <Border Grid.RowSpan="2" Background="Transparent" Width="4" Height="4" HorizontalAlignment="Right" VerticalAlignment="Bottom" chrome:WindowDecorationProperties.ElementRole="ResizeSE" />
     </Grid>
-    <TextBlock Grid.Row="3" Text="Local data · available offline" Margin="0,16,0,0" FontSize="12" />
-  </Grid>
+  </Border>
 </Window>
