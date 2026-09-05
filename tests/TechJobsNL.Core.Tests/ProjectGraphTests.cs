@@ -88,8 +88,7 @@ public sealed class ProjectGraphTests
                 continue;
             }
 
-            var project = relative.Split('/')[1];
-            var expectedNamespace = project.Replace(".", ".");
+            var expectedNamespace = string.Join('.', relative.Split('/')[1..^1]);
             var text = File.ReadAllText(sourceFile);
             Assert.Contains($"namespace {expectedNamespace};", text, StringComparison.Ordinal);
         }
