@@ -9,6 +9,31 @@ namespace TechJobsNL.Persistence.Sqlite.Tests;
 public sealed class AtomicScanPersistenceTests
 {
     [Fact]
+    [Trait("TaskId", "V0.1.0-014")]
+    public async Task GetAllVacanciesAsync_AfterRestart_RehydratesCompleteDetails()
+    {
+        var path = TemporaryPath();
+        try
+        {
+            await using (var store = await OpenAsync(path))
+            {
+                await store.SynchronizeCompaniesAsync([Company("alpha")], TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("first", Company("alpha"), [Vacancy("one", "Platform Engineer", "{\"id\":1}")], At(8), At(9), TestContext.Current.CancellationToken);
+                await store.ToggleAppliedAsync(new VacancyKey(new CompanyId("alpha"), new SourceId("one")), At(10), TestContext.Current.CancellationToken);
+            }
+
+            await using var reopened = await OpenAsync(path);
+            var record = (await reopened.GetAllVacanciesAsync(TestContext.Current.CancellationToken)).Single();
+            record.Key.Should().Be(new VacancyKey(new CompanyId("alpha"), new SourceId("one")));
+            record.Classified.Observed.Title.Should().Be("Platform Engineer");
+            record.Classified.Observed.Locations.Should().Equal("Amsterdam");
+            record.Classified.Observed.RawPayload.Should().Be("{\"id\":1}");
+            record.AppliedAt.Should().Be(At(10));
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
     [Trait("TaskId", "V0.1.0-013")]
     public async Task VacancyLifecycle_RawChurnDoesNotSnapshotAndAppliedStateSurvivesReopen()
     {
