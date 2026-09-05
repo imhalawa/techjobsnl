@@ -96,7 +96,7 @@ public sealed partial class SqliteStore : IScanPersistence
 
     public async Task<IReadOnlyList<SourceHealthRecord>> GetSourceHealthAsync(CancellationToken cancellationToken)
     {
-        const string sql = "select id Id, name Name, cast(enabled as integer) Enabled, latest_attempted_at LatestAttemptedAt, latest_successful_at LatestSuccessfulAt, health Health, latest_error_kind LatestErrorKind, latest_diagnostic LatestDiagnostic from companies order by name collate nocase, id;";
+        const string sql = "select id Id, name Name, enabled Enabled, latest_attempted_at LatestAttemptedAt, latest_successful_at LatestSuccessfulAt, health Health, latest_error_kind LatestErrorKind, latest_diagnostic LatestDiagnostic from companies order by name collate nocase, id;";
         var rows = await _connection.QueryAsync<CompanyRow>(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
         return rows.Select(static row => new SourceHealthRecord(new CompanyId(row.Id), row.Name, row.Enabled != 0,
             ParseTime(row.LatestAttemptedAt), ParseTime(row.LatestSuccessfulAt), ParseHealth(row.Health), ParseError(row.LatestErrorKind), row.LatestDiagnostic)).ToArray();
