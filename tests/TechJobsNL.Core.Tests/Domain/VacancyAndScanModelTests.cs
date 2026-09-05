@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Reflection;
 using FluentAssertions;
 using TechJobsNL.Core.Domain;
+using VacancyEligibility = TechJobsNL.Core.Domain.Eligibility;
 
 namespace TechJobsNL.Core.Tests.Domain;
 
@@ -26,7 +27,7 @@ public sealed class VacancyAndScanModelTests
             "Build reliable platforms.",
             "{\"id\":\"ats-42\"}",
             publishedAt);
-        var classified = new ClassifiedVacancy(observation, new Eligibility(true, "eligible"));
+        var classified = new ClassifiedVacancy(observation, new VacancyEligibility(true, "eligible"));
         var record = new VacancyRecord(
             new VacancyKey(new CompanyId("example"), observation.SourceId),
             classified,
@@ -42,7 +43,7 @@ public sealed class VacancyAndScanModelTests
         record.Classified.Observed.Locations.Should().Equal("Amsterdam", "Remote");
         record.Classified.Observed.Countries.Should().Equal("NL");
         record.Classified.Observed.RawPayload.Should().Be("{\"id\":\"ats-42\"}");
-        record.Classified.Eligibility.Should().Be(new Eligibility(true, "eligible"));
+        record.Classified.Eligibility.Should().Be(new VacancyEligibility(true, "eligible"));
         record.SourceOpen.Should().BeTrue();
         record.IsNew.Should().BeTrue();
         record.FirstSeenAt.Should().Be(publishedAt.AddDays(-2));
@@ -121,7 +122,7 @@ public sealed class VacancyAndScanModelTests
             typeof(VacancyKey),
             typeof(ObservedVacancy),
             typeof(ClassifiedVacancy),
-            typeof(Eligibility),
+            typeof(VacancyEligibility),
             typeof(VacancyRecord),
             typeof(SourceScan.Complete),
             typeof(SourceScan.Incomplete),
