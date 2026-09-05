@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>TechJobsNL.Adapters.Platform</AssemblyName>
-    <RootNamespace>TechJobsNL.Adapters.Platform</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../TechJobsNL.Core/TechJobsNL.Core.csproj" />
-  </ItemGroup>
-</Project>

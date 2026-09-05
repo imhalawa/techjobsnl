@@ -316,25 +316,6 @@
         "resolved": "10.0.1",
         "contentHash": "xfaHEHVDkMOOZR5S6ZGezD0+vekdH1Nx/9Ih8/rOqOGSOk1fxiN3u94bYkBW/wigj0Uw2Wt3vvRj9mtYdgwEjw=="
       },
-      "techjobsnl.adapters.aiexperience.deepseek": {
-        "type": "Project",
-        "dependencies": {
-          "Refit.HttpClientFactory": "[9.0.2, )",
-          "TechJobsNL.Core": "[1.0.0, )"
-        }
-      },
-      "techjobsnl.adapters.analytics.local": {
-        "type": "Project",
-        "dependencies": {
-          "TechJobsNL.Core": "[1.0.0, )"
-        }
-      },
-      "techjobsnl.adapters.platform": {
-        "type": "Project",
-        "dependencies": {
-          "TechJobsNL.Core": "[1.0.0, )"
-        }
-      },
       "techjobsnl.adapters.providers": {
         "type": "Project",
         "dependencies": {
@@ -358,9 +339,6 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Extensions.Hosting": "[10.0.1, )",
-          "TechJobsNL.Adapters.AiExperience.DeepSeek": "[1.0.0, )",
-          "TechJobsNL.Adapters.Analytics.Local": "[1.0.0, )",
-          "TechJobsNL.Adapters.Platform": "[1.0.0, )",
           "TechJobsNL.Adapters.Providers": "[1.0.0, )",
           "TechJobsNL.Core": "[1.0.0, )",
           "TechJobsNL.Persistence.Sqlite": "[1.0.0, )",

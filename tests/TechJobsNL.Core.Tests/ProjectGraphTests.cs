@@ -14,20 +14,13 @@ public sealed class ProjectGraphTests
             ["src/TechJobsNL.Core/TechJobsNL.Core.csproj"] = [],
             ["src/TechJobsNL.Runtime/TechJobsNL.Runtime.csproj"] =
             [
-                "../TechJobsNL.Adapters.AiExperience.DeepSeek/TechJobsNL.Adapters.AiExperience.DeepSeek.csproj",
-                "../TechJobsNL.Adapters.Analytics.Local/TechJobsNL.Adapters.Analytics.Local.csproj",
-                "../TechJobsNL.Adapters.Platform/TechJobsNL.Adapters.Platform.csproj",
                 "../TechJobsNL.Adapters.Providers/TechJobsNL.Adapters.Providers.csproj",
                 "../TechJobsNL.Core/TechJobsNL.Core.csproj",
                 "../TechJobsNL.Persistence.Sqlite/TechJobsNL.Persistence.Sqlite.csproj"
             ],
             ["src/TechJobsNL.App/TechJobsNL.App.csproj"] = ["../TechJobsNL.Runtime/TechJobsNL.Runtime.csproj"],
-            ["src/TechJobsNL.Tui/TechJobsNL.Tui.csproj"] = ["../TechJobsNL.Runtime/TechJobsNL.Runtime.csproj"],
             ["src/TechJobsNL.Adapters.Providers/TechJobsNL.Adapters.Providers.csproj"] = ["../TechJobsNL.Core/TechJobsNL.Core.csproj"],
-            ["src/TechJobsNL.Adapters.Analytics.Local/TechJobsNL.Adapters.Analytics.Local.csproj"] = ["../TechJobsNL.Core/TechJobsNL.Core.csproj"],
-            ["src/TechJobsNL.Adapters.AiExperience.DeepSeek/TechJobsNL.Adapters.AiExperience.DeepSeek.csproj"] = ["../TechJobsNL.Core/TechJobsNL.Core.csproj"],
-            ["src/TechJobsNL.Persistence.Sqlite/TechJobsNL.Persistence.Sqlite.csproj"] = ["../TechJobsNL.Core/TechJobsNL.Core.csproj"],
-            ["src/TechJobsNL.Adapters.Platform/TechJobsNL.Adapters.Platform.csproj"] = ["../TechJobsNL.Core/TechJobsNL.Core.csproj"]
+            ["src/TechJobsNL.Persistence.Sqlite/TechJobsNL.Persistence.Sqlite.csproj"] = ["../TechJobsNL.Core/TechJobsNL.Core.csproj"]
         };
 
         foreach (var (projectPath, expectedProjectReferences) in expectedReferences)
@@ -41,6 +34,17 @@ public sealed class ProjectGraphTests
 
             Assert.Equal(expectedProjectReferences.Order(StringComparer.Ordinal), actualProjectReferences);
         }
+
+        var solution = XDocument.Load(Path.Combine(repositoryRoot.FullName, "TechJobsNL.slnx"));
+        Assert.Equal(["/src/", "/tests/"], solution.Root?.Elements("Folder").Select(folder => folder.Attribute("Name")?.Value));
+        Assert.Empty(solution.Root?.Elements("Project") ?? []);
+        Assert.Equal(expectedReferences.Keys.Order(StringComparer.Ordinal),
+            solution.Descendants("Folder").Single(folder => string.Equals(folder.Attribute("Name")?.Value, "/src/", StringComparison.Ordinal))
+                .Elements("Project").Select(project => project.Attribute("Path")?.Value).Order(StringComparer.Ordinal));
+        Assert.Equal(expectedReferences.Keys.Select(Path.GetFileNameWithoutExtension)
+                .Select(name => $"tests/{name}.Tests/{name}.Tests.csproj").Order(StringComparer.Ordinal),
+            solution.Descendants("Folder").Single(folder => string.Equals(folder.Attribute("Name")?.Value, "/tests/", StringComparison.Ordinal))
+                .Elements("Project").Select(project => project.Attribute("Path")?.Value).Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -115,7 +119,6 @@ public sealed class ProjectGraphTests
         var repositoryRoot = FindRepositoryRoot();
 
         AssertEmptyShell(repositoryRoot, "TechJobsNL.App");
-        AssertEmptyShell(repositoryRoot, "TechJobsNL.Tui");
     }
 
     private static DirectoryInfo FindRepositoryRoot()

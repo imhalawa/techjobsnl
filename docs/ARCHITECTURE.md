@@ -1,83 +1,73 @@
-# Target architecture
+# Current architecture
 
-This document is the textual source of truth for the .NET project map, dependency direction, module ownership, interfaces,
-adapters, and product invariants. [`architecture.mermaid`](architecture.mermaid) is its visual companion.
+This document describes the projects present in the working solution. [`architecture.mermaid`](architecture.mermaid)
+is its visual companion. Add projects when an assigned delivery needs them; future delivery plans and ownership remain
+in the private Project. Removing unused scaffolds does not remove the migration obligations in `GOAL.md`.
 
 ## Dependency direction
 
 ```text
-TechJobsNL.App ----\
-                    >---- TechJobsNL.Runtime ----> TechJobsNL.Core
-TechJobsNL.Tui ----/                 |
-                                   +----> adapter projects ----> TechJobsNL.Core
+TechJobsNL.App --> TechJobsNL.Runtime --> TechJobsNL.Core
+                         |
+                         +--> TechJobsNL.Adapters.Providers --> TechJobsNL.Core
+                         +--> TechJobsNL.Persistence.Sqlite --> TechJobsNL.Core
 ```
 
-`TechJobsNL.Core` owns canonical behavior and every port interface. Presentation projects own their view and interaction
-logic. Adapter projects implement Core-owned interfaces. `TechJobsNL.Runtime` is the composition root shared by executable
-clients and contains wiring rather than business rules.
+Core owns canonical behavior and port interfaces. Adapters implement Core contracts. Runtime owns explicit composition;
+presentation consumes Runtime and the Core application interface. Core has no presentation, adapter, platform, Dapper,
+Refit, Polly, or Avalonia dependencies.
 
-## Production projects
+## Projects and folders
 
-- `TechJobsNL.Core`: Domain, Application, canonical read models, and `Ports.*` interfaces.
-- `TechJobsNL.Runtime`: host startup, configuration, logging, command/query registration, and explicit adapter composition.
-- `TechJobsNL.App`: Avalonia desktop views, immutable ViewModel state, navigation, dialogs, and themes.
-- `TechJobsNL.Tui`: terminal rendering, input, navigation, and presentation state.
-- `TechJobsNL.Adapters.Providers`: company-directory, vacancy, official-publication, and trusted external-publication
-  adapters.
-- `TechJobsNL.Adapters.Analytics.Local`: deterministic extraction, technology analysis, coverage-aware Trends, and
-  recommendations.
-- `TechJobsNL.Adapters.AiExperience.DeepSeek`: optional DeepSeek implementation of AiExperience ports.
-- `TechJobsNL.Persistence.Sqlite`: Dapper persistence adapter and explicit SQLite migrations.
-- `TechJobsNL.Adapters.Platform`: operating-system secret storage, time, browser, clipboard, and platform actions.
+`TechJobsNL.slnx` groups production projects under `src` and matching test projects under `tests`, matching the filesystem.
 
-Tests mirror a production project when they prove behavior through that project's interface. Acceptance tests may span
-Runtime and a client while still asserting through public interfaces.
+- `TechJobsNL.Core`: domain/configuration models, dispatch, progress, scan orchestration, eligibility, vacancy queries,
+  company projections, operational read models, and persistence/provider boundaries.
+- `TechJobsNL.Runtime`: configuration loading, startup and resource ownership, explicit query registration and composition.
+- `TechJobsNL.App`: desktop executable and its presentation behavior. The executable currently remains a host scaffold.
+- `TechJobsNL.Adapters.Providers`: external vacancy contracts, safe HTTP behavior, and source normalization.
+- `TechJobsNL.Persistence.Sqlite`: compatible SQLite opening/recovery, local persistence and read adapters.
 
-## Core modules and seams
+Tests mirror the owning production project. Runtime integration tests may span Core and adapters while asserting through
+the public Runtime/Core interface. Do not retain empty projects solely to reserve a future name or dependency.
 
-Within Core, Domain depends on nothing. Application depends on Domain and owns commands, queries, progress, orchestration,
-and canonical read models. Port interfaces live at the Application-owned seams:
+## Core boundaries
 
-- `Ports.Providers`: company directory, vacancies, official content, and trusted external publications.
-- `Ports.Analytics`: fact extraction, technology analysis, Trends, and deterministic recommendations.
-- `Ports.AiExperience`: summarization, filtering and ranking, cleanup, normalization, and interactive refinement.
-- `Ports.Persistence`: companies, follows, evidence, content, Feed, profiles, library, settings, and history.
-- `Ports.Platform`: protected secrets, time, browser, clipboard, and required platform behavior.
+Domain models have no environmental dependencies. Canonical application behavior owns commands, queries, progress,
+orchestration and read models. Port interfaces belong to Core and hide persistence, provider and platform details.
+Add a port where a real adapter makes the boundary useful; avoid generic CRUD and speculative extension points.
 
-Core has no presentation, adapter, terminal, Avalonia, desktop, mobile, Dapper, Refit, Polly, or platform dependency.
-Adapters depend on Core and not on presentation projects or one another. Add a port only where production and deterministic
-test adapters make the seam real. Prefer deep modules: small interfaces that hide substantial behavior and concentrate
-verification.
+Keep collections immutable across ownership boundaries. Preserve company/source identity and source outcome semantics.
+Presentation state and interaction logic belong to the client; search, eligibility, lifecycle and retained-data meaning
+belong to Core.
 
 ## Runtime and application interface
 
-Runtime registers adapters explicitly. Project-owned command/query dispatch uses separate `ExecuteAsync` and `QueryAsync`
-entry points and applies logging, timing, validation, then handler execution without MediatR, reflection, assembly scanning,
-or hidden registration. Bounded channels carry ordered refresh and presentation progress.
+Register adapters explicitly. Project-owned dispatch uses separate `ExecuteAsync` and `QueryAsync` entry points, with
+logging, timing, validation and handler execution. Avoid service location, assembly scanning and hidden registration.
+Bounded channels carry ordered scan progress across lifetimes.
 
-App and Tui may present different views and interaction logic. They consume the same commands, queries, progress, canonical
-read models, persistence behavior, analytics, and provider outcomes. They never depend on each other or duplicate business
-rules.
+Local browsing loads TOML and compatible SQLite state off the presentation thread, materializes a Core catalogue and
+closes database handles before returning a session. That session queries an immutable snapshot; reopening reloads local
+changes. Startup reports configuration, database, recovery and retained-data failures distinctly. It does not register
+or call external providers. Disposing a browsing session releases its snapshot and rejects subsequent queries.
 
 ## Adapter technology
 
-- .NET 10 LTS and stable C# 14.
-- Microsoft extensions for dependency injection, configuration, logging, and hosting.
-- SQLite through Dapper and explicit lowercase SQL; repositories expose behavior rather than generic CRUD.
-- Refit external contracts return `ApiResponse<T>` and use typed reflection-based System.Text.Json models.
-- Named Polly resilience pipelines belong to the owning external adapter.
-- Avalonia with CommunityToolkit.Mvvm; UI-required partial types remain in App and code-behind contains view mechanics only.
-- Protected operating-system storage holds user secrets; secret values never enter SQLite, logs, diagnostics, or source
-  control.
+- .NET 10 LTS and stable C# 14, pinned by repository build configuration.
+- Microsoft extensions for hosting, dependency injection and logging at composition boundaries.
+- SQLite through Dapper with explicit lowercase SQL and compatible, recoverable migrations.
+- Refit contracts and owning-adapter resilience for external source behavior.
+- Avalonia and CommunityToolkit.Mvvm for desktop presentation.
 
 ## Product invariants
 
-- Startup reads local state and contacts no provider until the person explicitly requests external work.
-- Every vacancy source uses an official company or ATS endpoint and yields stable identity and trusted official URLs.
-- Provider results are Complete, Incomplete, or Failed. Only Complete may close missing source IDs.
-- Each company commits independently; one failed, incomplete, or storage-failed company cannot invalidate another.
-- Blocking persistence, network, analytics, and discovery work stays outside presentation render loops.
-- Direct search matches title or company. Derived discovery uses retained, evidence-linked facts.
-- Optional model behavior has bounded input, validated output, cached attempts, safe deterministic fallback, and explicit
-  approval before changing canonical or preference state.
-- Jobs, evidence, history, application state, analytics, source health, library data, and settings remain local by default.
+- Startup reads local state and contacts no source until the person explicitly requests external work.
+- Sources use official company or ATS endpoints, stable identity and trusted official URLs.
+- Complete, Incomplete and Failed remain distinct. Only Complete can close missing source IDs.
+- Each company commits independently; failure retains that company's trusted vacancies.
+- Blocking persistence/network work stays outside presentation render loops.
+- Direct search matches title or company through shared Core behavior.
+- Existing TOML, SQLite data and deferred stored values remain compatible; preserve recovery backups.
+- Operational views omit raw payloads and redact sensitive diagnostic components.
+- Secrets belong in protected storage, not logs, SQLite diagnostics or source control.

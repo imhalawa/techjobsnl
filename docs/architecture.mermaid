@@ -1,154 +1,27 @@
-%% TechJobsNL target architecture for the Rust-to-.NET migration.
-%% Organized as a top-to-bottom dependency and data-flow view to minimize crossing edges.
-%% Solid arrows show calls or canonical data flow. Dashed arrows show interface implementations or optional behavior.
-%%{init: {"flowchart": {"curve": "basis", "nodeSpacing": 30, "rankSpacing": 45}}}%%
+%% Projects present in the current solution; future delivery remains in the private Project.
 flowchart TB
-
-    Person([Person])
-
-    subgraph Presentation["Presentation projects — different views, shared behavior"]
-        direction LR
-        Desktop["TechJobsNL.App<br/>Avalonia desktop — first client"]
-        Tui["TechJobsNL.Tui<br/>terminal workflow"]
-        Mobile["Future mobile clients<br/>Android and iOS"]
+    subgraph src["src"]
+        App["TechJobsNL.App<br/>desktop host and presentation"]
+        Runtime["TechJobsNL.Runtime<br/>startup · configuration · composition"]
+        Core["TechJobsNL.Core<br/>domain · dispatch · queries · scanning · ports"]
+        Providers["TechJobsNL.Adapters.Providers<br/>safe HTTP · source normalization"]
+        Sqlite["TechJobsNL.Persistence.Sqlite<br/>compatible persistence · recovery · local reads"]
+        App --> Runtime
+        Runtime --> Core
+        Runtime --> Providers
+        Runtime --> Sqlite
+        Providers --> Core
+        Sqlite --> Core
     end
-
-    Runtime["TechJobsNL.Runtime<br/>host startup · configuration · logging<br/>explicit adapter registration · refresh policy"]
-
-    subgraph Core["TechJobsNL.Core — canonical behavior, interfaces, and data"]
-        direction TB
-
-        Entry["Application interface<br/>command dispatcher · query dispatcher · progress stream"]
-
-        subgraph UseCases["Application modules"]
-            direction LR
-            Discover["Discover companies"]
-            Follow["Follow companies"]
-            Refresh["Refresh followed companies"]
-            Explore["Explore Feed and profiles"]
-            Library["Manage personal library"]
-        end
-
-        subgraph Pipeline["Company-intelligence pipeline"]
-            direction LR
-            Collect["Collect<br/>provider outcomes"]
-            Normalize["Normalize<br/>identity · deduplication · evidence"]
-            Analyze["Analyze<br/>facts · technology · Trends · recommendations"]
-            Project["Project<br/>Company Profiles · Feed · read models"]
-            AiCoordinator["AiExperience<br/>capability · policy · validation · fallback"]
-        end
-
-        subgraph Canonical["Domain and canonical read models"]
-            direction LR
-            CompanyState["Company intelligence<br/>Company Profile · Company Follow"]
-            EvidenceState["Retained evidence<br/>origin · observed time · content hash"]
-            ContentState["Typed knowledge<br/>Vacancy · Article · Trend · technology assertion"]
-            ExperienceState["Personal experience<br/>Company Update · Feed · Library"]
-            AiState["AiExperience result<br/>version · provenance · evidence references"]
-        end
-
-        subgraph Ports["Core-owned port interfaces"]
-            direction LR
-            ProviderPorts["Ports.Providers<br/>company directory<br/>vacancies<br/>official content<br/>external publications"]
-            AnalyticsPorts["Ports.Analytics<br/>fact extraction<br/>Trend analysis<br/>technology analysis<br/>recommendations"]
-            AiPorts["Ports.AiExperience<br/>summarization<br/>filtering and ranking<br/>cleanup and normalization<br/>interactive refinement"]
-            PersistencePorts["Ports.Persistence<br/>companies and follows<br/>evidence and content<br/>Feed and profiles<br/>library and settings"]
-            PlatformPorts["Ports.Platform<br/>secret storage<br/>time"]
-        end
-
-        Entry --> Discover
-        Entry --> Follow
-        Entry --> Refresh
-        Entry --> Explore
-        Entry --> Library
-
-        Refresh --> Collect
-        Collect --> Normalize
-        Normalize --> Analyze
-        Analyze --> Project
-        AiCoordinator -. "optional enhancement" .-> Project
-
-        Discover --> CompanyState
-        Follow --> CompanyState
-        Collect --> EvidenceState
-        Normalize --> ContentState
-        Analyze --> ContentState
-        Project --> ExperienceState
-        AiCoordinator --> AiState
-
-        CompanyState --> ExperienceState
-        EvidenceState --> ContentState
-        ContentState --> ExperienceState
-        AiState -. "never replaces evidence" .-> ExperienceState
-
-        Discover --> ProviderPorts
-        Follow --> PersistencePorts
-        Collect --> ProviderPorts
-        Collect --> PersistencePorts
-        Analyze --> AnalyticsPorts
-        Analyze --> PersistencePorts
-        Project --> PersistencePorts
-        Explore --> PersistencePorts
-        Library --> PersistencePorts
-        AiCoordinator --> AiPorts
-        AiCoordinator --> PersistencePorts
-        AiCoordinator --> PlatformPorts
-        Refresh --> PlatformPorts
+    subgraph tests["tests"]
+        AppTests["TechJobsNL.App.Tests"]
+        RuntimeTests["TechJobsNL.Runtime.Tests"]
+        CoreTests["TechJobsNL.Core.Tests"]
+        ProviderTests["TechJobsNL.Adapters.Providers.Tests"]
+        SqliteTests["TechJobsNL.Persistence.Sqlite.Tests"]
     end
-
-    subgraph Adapters["Adapter projects — depend on Core"]
-        direction LR
-        ProviderAdapters["TechJobsNL.Adapters.Providers<br/>local directory · official career and ATS<br/>company blogs and newsrooms<br/>trusted external publications"]
-        LocalAnalytics["TechJobsNL.Adapters.Analytics.Local<br/>versioned deterministic extraction<br/>coverage-aware Trends<br/>technology analysis · recommendations"]
-        DeepSeekAdapter["TechJobsNL.Adapters.AiExperience.DeepSeek<br/>DeepSeek V4 Flash<br/>optional · user-supplied key"]
-        SqliteAdapter["TechJobsNL.Persistence.Sqlite<br/>Dapper · explicit migrations<br/>operation-scoped transactions"]
-        PlatformAdapters["TechJobsNL.Adapters.Platform<br/>operating-system secret store<br/>time · browser · clipboard"]
-    end
-
-    subgraph Systems["External systems and local-first storage"]
-        direction LR
-        OfficialSources["Official sources<br/>career sites · ATS endpoints<br/>engineering blogs · newsrooms · feeds"]
-        TrustedMedia["Trusted Dutch and global<br/>technology publications"]
-        DeepSeekEndpoint["DeepSeek endpoint"]
-        Database[("SQLite<br/>companies · follows · evidence · vacancies · articles<br/>Trends · Feed · cache · library · history")]
-        Secrets[("Protected user secrets<br/>DeepSeek key")]
-        Taxonomies[("Bundled taxonomies<br/>deterministic rules")]
-    end
-
-    Person --> Desktop
-    Person --> Tui
-    Person --> Mobile
-    Desktop --> Runtime
-    Tui --> Runtime
-    Mobile --> Runtime
-    Runtime --> Entry
-
-    ProviderPorts -. "implemented by" .-> ProviderAdapters
-    AnalyticsPorts -. "implemented by" .-> LocalAnalytics
-    AiPorts -. "implemented by" .-> DeepSeekAdapter
-    PersistencePorts -. "implemented by" .-> SqliteAdapter
-    PlatformPorts -. "implemented by" .-> PlatformAdapters
-
-    ProviderAdapters --> OfficialSources
-    ProviderAdapters --> TrustedMedia
-    LocalAnalytics --> Taxonomies
-    DeepSeekAdapter --> DeepSeekEndpoint
-    SqliteAdapter --> Database
-    PlatformAdapters --> Secrets
-
-    classDef client fill:#dbeafe,stroke:#2563eb,color:#172554;
-    classDef runtime fill:#e0e7ff,stroke:#4f46e5,color:#1e1b4b;
-    classDef core fill:#dcfce7,stroke:#16a34a,color:#052e16;
-    classDef port fill:#fef3c7,stroke:#d97706,color:#451a03;
-    classDef adapter fill:#f3e8ff,stroke:#9333ea,color:#3b0764;
-    classDef system fill:#f1f5f9,stroke:#64748b,color:#0f172a;
-    classDef data fill:#ffe4e6,stroke:#e11d48,color:#4c0519;
-
-    class Desktop,Tui,Mobile client;
-    class Runtime runtime;
-    class Entry,Discover,Follow,Refresh,Explore,Library,Collect,Normalize,Analyze,Project,AiCoordinator core;
-    class CompanyState,EvidenceState,ContentState,ExperienceState,AiState core;
-    class ProviderPorts,AnalyticsPorts,AiPorts,PersistencePorts,PlatformPorts port;
-    class ProviderAdapters,LocalAnalytics,DeepSeekAdapter,SqliteAdapter,PlatformAdapters adapter;
-    class OfficialSources,TrustedMedia,DeepSeekEndpoint system;
-    class Database,Secrets,Taxonomies data;
+    AppTests -.-> App
+    RuntimeTests -.-> Runtime
+    CoreTests -.-> Core
+    ProviderTests -.-> Providers
+    SqliteTests -.-> Sqlite
