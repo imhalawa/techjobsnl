@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>TechJobsNL.Persistence.Sqlite</AssemblyName>
+    <RootNamespace>TechJobsNL.Persistence.Sqlite</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <ProjectReference Include="../TechJobsNL.Core/TechJobsNL.Core.csproj" />
+  </ItemGroup>
+</Project>

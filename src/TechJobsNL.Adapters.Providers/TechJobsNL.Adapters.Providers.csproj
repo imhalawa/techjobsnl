@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>TechJobsNL.Adapters.Providers</AssemblyName>
+    <RootNamespace>TechJobsNL.Adapters.Providers</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Polly.Extensions" />
+    <PackageReference Include="Refit.HttpClientFactory" />
+    <ProjectReference Include="../TechJobsNL.Core/TechJobsNL.Core.csproj" />
+  </ItemGroup>
+</Project>

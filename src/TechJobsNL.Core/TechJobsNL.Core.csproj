@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>TechJobsNL.Core</AssemblyName>
+    <RootNamespace>TechJobsNL.Core</RootNamespace>
+  </PropertyGroup>
+</Project>

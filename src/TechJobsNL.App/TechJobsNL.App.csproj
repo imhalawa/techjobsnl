@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>TechJobsNL.App</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TechJobsNL.App</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../TechJobsNL.Runtime/TechJobsNL.Runtime.csproj" />
+  </ItemGroup>
+</Project>

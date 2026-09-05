@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>TechJobsNL.Adapters.AiExperience.DeepSeek</AssemblyName>
+    <RootNamespace>TechJobsNL.Adapters.AiExperience.DeepSeek</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Refit.HttpClientFactory" />
+    <ProjectReference Include="../TechJobsNL.Core/TechJobsNL.Core.csproj" />
+  </ItemGroup>
+</Project>

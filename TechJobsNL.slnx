@@ -1,0 +1,20 @@
+<Solution>
+  <Project Path="src/TechJobsNL.Core/TechJobsNL.Core.csproj" />
+  <Project Path="src/TechJobsNL.Runtime/TechJobsNL.Runtime.csproj" />
+  <Project Path="src/TechJobsNL.App/TechJobsNL.App.csproj" />
+  <Project Path="src/TechJobsNL.Tui/TechJobsNL.Tui.csproj" />
+  <Project Path="src/TechJobsNL.Adapters.Providers/TechJobsNL.Adapters.Providers.csproj" />
+  <Project Path="src/TechJobsNL.Adapters.Analytics.Local/TechJobsNL.Adapters.Analytics.Local.csproj" />
+  <Project Path="src/TechJobsNL.Adapters.AiExperience.DeepSeek/TechJobsNL.Adapters.AiExperience.DeepSeek.csproj" />
+  <Project Path="src/TechJobsNL.Persistence.Sqlite/TechJobsNL.Persistence.Sqlite.csproj" />
+  <Project Path="src/TechJobsNL.Adapters.Platform/TechJobsNL.Adapters.Platform.csproj" />
+  <Project Path="tests/TechJobsNL.Core.Tests/TechJobsNL.Core.Tests.csproj" />
+  <Project Path="tests/TechJobsNL.Runtime.Tests/TechJobsNL.Runtime.Tests.csproj" />
+  <Project Path="tests/TechJobsNL.App.Tests/TechJobsNL.App.Tests.csproj" />
+  <Project Path="tests/TechJobsNL.Tui.Tests/TechJobsNL.Tui.Tests.csproj" />
+  <Project Path="tests/TechJobsNL.Adapters.Providers.Tests/TechJobsNL.Adapters.Providers.Tests.csproj" />
+  <Project Path="tests/TechJobsNL.Adapters.Analytics.Local.Tests/TechJobsNL.Adapters.Analytics.Local.Tests.csproj" />
+  <Project Path="tests/TechJobsNL.Adapters.AiExperience.DeepSeek.Tests/TechJobsNL.Adapters.AiExperience.DeepSeek.Tests.csproj" />
+  <Project Path="tests/TechJobsNL.Persistence.Sqlite.Tests/TechJobsNL.Persistence.Sqlite.Tests.csproj" />
+  <Project Path="tests/TechJobsNL.Adapters.Platform.Tests/TechJobsNL.Adapters.Platform.Tests.csproj" />
+</Solution>
