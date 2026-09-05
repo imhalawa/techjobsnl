@@ -16,6 +16,7 @@
     <PackageVersion Include="Polly.Extensions" Version="8.6.5" />
     <PackageVersion Include="Refit.HttpClientFactory" Version="9.0.2" />
     <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
+    <PackageVersion Include="Tomlyn" Version="2.10.1" />
     <PackageVersion Include="Verify.XunitV3" Version="32.0.0" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
