@@ -6,11 +6,21 @@ using System.Text.Json;
 using Dapper;
 using TechJobsNL.Core.Domain;
 using TechJobsNL.Core.Domain.Configuration;
+using TechJobsNL.Core.Scanning;
 
 namespace TechJobsNL.Persistence.Sqlite;
 
-public sealed partial class SqliteStore
+public sealed partial class SqliteStore : IScanPersistence
 {
+    Task IScanPersistence.PersistCompleteAsync(string runId, CompanyConfiguration company, IReadOnlyCollection<ClassifiedVacancy> vacancies, DateTimeOffset startedAt, DateTimeOffset completedAt, CancellationToken cancellationToken) =>
+        PersistCompleteScanAsync(runId, company, vacancies, startedAt, completedAt, cancellationToken);
+
+    Task IScanPersistence.PersistIncompleteAsync(string runId, CompanyId companyId, string diagnostic, int observedCount, DateTimeOffset startedAt, DateTimeOffset completedAt, CancellationToken cancellationToken) =>
+        RecordIncompleteScanAsync(runId, companyId, diagnostic, observedCount, startedAt, completedAt, cancellationToken);
+
+    Task IScanPersistence.PersistFailedAsync(string runId, CompanyId companyId, ScanFailure failure, DateTimeOffset startedAt, DateTimeOffset completedAt, CancellationToken cancellationToken) =>
+        RecordFailedScanAsync(runId, companyId, failure, startedAt, completedAt, cancellationToken);
+
     private static readonly JsonSerializerOptions CompatibleJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
     public async Task PersistCompleteScanAsync(string runId, CompanyConfiguration company, IReadOnlyCollection<ClassifiedVacancy> vacancies, DateTimeOffset startedAt, DateTimeOffset completedAt, CancellationToken cancellationToken)
     {
