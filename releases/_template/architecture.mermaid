@@ -1,0 +1,7 @@
+%% Cumulative architecture delivered by this release.
+flowchart TB
+    Person([Person]) --> Client["Runnable client"]
+    Client --> Core["TechJobsNL.Core"]
+    Core --> Port["Core-owned port"]
+    Port -. "implemented by" .-> Adapter["Release adapter"]
+    Adapter --> Data[("Local data")]

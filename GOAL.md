@@ -19,6 +19,6 @@ The migration succeeds when:
 
 ## Lifecycle
 
-This is a temporary mission file. The final migration-closing issue must delete `GOAL.md` after every completion condition
-has evidence and approval. That issue must also replace migration-only instructions in `AGENTS.md` with the enduring .NET
+This is a temporary mission file. The final migration-closing task must delete `GOAL.md` after every completion condition
+has evidence and approval. That task must also replace migration-only instructions in `AGENTS.md` with the enduring .NET
 project guidance.
