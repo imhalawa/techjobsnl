@@ -22,8 +22,8 @@ Kind, Area, Risk, Minimum Model, Reasoning Effort, and Depends On.
 | Kind | Foundation / Feature / Adapter / Migration / UX / Test / Documentation / Bug |
 | Primary area | Core / App / Tui / Runtime / Providers / Analytics / AiExperience / Persistence / Platform / Build |
 | Risk | Low / Medium / High / Critical |
-| Minimum model | `<model>` |
-| Reasoning effort | Low / Medium / High / XHigh |
+| Minimum model | `gpt-5.6-luna` / `gpt-5.6-terra` / `gpt-5.6-sol` |
+| Reasoning effort | Low / Medium |
 | Depends on | `None` or stable task IDs |
 | Can run in parallel with | `None` or stable task IDs |
 
@@ -153,15 +153,16 @@ change proves one small user journey.
 
 ## Model assignment
 
-| Work profile | Minimum model | Effort |
-| --- | --- | --- |
-| Mechanical documentation, fixture registration, narrowly specified configuration | `gpt-5.4-mini` | Medium |
-| Small adapter or deterministic test against an established interface | `gpt-5.6-luna` | Medium |
-| Normal Core/App feature, persistence behavior, or bounded vertical slice | `gpt-5.6-terra` | High |
-| Difficult source parity, migrations, concurrency, reliability, or multi-project integration | `gpt-5.6-sol` | High |
-| Architecture, ambiguous Rust behavior, security/privacy seams, or migration cutover | `gpt-6-astra` | High or XHigh |
+Use the lowest sufficient tier. Terra Medium is the default; assigning Sol requires a task-specific reason.
 
-An orchestrator may assign a stronger model than the recorded minimum, never a weaker one.
+| Tier | Use for | Model | Effort |
+| --- | --- | --- | --- |
+| Mechanical | Documentation, boilerplate, fixture registration, cleanup, or a tightly specified isolated change | `gpt-5.6-luna` | Low |
+| Implementation | Rust translation, adapters against established interfaces, deterministic tests, normal Core/App work, persistence, or a bounded vertical slice | `gpt-5.6-terra` | Medium |
+| Lead | Cross-project coordination, unresolved Rust contradictions, risky migration/cutover work, or final integration review | `gpt-5.6-sol` | Medium |
+
+Sol Medium is the ceiling for planned migration work. Split a task whose uncertainty appears to require more reasoning rather
+than escalating the model or effort.
 
 ## Workflow mapping
 
