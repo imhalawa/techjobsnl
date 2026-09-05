@@ -9,6 +9,56 @@ namespace TechJobsNL.Persistence.Sqlite.Tests;
 public sealed class AtomicScanPersistenceTests
 {
     [Fact]
+    [Trait("TaskId", "V0.1.0-013")]
+    public async Task VacancyLifecycle_RawChurnDoesNotSnapshotAndAppliedStateSurvivesReopen()
+    {
+        var path = TemporaryPath();
+        try
+        {
+            await using (var store = await OpenAsync(path))
+            {
+                await store.SynchronizeCompaniesAsync([Company("alpha")], TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("first", Company("alpha"), [Vacancy("one", rawPayload: "{\"page\":1}")], At(8), At(9), TestContext.Current.CancellationToken);
+                await store.ToggleAppliedAsync(new VacancyKey(new CompanyId("alpha"), new SourceId("one")), At(10), TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("raw", Company("alpha"), [Vacancy("one", rawPayload: "{\"page\":2}")], At(10), At(11), TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("closed", Company("alpha"), [], At(11), At(12), TestContext.Current.CancellationToken);
+            }
+
+            await using (var reopened = await OpenAsync(path))
+                await reopened.PersistCompleteScanAsync("reopened", Company("alpha"), [Vacancy("one", rawPayload: "{\"page\":3}")], At(12), At(13), TestContext.Current.CancellationToken);
+
+            (await ScalarAsync<long>(path, "select count(*) from job_snapshots where company_id='alpha' and source_id='one';")).Should().Be(1);
+            (await ScalarAsync<string>(path, "select raw_payload from jobs where company_id='alpha' and source_id='one';")).Should().Be("{\"page\":3}");
+            (await ScalarAsync<long>(path, "select source_open from jobs where company_id='alpha' and source_id='one';")).Should().Be(1);
+            (await ScalarAsync<long>(path, "select is_new from jobs where company_id='alpha' and source_id='one';")).Should().Be(0);
+            (await ScalarAsync<string>(path, "select first_seen_at from jobs where company_id='alpha' and source_id='one';")).Should().Be("2026-08-11T09:00:00+00:00");
+            (await ScalarAsync<string>(path, "select last_seen_at from jobs where company_id='alpha' and source_id='one';")).Should().Be("2026-08-11T13:00:00+00:00");
+            (await ScalarAsync<string>(path, "select reopened_at from jobs where company_id='alpha' and source_id='one';")).Should().Be("2026-08-11T13:00:00+00:00");
+            (await ScalarAsync<string>(path, "select applied_at from jobs where company_id='alpha' and source_id='one';")).Should().Be("2026-08-11T10:00:00+00:00");
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    [Trait("TaskId", "V0.1.0-013")]
+    public async Task PersistCompleteScanAsync_MeaningfulChange_CreatesEvidenceSnapshot()
+    {
+        var path = TemporaryPath();
+        try
+        {
+            await using (var store = await OpenAsync(path))
+            {
+                await store.SynchronizeCompaniesAsync([Company("alpha")], TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("first", Company("alpha"), [Vacancy("one")], At(8), At(9), TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("changed", Company("alpha"), [Vacancy("one", "Principal Engineer")], At(10), At(11), TestContext.Current.CancellationToken);
+            }
+
+            (await ScalarAsync<long>(path, "select count(*) from job_snapshots where company_id='alpha' and source_id='one';")).Should().Be(2);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
     [Trait("TaskId", "V0.1.0-012")]
     public async Task PersistCompleteScanAsync_ClosesOnlyMissingVacanciesForItsCompany()
     {
@@ -76,8 +126,8 @@ public sealed class AtomicScanPersistenceTests
         finally { File.Delete(path); }
     }
 
-    private static ClassifiedVacancy Vacancy(string id, string? title = null) => new(
-        new ObservedVacancy(new SourceId(id), title ?? $"Engineer {id}", null, null, null, ["Amsterdam"], ["NL"], $"https://example.test/jobs/{id}", $"https://example.test/jobs/{id}/apply", "Description", "{}", null),
+    private static ClassifiedVacancy Vacancy(string id, string? title = null, string rawPayload = "{}") => new(
+        new ObservedVacancy(new SourceId(id), title ?? $"Engineer {id}", null, null, null, ["Amsterdam"], ["NL"], $"https://example.test/jobs/{id}", $"https://example.test/jobs/{id}/apply", "Description", rawPayload, null),
         new TechJobsNL.Core.Domain.Eligibility(true, "eligible"));
     private static CompanyConfiguration Company(string id) => new(id, id, "Unknown", "Unknown", true, ImmutableDictionary<string, string>.Empty, new SourceConfiguration.Unsupported("fixture"));
     private static DateTimeOffset At(int hour) => new(2026, 8, 11, hour, 0, 0, TimeSpan.Zero);

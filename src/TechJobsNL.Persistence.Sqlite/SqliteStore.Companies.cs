@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Dapper;
 using TechJobsNL.Core.Domain;
@@ -10,6 +11,7 @@ namespace TechJobsNL.Persistence.Sqlite;
 
 public sealed partial class SqliteStore
 {
+    private static readonly JsonSerializerOptions CompatibleJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
     public async Task PersistCompleteScanAsync(string runId, CompanyConfiguration company, IReadOnlyCollection<ClassifiedVacancy> vacancies, DateTimeOffset startedAt, DateTimeOffset completedAt, CancellationToken cancellationToken)
     {
         var transaction = await _connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
@@ -24,8 +26,12 @@ public sealed partial class SqliteStore
             foreach (var vacancy in vacancies)
             {
                 var observed = vacancy.Observed;
-                var values = new { CompanyId = company.Id, SourceId = observed.SourceId.Value, observed.Title, observed.Department, observed.Team, EmploymentType = observed.EmploymentType, Locations = JsonSerializer.Serialize(observed.Locations), Countries = JsonSerializer.Serialize(observed.Countries), JobUrl = observed.JobUrl, ApplyUrl = observed.ApplyUrl, observed.Description, PublishedAt = observed.PublishedAt is null ? null : Format(observed.PublishedAt.Value), RawPayload = observed.RawPayload, ContentHash = Hash(observed), Eligible = vacancy.Eligibility.IsEligible ? 1 : 0, Reason = vacancy.Eligibility.Reason, ObservedAt = Format(completedAt) };
+                var contentHash = Hash(observed);
+                var values = new { CompanyId = company.Id, SourceId = observed.SourceId.Value, observed.Title, observed.Department, observed.Team, EmploymentType = observed.EmploymentType, Locations = JsonSerializer.Serialize(observed.Locations, CompatibleJson), Countries = JsonSerializer.Serialize(observed.Countries, CompatibleJson), JobUrl = observed.JobUrl, ApplyUrl = observed.ApplyUrl, observed.Description, PublishedAt = observed.PublishedAt is null ? null : Format(observed.PublishedAt.Value), RawPayload = observed.RawPayload, ContentHash = contentHash, Eligible = vacancy.Eligibility.IsEligible ? 1 : 0, Reason = vacancy.Eligibility.Reason, ObservedAt = Format(completedAt) };
                 await _connection.ExecuteAsync(new CommandDefinition(upsert, values, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                const string snapshot = "insert or ignore into job_snapshots (company_id, source_id, content_hash, captured_at, title, metadata_json, locations_json, job_url, apply_url, description, raw_payload) values (@CompanyId,@SourceId,@ContentHash,@CapturedAt,@Title,@Metadata,@Locations,@JobUrl,@ApplyUrl,@Description,@RawPayload);";
+                var snapshotValues = new { CompanyId = company.Id, SourceId = observed.SourceId.Value, ContentHash = contentHash, CapturedAt = Format(completedAt), observed.Title, Metadata = MetadataJson(observed), Locations = JsonSerializer.Serialize(observed.Locations, CompatibleJson), JobUrl = observed.JobUrl, ApplyUrl = observed.ApplyUrl, observed.Description, RawPayload = observed.RawPayload };
+                await _connection.ExecuteAsync(new CommandDefinition(snapshot, snapshotValues, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
             }
 
             var observedIds = vacancies.Select(static vacancy => vacancy.Observed.SourceId.Value).ToArray();
@@ -69,6 +75,13 @@ public sealed partial class SqliteStore
     public Task RecordIncompleteScanAsync(string runId, CompanyId companyId, string diagnostic, int observedCount, DateTimeOffset startedAt, DateTimeOffset completedAt, CancellationToken cancellationToken) =>
         RecordScanAsync(runId, companyId, "incomplete", observedCount, "incomplete-results", diagnostic, startedAt, completedAt, cancellationToken);
 
+    public async Task ToggleAppliedAsync(VacancyKey key, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        const string sql = "update jobs set applied_at=case when applied_at is null then @AppliedAt else null end where company_id=@CompanyId and source_id=@SourceId;";
+        var changed = await _connection.ExecuteAsync(new CommandDefinition(sql, new { CompanyId = key.CompanyId.Value, SourceId = key.SourceId.Value, AppliedAt = Format(at) }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        if (changed == 0) throw new KeyNotFoundException($"Vacancy {key.CompanyId.Value}/{key.SourceId.Value} does not exist.");
+    }
+
     public async Task<IReadOnlyList<SourceHealthRecord>> GetSourceHealthAsync(CancellationToken cancellationToken)
     {
         const string sql = "select id Id, name Name, cast(enabled as integer) Enabled, latest_attempted_at LatestAttemptedAt, latest_successful_at LatestSuccessfulAt, health Health, latest_error_kind LatestErrorKind, latest_diagnostic LatestDiagnostic from companies order by name collate nocase, id;";
@@ -101,13 +114,24 @@ public sealed partial class SqliteStore
         finally { await transaction.DisposeAsync().ConfigureAwait(false); }
     }
 
-    private static string Format(DateTimeOffset value) => value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+    private static string Format(DateTimeOffset value) => value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture);
     private static DateTimeOffset ParseRequired(string value) => DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
     private static DateTimeOffset? ParseTime(string? value) => value is null ? null : ParseRequired(value);
     private static SourceHealth ParseHealth(string value) => value switch { "unknown" => SourceHealth.Unknown, "healthy" or "complete" => SourceHealth.Healthy, "incomplete" => SourceHealth.Incomplete, "failed" => SourceHealth.Failed, _ => throw new InvalidDataException($"Unknown source health '{value}'.") };
     private static SourceErrorKind? ParseError(string? value) => value switch { null => null, "configuration" => SourceErrorKind.Configuration, "transport" => SourceErrorKind.Transport, "timeout" => SourceErrorKind.Timeout, "rate-limit" => SourceErrorKind.RateLimit, "schema" => SourceErrorKind.Schema, "incomplete-results" => SourceErrorKind.IncompleteResults, "browser" => SourceErrorKind.Browser, "storage" => SourceErrorKind.Storage, _ => throw new InvalidDataException($"Unknown source error kind '{value}'.") };
     private static string ErrorText(SourceErrorKind value) => value switch { SourceErrorKind.Configuration => "configuration", SourceErrorKind.Transport => "transport", SourceErrorKind.Timeout => "timeout", SourceErrorKind.RateLimit => "rate-limit", SourceErrorKind.Schema => "schema", SourceErrorKind.IncompleteResults => "incomplete-results", SourceErrorKind.Browser => "browser", SourceErrorKind.Storage => "storage", _ => throw new ArgumentOutOfRangeException(nameof(value)) };
-    private static string Hash(ObservedVacancy vacancy) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', vacancy.Title, vacancy.Department, vacancy.Team, vacancy.EmploymentType, string.Join('|', vacancy.Locations), vacancy.JobUrl, vacancy.ApplyUrl, vacancy.Description))));
+    private static string Hash(ObservedVacancy vacancy) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(MeaningfulJson(vacancy))));
+    private static string MeaningfulJson(ObservedVacancy vacancy)
+    {
+        var locations = vacancy.Locations.Select(Normalize).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var value = new { title = Normalize(vacancy.Title), metadata = Metadata(vacancy), locations, job_url = vacancy.JobUrl.Trim(), apply_url = vacancy.ApplyUrl.Trim(), description = Normalize(vacancy.Description) };
+        return JsonSerializer.Serialize(value, CompatibleJson);
+    }
+
+    private static string MetadataJson(ObservedVacancy vacancy) => JsonSerializer.Serialize(Metadata(vacancy), CompatibleJson);
+    private static object Metadata(ObservedVacancy vacancy) => new { department = NormalizeOrNull(vacancy.Department), team = NormalizeOrNull(vacancy.Team), employment_type = NormalizeOrNull(vacancy.EmploymentType), countries = vacancy.Countries.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), published_at = vacancy.PublishedAt is null ? null : Format(vacancy.PublishedAt.Value) };
+    private static string Normalize(string value) => value.Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
+    private static string? NormalizeOrNull(string? value) => value is null ? null : Normalize(value);
 
     private sealed record CompanyRow(string Id, string Name, long Enabled, string? LatestAttemptedAt, string? LatestSuccessfulAt, string Health, string? LatestErrorKind, string? LatestDiagnostic);
     private sealed record ScanRow(string RunId, string CompanyId, string CompanyName, string StartedAt, string CompletedAt, string Outcome, long ObservedCount, string? ErrorKind, string? Diagnostic);
