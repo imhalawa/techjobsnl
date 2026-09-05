@@ -75,11 +75,13 @@ public sealed partial class SqliteStore
     public Task RecordIncompleteScanAsync(string runId, CompanyId companyId, string diagnostic, int observedCount, DateTimeOffset startedAt, DateTimeOffset completedAt, CancellationToken cancellationToken) =>
         RecordScanAsync(runId, companyId, "incomplete", observedCount, "incomplete-results", diagnostic, startedAt, completedAt, cancellationToken);
 
-    public async Task ToggleAppliedAsync(VacancyKey key, DateTimeOffset at, CancellationToken cancellationToken)
+    public async Task<AppliedToggleResult> ToggleAppliedAsync(VacancyKey key, DateTimeOffset at, CancellationToken cancellationToken)
     {
-        const string sql = "update jobs set applied_at=case when applied_at is null then @AppliedAt else null end where company_id=@CompanyId and source_id=@SourceId;";
-        var changed = await _connection.ExecuteAsync(new CommandDefinition(sql, new { CompanyId = key.CompanyId.Value, SourceId = key.SourceId.Value, AppliedAt = Format(at) }, cancellationToken: cancellationToken)).ConfigureAwait(false);
-        if (changed == 0) throw new KeyNotFoundException($"Vacancy {key.CompanyId.Value}/{key.SourceId.Value} does not exist.");
+        const string sql = "update jobs set applied_at=case when applied_at is null then @AppliedAt else null end where company_id=@CompanyId and source_id=@SourceId returning 1 as Found, applied_at AppliedAt;";
+        var row = await _connection.QuerySingleOrDefaultAsync<ActionRow>(new CommandDefinition(sql, new { CompanyId = key.CompanyId.Value, SourceId = key.SourceId.Value, AppliedAt = Format(at) }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        if (row is null) throw new KeyNotFoundException($"Vacancy {key.CompanyId.Value}/{key.SourceId.Value} does not exist.");
+        var appliedAt = ParseTime(row.AppliedAt);
+        return new AppliedToggleResult(key, appliedAt is not null, appliedAt);
     }
 
     public async Task<IReadOnlyList<SourceHealthRecord>> GetSourceHealthAsync(CancellationToken cancellationToken)
@@ -135,4 +137,5 @@ public sealed partial class SqliteStore
 
     private sealed record CompanyRow(string Id, string Name, long Enabled, string? LatestAttemptedAt, string? LatestSuccessfulAt, string Health, string? LatestErrorKind, string? LatestDiagnostic);
     private sealed record ScanRow(string RunId, string CompanyId, string CompanyName, string StartedAt, string CompletedAt, string Outcome, long ObservedCount, string? ErrorKind, string? Diagnostic);
+    private sealed record ActionRow(long Found, string? AppliedAt);
 }

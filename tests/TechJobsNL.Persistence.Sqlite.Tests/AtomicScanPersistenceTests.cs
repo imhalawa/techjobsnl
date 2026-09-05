@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
+using System.Text.Json.Nodes;
 using TechJobsNL.Core.Domain;
 using TechJobsNL.Core.Domain.Configuration;
 
@@ -8,6 +9,65 @@ namespace TechJobsNL.Persistence.Sqlite.Tests;
 
 public sealed class AtomicScanPersistenceTests
 {
+    [Fact]
+    [Trait("TaskId", "V0.1.0-016")]
+    public async Task AppliedAndSavedToggles_ReturnCanonicalStateAndSurviveRestart()
+    {
+        var path = TemporaryPath();
+        try
+        {
+            var key = new VacancyKey(new CompanyId("alpha"), new SourceId("one"));
+            await using (var store = await OpenAsync(path))
+            {
+                await store.SynchronizeCompaniesAsync([Company("alpha")], TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("first", Company("alpha"), [Vacancy("one")], At(8), At(9), TestContext.Current.CancellationToken);
+                (await store.ToggleAppliedAsync(key, At(10), TestContext.Current.CancellationToken)).Should().Be(new AppliedToggleResult(key, true, At(10)));
+                (await store.ToggleSavedVacancyAsync(key, TestContext.Current.CancellationToken)).Should().Be(new SavedVacancyToggleResult(key, true));
+            }
+
+            await using var reopened = await OpenAsync(path);
+            (await reopened.GetAllVacanciesAsync(TestContext.Current.CancellationToken)).Single().AppliedAt.Should().Be(At(10));
+            var library = JsonNode.Parse((await reopened.GetLibraryJsonAsync(TestContext.Current.CancellationToken))!)!.AsObject();
+            library["jobs"]!.AsArray().Should().ContainSingle();
+            (await reopened.ToggleAppliedAsync(key, At(11), TestContext.Current.CancellationToken)).IsApplied.Should().BeFalse();
+            (await reopened.ToggleSavedVacancyAsync(key, TestContext.Current.CancellationToken)).IsSaved.Should().BeFalse();
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    [Trait("TaskId", "V0.1.0-016")]
+    public async Task ToggleSavedVacancyAsync_PreservesDeferredLibraryAndFiltersWithoutOrphans()
+    {
+        var path = TemporaryPath();
+        const string libraryFixture = "{\"jobs\":[],\"skills\":{\"csharp\":\"mastered\"},\"stacks\":[\"dotnet\"],\"roles\":{\"backend\":true},\"companies\":[\"alpha\"],\"suggestions\":[{\"name\":\"rust\"}],\"future\":{\"retained\":true}}";
+        try
+        {
+            await using (var store = await OpenAsync(path))
+            {
+                await store.SynchronizeCompaniesAsync([Company("alpha")], TestContext.Current.CancellationToken);
+                await store.PersistCompleteScanAsync("first", Company("alpha"), [Vacancy("one")], At(8), At(9), TestContext.Current.CancellationToken);
+            }
+            await ExecuteAsync(path, $"insert into analytics_state(id,filters_json,library_json) values(1,'{{\"countries\":[\"NL\"]}}','{libraryFixture}');");
+            await using (var store = await OpenAsync(path))
+            {
+                await store.ToggleSavedVacancyAsync(new VacancyKey(new CompanyId("alpha"), new SourceId("one")), TestContext.Current.CancellationToken);
+                var action = () => store.ToggleSavedVacancyAsync(new VacancyKey(new CompanyId("alpha"), new SourceId("missing")), TestContext.Current.CancellationToken);
+                await action.Should().ThrowAsync<KeyNotFoundException>();
+                var library = JsonNode.Parse((await store.GetLibraryJsonAsync(TestContext.Current.CancellationToken))!)!.AsObject();
+                library["skills"]!["csharp"]!.GetValue<string>().Should().Be("mastered");
+                library["stacks"]!.AsArray().Single()!.GetValue<string>().Should().Be("dotnet");
+                library["roles"]!["backend"]!.GetValue<bool>().Should().BeTrue();
+                library["companies"]!.AsArray().Single()!.GetValue<string>().Should().Be("alpha");
+                library["suggestions"]!.AsArray().Should().ContainSingle();
+                library["future"]!["retained"]!.GetValue<bool>().Should().BeTrue();
+                library["jobs"]!.AsArray().Should().ContainSingle();
+            }
+            (await ScalarAsync<string>(path, "select filters_json from analytics_state where id=1;")).Should().Be("{\"countries\":[\"NL\"]}");
+        }
+        finally { File.Delete(path); }
+    }
+
     [Fact]
     [Trait("TaskId", "V0.1.0-015")]
     public async Task VacancySnapshotEvidence_AfterRestart_ReproducesMeaningfulFeedInputs()
