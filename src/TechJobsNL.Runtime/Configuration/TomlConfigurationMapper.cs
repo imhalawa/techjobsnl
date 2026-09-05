@@ -86,5 +86,3 @@ internal static class TomlConfigurationMapper
     private static ImmutableArray<string> Strings(TomlTable table, string key) => Array(table, key).Cast<string>().ToImmutableArray();
     private static AnalyticsProvider Provider(string value) => value switch { "local" => AnalyticsProvider.Local, "claude" => AnalyticsProvider.Claude, "codex" => AnalyticsProvider.Codex, _ => throw new InvalidOperationException($"Unknown analytics provider '{value}'.") };
 }
-
-
