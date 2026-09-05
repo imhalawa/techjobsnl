@@ -1,8 +1,10 @@
+using Avalonia;
+
 namespace TechJobsNL.App;
 
 internal static class Program
 {
-    private static void Main()
-    {
-    }
+    [STAThread]
+    private static void Main(string[] args) =>
+        AppBuilder.Configure<DesktopApplication>().UsePlatformDetect().StartWithClassicDesktopLifetime(args);
 }

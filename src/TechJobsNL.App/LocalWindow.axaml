@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:b="using:TechJobsNL.App.Browsing"
+        xmlns:v="clr-namespace:TechJobsNL.Core.Vacancies;assembly=TechJobsNL.Core"
+        x:Class="TechJobsNL.App.LocalWindow" x:DataType="b:LocalWindowViewModel"
+        Title="TechJobsNL" Width="1000" Height="700" MinWidth="560" MinHeight="400"
+        WindowStartupLocation="CenterScreen">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="24">
+    <StackPanel Spacing="8" Margin="0,0,0,24">
+      <TextBlock Text="Vacancies" FontSize="28" FontWeight="SemiBold" />
+      <TextBlock Text="Browse vacancies retained on this device." TextWrapping="Wrap" />
+    </StackPanel>
+    <ProgressBar Grid.Row="1" IsIndeterminate="True" IsVisible="{Binding State.IsLoading}" Margin="0,0,0,16" />
+    <Grid Grid.Row="2">
+      <TextBlock x:Name="StateMessage" Text="{Binding State.Message}" TextWrapping="Wrap"
+                 IsVisible="{Binding !State.HasVacancies}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+      <ListBox x:Name="VacancyList" ItemsSource="{Binding State.Vacancies}" IsVisible="{Binding State.HasVacancies}"
+               AutomationProperties.Name="Retained vacancies">
+        <ListBox.Styles>
+          <Style Selector="ListBoxItem" x:DataType="v:RetainedVacancy">
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
+            <Setter Property="AutomationProperties.HelpText" Value="{Binding CompanyName}" />
+          </Style>
+          <Style Selector="ListBoxItem:focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+          </Style>
+        </ListBox.Styles>
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="v:RetainedVacancy">
+            <StackPanel Spacing="4" Margin="8,10">
+              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding CompanyName}" TextWrapping="Wrap" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Grid>
+    <TextBlock Grid.Row="3" Text="Local data · available offline" Margin="0,16,0,0" FontSize="12" />
+  </Grid>
+</Window>

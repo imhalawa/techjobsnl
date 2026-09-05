@@ -12,6 +12,53 @@ namespace TechJobsNL.Runtime.Browsing;
 /// <summary>Composes local configuration, compatible SQLite reads, and Core browsing without providers.</summary>
 public static class LocalBrowsingRuntime
 {
+    /// <summary>Opens the compatible per-user location, installing defaults only on first launch.</summary>
+    public static async Task<LocalBrowsingOpenResult> OpenDefaultAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var platform = OperatingSystem.IsWindows() ? OperatingSystemKind.Windows
+                : OperatingSystem.IsMacOS() ? OperatingSystemKind.MacOs : OperatingSystemKind.Linux;
+            var path = ConfigurationPaths.GetConfigurationPath(platform,
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                Environment.GetEnvironmentVariable("XDG_CONFIG_HOME"),
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+            return await CreateAndOpenAsync(path, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return new LocalBrowsingOpenResult.Failed(LocalBrowsingFailureKind.Configuration,
+                "The local settings folder is unavailable. Check that your user profile is accessible.", null);
+        }
+    }
+
+    /// <summary>Installs compatible defaults without overwriting existing settings, then opens local data.</summary>
+    public static async Task<LocalBrowsingOpenResult> CreateAndOpenAsync(string configurationPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var stream = typeof(LocalBrowsingRuntime).Assembly.GetManifestResourceStream("TechJobsNL.DefaultConfiguration.toml")
+                ?? throw new InvalidOperationException("Shipped configuration is unavailable.");
+            using var reader = new StreamReader(stream);
+            var defaults = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+            await TomlConfigurationFile.EnsureCreatedAsync(configurationPath, defaults, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return new LocalBrowsingOpenResult.Failed(LocalBrowsingFailureKind.Configuration,
+                "The local settings could not be created. Check that the settings folder is writable.", null);
+        }
+        return await OpenAsync(configurationPath, cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Loads a snapshot off the presentation thread and closes all database handles before returning.</summary>
     public static Task<LocalBrowsingOpenResult> OpenAsync(string configurationPath, CancellationToken cancellationToken) =>
         Task.Run(() => OpenLocalAsync(configurationPath, cancellationToken), cancellationToken);

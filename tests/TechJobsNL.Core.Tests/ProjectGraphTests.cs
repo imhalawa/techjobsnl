@@ -113,12 +113,26 @@ public sealed class ProjectGraphTests
     }
 
     [Fact]
-    [Trait("TaskId", "V0.1.0-001")]
-    public void ProjectGraph_Clients_AreEmptyExecutableShells()
+    [Trait("TaskId", "V0.1.0-077")]
+    public void ProjectGraph_Desktop_UsesRuntimeWithoutOwningDatabaseOrProviders()
     {
         var repositoryRoot = FindRepositoryRoot();
-
-        AssertEmptyShell(repositoryRoot, "TechJobsNL.App");
+        var projectDirectory = Path.Combine(repositoryRoot.FullName, "src", "TechJobsNL.App");
+        var project = XDocument.Load(Path.Combine(projectDirectory, "TechJobsNL.App.csproj"));
+        Assert.Equal("WinExe", project.Root?.Element("PropertyGroup")?.Element("OutputType")?.Value);
+        var startup = File.ReadAllText(Path.Combine(projectDirectory, "Program.cs"));
+        Assert.Contains("[STAThread]", startup, StringComparison.Ordinal);
+        Assert.Contains("StartWithClassicDesktopLifetime", startup, StringComparison.Ordinal);
+        foreach (var source in Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
+                     .Where(path => !Path.GetRelativePath(projectDirectory, path).Split(Path.DirectorySeparatorChar)
+                         .Any(part => part is "bin" or "obj")))
+        {
+            var text = File.ReadAllText(source);
+            Assert.DoesNotContain("TechJobsNL.Persistence", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("TechJobsNL.Adapters", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("SqliteConnection", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("HttpClient", text, StringComparison.Ordinal);
+        }
     }
 
     private static DirectoryInfo FindRepositoryRoot()
@@ -138,16 +152,4 @@ public sealed class ProjectGraphTests
         throw new DirectoryNotFoundException("Could not find the repository root.");
     }
 
-    private static void AssertEmptyShell(DirectoryInfo repositoryRoot, string projectName)
-    {
-        var projectDirectory = Path.Combine(repositoryRoot.FullName, "src", projectName);
-        var sourceFiles = Directory.GetFiles(projectDirectory, "*.cs", SearchOption.TopDirectoryOnly)
-            .Select(filePath => Path.GetFileName(filePath) ?? string.Empty)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-        var project = XDocument.Load(Path.Combine(projectDirectory, $"{projectName}.csproj"));
-
-        Assert.Equal(["Program.cs"], sourceFiles);
-        Assert.Equal("Exe", project.Root?.Element("PropertyGroup")?.Element("OutputType")?.Value);
-    }
 }

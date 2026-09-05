@@ -1,10 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AssemblyName>TechJobsNL.App</AssemblyName>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <RootNamespace>TechJobsNL.App</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
     <ProjectReference Include="../TechJobsNL.Runtime/TechJobsNL.Runtime.csproj" />
   </ItemGroup>
 </Project>

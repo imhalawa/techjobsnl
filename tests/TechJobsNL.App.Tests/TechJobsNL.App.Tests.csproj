@@ -5,6 +5,7 @@
     <RootNamespace>TechJobsNL.App.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Avalonia.Headless.XUnit" />
     <PackageReference Include="AutoFixture" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

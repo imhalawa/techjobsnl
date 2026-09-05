@@ -5,6 +5,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageVersion Include="Avalonia" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.1.2" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="AutoFixture" Version="4.18.1" />
     <PackageVersion Include="Dapper" Version="2.1.66" />
     <PackageVersion Include="FluentAssertions" Version="7.2.0" />

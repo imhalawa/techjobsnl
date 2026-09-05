@@ -4,6 +4,7 @@
     <RootNamespace>TechJobsNL.Runtime</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../../archive/rust/config.toml" LogicalName="TechJobsNL.DefaultConfiguration.toml" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Tomlyn" />
     <ProjectReference Include="../TechJobsNL.Adapters.Providers/TechJobsNL.Adapters.Providers.csproj" />

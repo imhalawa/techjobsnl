@@ -17,6 +17,33 @@ namespace TechJobsNL.Runtime.Tests;
 public sealed class LocalBrowsingTests
 {
     [Fact]
+    [Trait("TaskId", "V0.1.0-077")]
+    public async Task CreateAndOpenAsync_FreshInstall_CreatesCompatibleDefaultsAndPreservesThemOnReopen()
+    {
+        var directory = Directory.CreateTempSubdirectory("techjobsnl-first-launch-");
+        try
+        {
+            var path = Path.Combine(directory.FullName, "config.toml");
+            var opened = (await LocalBrowsingRuntime.CreateAndOpenAsync(path, Token))
+                .Should().BeOfType<LocalBrowsingOpenResult.Opened>().Which;
+            await using (var session = opened.Session)
+            {
+                (await BrowseAsync(session, "")).Should().BeEmpty();
+            }
+            var customized = (await File.ReadAllTextAsync(path, Token)) + "\n# Retained user choices\n";
+            await File.WriteAllTextAsync(path, customized, Token);
+            var reopened = (await LocalBrowsingRuntime.CreateAndOpenAsync(path, Token))
+                .Should().BeOfType<LocalBrowsingOpenResult.Opened>().Which;
+            await reopened.Session.DisposeAsync();
+            (await File.ReadAllTextAsync(path, Token)).Should().Be(customized);
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
+    }
+
+    [Fact]
     public async Task OpenAndQuery_CancelledRequests_PreserveDataAndPropagateCancellation()
     {
         await using var fixture = await LocalFixture.CreateAsync();
