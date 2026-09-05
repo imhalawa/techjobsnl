@@ -12,7 +12,15 @@ public sealed class ProjectGraphTests
         var expectedReferences = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["src/TechJobsNL.Core/TechJobsNL.Core.csproj"] = [],
-            ["src/TechJobsNL.Runtime/TechJobsNL.Runtime.csproj"] = ["../TechJobsNL.Core/TechJobsNL.Core.csproj"],
+            ["src/TechJobsNL.Runtime/TechJobsNL.Runtime.csproj"] =
+            [
+                "../TechJobsNL.Adapters.AiExperience.DeepSeek/TechJobsNL.Adapters.AiExperience.DeepSeek.csproj",
+                "../TechJobsNL.Adapters.Analytics.Local/TechJobsNL.Adapters.Analytics.Local.csproj",
+                "../TechJobsNL.Adapters.Platform/TechJobsNL.Adapters.Platform.csproj",
+                "../TechJobsNL.Adapters.Providers/TechJobsNL.Adapters.Providers.csproj",
+                "../TechJobsNL.Core/TechJobsNL.Core.csproj",
+                "../TechJobsNL.Persistence.Sqlite/TechJobsNL.Persistence.Sqlite.csproj"
+            ],
             ["src/TechJobsNL.App/TechJobsNL.App.csproj"] = ["../TechJobsNL.Runtime/TechJobsNL.Runtime.csproj"],
             ["src/TechJobsNL.Tui/TechJobsNL.Tui.csproj"] = ["../TechJobsNL.Runtime/TechJobsNL.Runtime.csproj"],
             ["src/TechJobsNL.Adapters.Providers/TechJobsNL.Adapters.Providers.csproj"] = ["../TechJobsNL.Core/TechJobsNL.Core.csproj"],
