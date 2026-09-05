@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using FluentAssertions;
 using TechJobsNL.Core.Domain;
 
@@ -13,7 +14,7 @@ public sealed class VacancyAndScanModelTests
     {
         var publishedAt = new DateTimeOffset(2026, 9, 5, 8, 30, 0, TimeSpan.Zero);
         var observation = new ObservedVacancy(
-            "ats-42",
+            new SourceId("ats-42"),
             "Platform Engineer",
             "Engineering",
             "Developer Experience",
@@ -27,7 +28,7 @@ public sealed class VacancyAndScanModelTests
             publishedAt);
         var classified = new ClassifiedVacancy(observation, new Eligibility(true, "eligible"));
         var record = new VacancyRecord(
-            new VacancyKey("example", observation.SourceId),
+            new VacancyKey(new CompanyId("example"), observation.SourceId),
             classified,
             true,
             true,
@@ -37,7 +38,7 @@ public sealed class VacancyAndScanModelTests
             null,
             publishedAt.AddHours(1));
 
-        record.Key.Should().Be(new VacancyKey("example", "ats-42"));
+        record.Key.Should().Be(new VacancyKey(new CompanyId("example"), new SourceId("ats-42")));
         record.Classified.Observed.Locations.Should().Equal("Amsterdam", "Remote");
         record.Classified.Observed.Countries.Should().Equal("NL");
         record.Classified.Observed.RawPayload.Should().Be("{\"id\":\"ats-42\"}");
@@ -85,20 +86,81 @@ public sealed class VacancyAndScanModelTests
     [Fact]
     [Trait("TaskId", "V0.1.0-003")]
     [Trait("Category", "Unit")]
+    public void IdentityBoundaries_DefaultOrWhitespaceIdentifiers_RejectTheValue()
+    {
+        Action whitespaceCompanyId = () => _ = new CompanyId(" ");
+        Action whitespaceSourceId = () => _ = new SourceId(" ");
+        Action defaultVacancyKey = () => _ = new VacancyKey(default, new SourceId("ats-42"));
+        Action defaultObservation = () => _ = new ObservedVacancy(
+            default,
+            "Platform Engineer",
+            null,
+            null,
+            null,
+            ImmutableArray<string>.Empty,
+            ImmutableArray<string>.Empty,
+            "https://careers.example.test/jobs/ats-42",
+            "https://careers.example.test/jobs/ats-42/apply",
+            "Build reliable platforms.",
+            "{\"id\":\"ats-42\"}",
+            null);
+
+        whitespaceCompanyId.Should().Throw<ArgumentException>();
+        whitespaceSourceId.Should().Throw<ArgumentException>();
+        defaultVacancyKey.Should().Throw<ArgumentException>();
+        defaultObservation.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    [Trait("TaskId", "V0.1.0-003")]
+    [Trait("Category", "Unit")]
+    public void PublicDomainModels_GetOnlyProperties_PreventWithBypasses()
+    {
+        Type[] models =
+        [
+            typeof(VacancyKey),
+            typeof(ObservedVacancy),
+            typeof(ClassifiedVacancy),
+            typeof(Eligibility),
+            typeof(VacancyRecord),
+            typeof(SourceScan.Complete),
+            typeof(SourceScan.Incomplete),
+            typeof(ScanFailure),
+            typeof(RunStarted),
+            typeof(CompanyStarted),
+            typeof(CompanyCompleted),
+            typeof(CompanyFailed),
+            typeof(CompanyIncomplete),
+            typeof(RunFinished),
+            typeof(Started),
+            typeof(Completed),
+            typeof(Failed)
+        ];
+
+        foreach (var model in models)
+        {
+            model.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Should().OnlyContain(property => !property.CanWrite, model.FullName);
+        }
+    }
+
+    [Fact]
+    [Trait("TaskId", "V0.1.0-003")]
+    [Trait("Category", "Unit")]
     public void ScanEvent_ExhaustivelyPreservesRunCompanyAndLegacySourceProgress()
     {
         var sourceScan = new SourceScan.Complete([Observation()]);
         ScanEvent[] events =
         [
             new RunStarted("run-7", 2),
-            new CompanyStarted("example"),
-            new CompanyCompleted("example", 3, 2),
-            new CompanyFailed("broken", SourceErrorKind.Transport, "Connection reset."),
-            new CompanyIncomplete("partial", "Missing page two.", 1),
+            new CompanyStarted(new CompanyId("example")),
+            new CompanyCompleted(new CompanyId("example"), 3, 2),
+            new CompanyFailed(new CompanyId("broken"), SourceErrorKind.Transport, "Connection reset."),
+            new CompanyIncomplete(new CompanyId("partial"), "Missing page two.", 1),
             new RunFinished("run-7", 1, 1, 1),
-            new Started("example"),
-            new Completed("example", sourceScan),
-            new Failed("broken", SourceErrorKind.Storage, "Transaction failed.")
+            new Started(new CompanyId("example")),
+            new Completed(new CompanyId("example"), sourceScan),
+            new Failed(new CompanyId("broken"), SourceErrorKind.Storage, "Transaction failed.")
         ];
 
         events.Select(@event => @event.GetType()).Should().Equal(
@@ -116,7 +178,7 @@ public sealed class VacancyAndScanModelTests
     }
 
     private static ObservedVacancy Observation() => new(
-        "ats-42",
+        new SourceId("ats-42"),
         "Platform Engineer",
         null,
         null,

@@ -6,8 +6,32 @@ namespace TechJobsNL.Core.Domain;
 public abstract record SourceScan
 {
     /// <summary>Reports a source result that is safe to use for vacancy lifecycle updates.</summary>
-    public sealed record Complete(ImmutableArray<ObservedVacancy> Observations) : SourceScan;
+    public sealed record Complete : SourceScan
+    {
+        /// <summary>Initializes a complete source result.</summary>
+        public Complete(ImmutableArray<ObservedVacancy> observations)
+        {
+            Observations = observations;
+        }
+
+        /// <summary>Gets all observed Vacancies.</summary>
+        public ImmutableArray<ObservedVacancy> Observations { get; }
+    }
 
     /// <summary>Reports observations that cannot safely be treated as a complete source result.</summary>
-    public sealed record Incomplete(ImmutableArray<ObservedVacancy> Observations, string Diagnostic) : SourceScan;
+    public sealed record Incomplete : SourceScan
+    {
+        /// <summary>Initializes an incomplete source result.</summary>
+        public Incomplete(ImmutableArray<ObservedVacancy> observations, string diagnostic)
+        {
+            Observations = observations;
+            Diagnostic = diagnostic;
+        }
+
+        /// <summary>Gets all observed Vacancies.</summary>
+        public ImmutableArray<ObservedVacancy> Observations { get; }
+
+        /// <summary>Gets the incomplete-result diagnostic.</summary>
+        public string Diagnostic { get; }
+    }
 }
