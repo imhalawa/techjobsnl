@@ -4,5 +4,6 @@
 **/obj/
 .vs/
 target/
+artifacts/
 *.suo
 *.user
