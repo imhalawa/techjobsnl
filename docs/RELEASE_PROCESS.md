@@ -30,8 +30,9 @@ Lifecycle is Draft, Planned, Current, Shipped, or Superseded. Exactly zero or on
 Project fields own lifecycle; avoid duplicating mutable status in bodies. A release delivers one useful journey,
 normally through two to four new short tasks. Integrated foundations are credited rather than reimplemented.
 
-Detail Current-release tasks only. Keep near-future releases as outcome sketches and distant requirements in
-traceable delivery sketches. Every original requirement remains owned, including non-AC scope and evidence.
+Keep unfinished task cards visible and assign each to a visible release record. Future tasks may stay Draft;
+prepare their concise execution packets when selected. Every requirement needs a task owner, including non-AC
+scope and evidence. Roadmap prose and audit ledgers are indexes, not replacements for task ownership.
 Split a broad release into smaller journeys rather than deleting requirements to meet a task-count target.
 
 A task becomes Ready when its release is Planned or Current, dependencies are integrated, applicable design
@@ -40,8 +41,9 @@ Prototype approval is required where an inherited obligation or unresolved inter
 use `docs/design-system/prototypes.md`. Core-wide completion is not a universal prerequisite for presentation.
 
 Declare platform coverage per release. Interim subsets do not waive eventual Windows/Linux/macOS commitments.
-Retain original private records and map every transferred obligation before archiving unstarted work. Superseded
-does not mean delivered. Completed evidence and Active task contracts remain intact.
+Archive unfinished work only after visible replacement tasks own every transferred obligation and acceptance
+criterion. Otherwise keep the original task visible as Draft. Superseded does not mean delivered. Completed
+evidence and Active task contracts remain intact.
 
 ## Shipping
 

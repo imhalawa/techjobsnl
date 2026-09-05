@@ -31,8 +31,9 @@ record and map it to a destination; split broad criteria into verifiable sub-obl
 The packet includes the exact inherited obligations it executes. Executors need not open the whole legacy task.
 Non-AC scope, commands, artifacts, invariants, and review duties also need an owner; an AC-only mapping is insufficient.
 
-Detail only Current-release work. Future release sketches retain source references and requirements without
-speculative task decomposition. Split multiple useful outcomes, multiple new source strategies, or unresolved
+Prepare detailed execution packets for Current-release work. Keep future task owners visible as Draft under
+visible release records, with their existing requirements and criteria intact. Split multiple useful outcomes,
+multiple new source strategies, or unresolved
 design decisions. A short investigation answers one named unknown and produces a decision or repro.
 
 Draft: scope/evidence not ready. Ready: concrete dependencies integrated and checks specified. Active: owned.

@@ -3,6 +3,9 @@
 The private Project owns the queue. `docs/RELEASE_PROCESS.md` owns release gates;
 `docs/ISSUE_TEMPLATE.md` owns task shape. This replaces the sequential migration orchestrator.
 
+Every unfinished requirement has a visible task and owning release. Draft means not yet executable, not hidden.
+Archive unfinished records only after visible replacements take ownership of all scope and acceptance criteria.
+
 1. Read `AGENTS.md`, the assigned packet, and its exact context pointers. Load the Current release promise once.
    Reuse already-read context. Fetch dependency states and commit hashes, not their complete task bodies.
 2. Verify the task is Ready in the Current release and dependency commits are integrated into `era`.
